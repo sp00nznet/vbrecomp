@@ -582,12 +582,17 @@ typedef struct {
 } label_set_t;
 
 static void label_set_add(label_set_t *ls, uint32_t addr) {
+    /* Cap at 4096 labels per function */
+    if (ls->count >= 4096) return;
     for (int i = 0; i < ls->count; i++) {
         if (ls->addrs[i] == addr) return;
     }
     if (ls->count >= ls->cap) {
-        ls->cap *= 2;
-        ls->addrs = realloc(ls->addrs, ls->cap * sizeof(uint32_t));
+        ls->cap = ls->cap * 2;
+        if (ls->cap > 4096) ls->cap = 4096;
+        uint32_t *new_addrs = realloc(ls->addrs, ls->cap * sizeof(uint32_t));
+        if (!new_addrs) return;
+        ls->addrs = new_addrs;
     }
     ls->addrs[ls->count++] = addr;
 }
@@ -610,8 +615,27 @@ static uint32_t resolve_addr(v810_ctx_t *ctx, uint32_t addr) {
 /* Emit one function */
 static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     v810_func_t *func = &ctx->funcs[func_idx];
+
+    /* Bounds check */
+    if (func->addr < ctx->rom_base || func->addr >= ROM_REGION_END) return;
+    if (func->end_addr < ctx->rom_base || func->end_addr > ROM_REGION_END) return;
+
     uint32_t start_off = resolve_addr(ctx, func->addr);
     uint32_t end_off = resolve_addr(ctx, func->end_addr);
+
+    if (start_off >= ctx->rom_size || end_off > ctx->rom_size) return;
+    if (start_off >= end_off) return;
+
+    /* Only emit functions confirmed reachable from known entry points */
+    if (!func->confirmed) return;
+
+    /* Cap function size to avoid pathological cases from false JAL targets */
+    uint32_t func_size = end_off - start_off;
+    if (func_size > 0x10000) { /* 64KB max */
+        fprintf(stderr, "  warning: func_%08X is %u bytes, capping at 64KB\n",
+                func->addr, func_size);
+        end_off = start_off + 0x10000;
+    }
 
     /* First pass: collect all branch targets for labels */
     label_set_t labels = { .addrs = malloc(256 * sizeof(uint32_t)), .count = 0, .cap = 256 };
@@ -647,6 +671,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
 
     /* Second pass: emit code */
     off = start_off;
+    int insn_count = 0;
     while (off < end_off && off < ctx->rom_size) {
         v810_insn_t insn;
         if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
@@ -663,6 +688,13 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
 
         emit_insn(ctx, out, &insn);
         off += insn.size;
+        insn_count++;
+
+        /* Safety: cap at 10000 instructions per function */
+        if (insn_count > 10000) {
+            fprintf(out, "    /* TRUNCATED: too many instructions */\n");
+            break;
+        }
     }
 
     fprintf(out, "}\n");
@@ -678,8 +710,9 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "#include <string.h>\n");
     fprintf(out, "#include <math.h>\n\n");
 
-    /* Forward declarations */
+    /* Forward declarations (confirmed functions only) */
     for (int i = 0; i < ctx->num_funcs; i++) {
+        if (!ctx->funcs[i].confirmed) continue;
         fprintf(out, "void vb_func_%08X(void);\n", ctx->funcs[i].addr);
     }
     fprintf(out, "\n");
@@ -688,6 +721,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     for (int i = 0; i < ctx->num_funcs; i++) {
         emit_function(ctx, out, i);
     }
+    fprintf(stderr, "\n");
 }
 
 void v810_emit_header(v810_ctx_t *ctx, FILE *out) {
@@ -698,6 +732,7 @@ void v810_emit_header(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "#define VB_RECOMP_FUNCS_H\n\n");
 
     for (int i = 0; i < ctx->num_funcs; i++) {
+        if (!ctx->funcs[i].confirmed) continue;
         fprintf(out, "void vb_func_%08X(void);\n", ctx->funcs[i].addr);
     }
 

@@ -246,16 +246,28 @@ int main(int argc, char **argv) {
     /* Find entry point */
     uint32_t entry = find_entry_point(rom, rom_size, ctx.rom_base);
     printf("Entry point: 0x%08X (ROM offset 0x%06X)\n\n", entry, entry - ctx.rom_base);
-    v810_ctx_add_func(&ctx, entry, false, -1);
+    {
+        int idx = v810_ctx_add_func(&ctx, entry, false, -1);
+        if (idx >= 0) ctx.funcs[idx].confirmed = true;
+    }
 
     /* Find interrupt handlers */
     printf("Interrupt handlers:\n");
     find_interrupt_handlers(&ctx);
+    /* Mark all interrupt handlers as confirmed */
+    for (int i = 0; i < ctx.num_funcs; i++) {
+        if (ctx.funcs[i].is_interrupt) ctx.funcs[i].confirmed = true;
+    }
     printf("\n");
 
     /* Analyze */
     printf("Analyzing code...\n");
+    fflush(stdout);
     v810_analyze(&ctx);
+    fflush(stdout);
+
+    printf("Emitting C code...\n");
+    fflush(stdout);
 
     /* Emit C code */
     char path[512];
@@ -283,14 +295,6 @@ int main(int argc, char **argv) {
     v810_emit_header(&ctx, fh);
     fclose(fh);
     printf("Wrote %s\n", path);
-
-    /* Stats */
-    int code_bytes = 0;
-    for (uint32_t i = 0; i < rom_size; i++) {
-        if (ctx.code_map[i] == 'C') code_bytes++;
-    }
-    printf("\nCode coverage: %d / %u bytes (%.1f%%)\n",
-           code_bytes, rom_size, 100.0 * code_bytes / rom_size);
 
     v810_ctx_free(&ctx);
     free(rom);

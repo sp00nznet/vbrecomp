@@ -54,6 +54,7 @@ typedef struct {
     uint32_t end_addr;      /* Address after last instruction */
     bool     visited;       /* Already analyzed? */
     bool     is_interrupt;  /* Interrupt handler? */
+    bool     confirmed;     /* Reachable from known entry points? */
     int      int_level;     /* Which interrupt level (-1 if not) */
 } v810_func_t;
 

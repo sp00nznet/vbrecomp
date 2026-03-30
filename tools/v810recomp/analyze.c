@@ -40,6 +40,9 @@ static int find_func(v810_ctx_t *ctx, uint32_t addr) {
 }
 
 int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int_level) {
+    /* V810 instructions are 16-bit aligned */
+    if (addr & 1) return -1;
+
     /* Already known? */
     int idx = find_func(ctx, addr);
     if (idx >= 0) return idx;
@@ -60,6 +63,7 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
     ctx->funcs[idx].end_addr = addr;
     ctx->funcs[idx].visited = false;
     ctx->funcs[idx].is_interrupt = is_interrupt;
+    ctx->funcs[idx].confirmed = false;
     ctx->funcs[idx].int_level = int_level;
 
     return idx;
@@ -91,9 +95,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
     func->visited = true;
 
     uint32_t addr = func->addr;
+    if (!is_rom_addr(ctx, addr)) return;
     uint32_t offset = addr_to_offset(ctx, addr);
+    if (offset >= ctx->rom_size) return;
     v810_insn_t insn;
-    bool in_function = true;
 
     /* Branch target worklist for intraprocedural branches */
     uint32_t branch_targets[1024];
@@ -122,9 +127,13 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                 }
             }
 
-            /* Track function extent */
+            /* Track function extent, with size limit */
             uint32_t next_addr = insn.addr + insn.size;
             if (next_addr > func->end_addr) {
+                /* Cap function size at 16KB to prevent runaway analysis */
+                if (next_addr - func->addr > 0x4000) {
+                    goto next_path;
+                }
                 func->end_addr = next_addr;
             }
 
@@ -142,7 +151,11 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             case 0x2B: { /* JAL disp26 - call */
                 uint32_t target = insn.addr + insn.imm;
                 if (is_rom_addr(ctx, target)) {
-                    v810_ctx_add_func(ctx, target, false, -1);
+                    int callee = v810_ctx_add_func(ctx, target, false, -1);
+                    /* Propagate confirmed status */
+                    if (callee >= 0 && func->confirmed) {
+                        ctx->funcs[callee].confirmed = true;
+                    }
                 }
                 /* Fall through to next instruction after call */
                 break;
@@ -226,7 +239,37 @@ static int func_cmp(const void *a, const void *b) {
     return 0;
 }
 
+/* Brute-force scan: find all JAL targets in the entire ROM */
+static void scan_all_jal_targets(v810_ctx_t *ctx) {
+    int found = 0;
+    for (uint32_t off = 0; off + 4 <= ctx->rom_size; off += 2) {
+        uint16_t hw1 = (uint16_t)ctx->rom[off] | ((uint16_t)ctx->rom[off + 1] << 8);
+        uint8_t opcode = (hw1 >> 10) & 0x3F;
+
+        if (opcode == 0x2B) {  /* JAL */
+            uint16_t hw2 = (uint16_t)ctx->rom[off + 2] | ((uint16_t)ctx->rom[off + 3] << 8);
+            uint32_t raw = ((uint32_t)(hw1 & 0x3FF) << 16) | hw2;
+            int32_t disp = (int32_t)((raw ^ (1u << 25)) - (1u << 25));
+            uint32_t addr = ctx->rom_base + off;
+            uint32_t target = addr + disp;
+
+            if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+
+            if (target >= ctx->rom_base && target < ROM_REGION_END && (target & 1) == 0) {
+                if (find_func(ctx, target) < 0) {
+                    v810_ctx_add_func(ctx, target, false, -1);
+                    found++;
+                }
+            }
+        }
+    }
+    printf("JAL scan: found %d additional function targets\n", found);
+}
+
 void v810_analyze(v810_ctx_t *ctx) {
+    /* First: brute-force scan for all JAL call targets in the ROM */
+    scan_all_jal_targets(ctx);
+
     /* Process worklist until no unvisited functions remain */
     bool progress = true;
     while (progress) {
@@ -242,12 +285,72 @@ void v810_analyze(v810_ctx_t *ctx) {
     /* Sort functions by address */
     qsort(ctx->funcs, ctx->num_funcs, sizeof(v810_func_t), func_cmp);
 
-    printf("Analysis complete: %d functions found\n", ctx->num_funcs);
+    /* Propagate confirmed status: re-analyze confirmed functions
+     * to mark their callees as confirmed too */
+    {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (int i = 0; i < ctx->num_funcs; i++) {
+                if (!ctx->funcs[i].confirmed) continue;
+                /* Re-scan this function's code for JAL targets */
+                uint32_t off = addr_to_offset(ctx, ctx->funcs[i].addr);
+                uint32_t end = addr_to_offset(ctx, ctx->funcs[i].end_addr);
+                if (off >= ctx->rom_size || end > ctx->rom_size) continue;
+                while (off < end && off < ctx->rom_size) {
+                    v810_insn_t insn;
+                    if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
+                    insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+                    if (insn.opcode == 0x2B) { /* JAL */
+                        uint32_t target = insn.addr + insn.imm;
+                        if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                        int idx = find_func(ctx, target);
+                        if (idx >= 0 && !ctx->funcs[idx].confirmed) {
+                            ctx->funcs[idx].confirmed = true;
+                            changed = true;
+                        }
+                    }
+                    off += insn.size;
+                }
+            }
+        }
+    }
+
+    /* Count confirmed vs total */
+    int confirmed = 0;
     for (int i = 0; i < ctx->num_funcs; i++) {
+        if (ctx->funcs[i].confirmed) confirmed++;
+    }
+
+    printf("Confirmed functions: %d / %d\n", confirmed, ctx->num_funcs);
+
+    /* Count code bytes */
+    int code_bytes = 0;
+    for (uint32_t i = 0; i < ctx->rom_size; i++) {
+        if (ctx->code_map[i] == 'C') code_bytes++;
+    }
+
+    printf("Analysis complete: %d functions found\n", ctx->num_funcs);
+    printf("Code coverage: %d / %u bytes (%.1f%%)\n",
+           code_bytes, ctx->rom_size, 100.0 * code_bytes / ctx->rom_size);
+
+    /* Only print first/last few functions to avoid flooding */
+    int show = ctx->num_funcs < 20 ? ctx->num_funcs : 10;
+    for (int i = 0; i < show; i++) {
         printf("  func_%08X  [%08X - %08X]%s\n",
                ctx->funcs[i].addr,
                ctx->funcs[i].addr,
                ctx->funcs[i].end_addr,
                ctx->funcs[i].is_interrupt ? " (interrupt)" : "");
+    }
+    if (ctx->num_funcs > 20) {
+        printf("  ... (%d more) ...\n", ctx->num_funcs - 20);
+        for (int i = ctx->num_funcs - 10; i < ctx->num_funcs; i++) {
+            printf("  func_%08X  [%08X - %08X]%s\n",
+                   ctx->funcs[i].addr,
+                   ctx->funcs[i].addr,
+                   ctx->funcs[i].end_addr,
+                   ctx->funcs[i].is_interrupt ? " (interrupt)" : "");
+        }
     }
 }
