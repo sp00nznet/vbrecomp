@@ -1,0 +1,16 @@
+build/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+.vs/
+*.user
+*.suo
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
