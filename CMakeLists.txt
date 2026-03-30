@@ -30,6 +30,16 @@ else()
     message(STATUS "SDL2 not found: platform backend disabled (stub)")
 endif()
 
+# --- Tools ---
+
+add_executable(v810recomp
+    tools/v810recomp/main.c
+    tools/v810recomp/decode.c
+    tools/v810recomp/analyze.c
+    tools/v810recomp/emit.c
+)
+target_include_directories(v810recomp PRIVATE tools/v810recomp)
+
 # --- Tests ---
 
 option(VBRECOMP_BUILD_TESTS "Build tests" ON)
