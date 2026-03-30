@@ -100,6 +100,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
     if (offset >= ctx->rom_size) return;
     v810_insn_t insn;
 
+    /* Simple constant propagation: track known register values */
+    uint32_t reg_val[32];
+    bool reg_known[32];
+
     /* Branch target worklist for intraprocedural branches */
     uint32_t branch_targets[1024];
     int num_targets = 0;
@@ -111,6 +115,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
     while (num_targets > 0) {
         /* Pop a target */
         offset = branch_targets[--num_targets];
+
+        /* Reset register knowledge at each path start */
+        memset(reg_known, 0, sizeof(reg_known));
+        reg_val[0] = 0; reg_known[0] = true; /* r0 is always 0 */
 
         while (offset < ctx->rom_size) {
             if (visited_offsets[offset]) break;  /* Already traced this path */
@@ -137,6 +145,53 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                 func->end_addr = next_addr;
             }
 
+            /* Update constant propagation */
+            switch (insn.opcode) {
+            case 0x00: /* MOV reg1, reg2 */
+                if (insn.reg2 != 0 && reg_known[insn.reg1]) {
+                    reg_val[insn.reg2] = reg_val[insn.reg1];
+                    reg_known[insn.reg2] = true;
+                } else if (insn.reg2 != 0) {
+                    reg_known[insn.reg2] = false;
+                }
+                break;
+            case 0x10: /* MOV imm5, reg2 */
+                if (insn.reg2 != 0) {
+                    reg_val[insn.reg2] = (uint32_t)insn.imm;
+                    reg_known[insn.reg2] = true;
+                }
+                break;
+            case 0x28: /* MOVEA imm16, reg1, reg2 */
+                if (insn.reg2 != 0 && reg_known[insn.reg1]) {
+                    reg_val[insn.reg2] = reg_val[insn.reg1] + (uint32_t)(int32_t)(int16_t)insn.imm;
+                    reg_known[insn.reg2] = true;
+                } else if (insn.reg2 != 0) {
+                    reg_known[insn.reg2] = false;
+                }
+                break;
+            case 0x2F: /* MOVHI imm16, reg1, reg2 */
+                if (insn.reg2 != 0 && reg_known[insn.reg1]) {
+                    reg_val[insn.reg2] = reg_val[insn.reg1] + ((uint32_t)(uint16_t)insn.imm << 16);
+                    reg_known[insn.reg2] = true;
+                } else if (insn.reg2 != 0) {
+                    reg_known[insn.reg2] = false;
+                }
+                break;
+            case 0x2B: /* JAL - clobbers r31 */
+                reg_known[31] = false;
+                /* Other registers may be clobbered by callee, but
+                 * for simple constant prop we'll be conservative later */
+                break;
+            default:
+                /* Any other instruction writing to reg2 invalidates it */
+                if (insn.format == FMT_I || insn.format == FMT_II ||
+                    insn.format == FMT_V || insn.format == FMT_VI ||
+                    insn.format == FMT_VII) {
+                    if (insn.reg2 != 0) reg_known[insn.reg2] = false;
+                }
+                break;
+            }
+
             /* Analyze control flow */
             switch (insn.opcode) {
             case 0x06: /* JMP [reg1] - indirect jump */
@@ -144,8 +199,22 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     /* JMP [r31] = return from subroutine */
                     goto next_path;
                 }
-                /* Other indirect jumps: could be switch tables, etc. */
-                /* For now, stop tracing this path */
+                /* Try to resolve via constant propagation */
+                if (reg_known[insn.reg1]) {
+                    uint32_t target = reg_val[insn.reg1] & 0xFFFFFFFE;
+                    if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                    if (is_rom_addr(ctx, target)) {
+                        uint32_t target_off = addr_to_offset(ctx, target);
+                        printf("  Resolved JMP [r%d] at 0x%08X -> 0x%08X\n",
+                               insn.reg1, insn.addr, target);
+                        /* Treat as intraprocedural jump or tail call */
+                        if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
+                            if (num_targets < 1024) {
+                                branch_targets[num_targets++] = target_off;
+                            }
+                        }
+                    }
+                }
                 goto next_path;
 
             case 0x2B: { /* JAL disp26 - call */
