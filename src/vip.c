@@ -72,7 +72,7 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_BRTC:    return reg_brtc;
     case VB_VIP_REST:    return reg_rest;
     case VB_VIP_FRMCYC:  return reg_frmcyc;
-    case VB_VIP_XPSTTS:  return reg_xpstts | 0x0040; /* Always report drawing done */
+    case VB_VIP_XPSTTS:  return reg_xpstts | 0x007E; /* Always report drawing done + DPBSY/SCANRDY */
     case VB_VIP_XPCTRL:  return reg_xpctrl;
     case VB_VIP_SPT0:    return reg_spt[0];
     case VB_VIP_SPT1:    return reg_spt[1];
