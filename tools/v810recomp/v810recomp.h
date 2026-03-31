@@ -71,6 +71,21 @@ typedef struct {
 
     /* Byte classification: which bytes are code vs data */
     uint8_t *code_map;      /* 1 byte per ROM byte: 'C'=code, 'D'=data, 0=unknown */
+
+    /* Resolved indirect jumps: JMP [reg] where the target is known */
+    struct { uint32_t from_addr; uint32_t to_addr; } *resolved_jumps;
+    int num_resolved;
+    int max_resolved;
+
+    /* Jump tables discovered in the code */
+    struct {
+        uint32_t jmp_addr;      /* Address of the JMP instruction */
+        uint32_t table_addr;    /* ROM address of the jump table */
+        int      num_entries;   /* Number of entries */
+        uint32_t *targets;      /* Array of target addresses */
+    } *jump_tables;
+    int num_jump_tables;
+    int max_jump_tables;
 } v810_ctx_t;
 
 /* Decode a single instruction */
