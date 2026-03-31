@@ -64,14 +64,14 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_INTPND:  return reg_intpnd;
     case VB_VIP_INTENB:  return reg_intenb;
     case VB_VIP_INTCLR:  return 0; /* Write-only */
-    case VB_VIP_DPSTTS:  return reg_dpstts;
+    case VB_VIP_DPSTTS:  return reg_dpstts | 0x003E; /* Always report display ready */
     case VB_VIP_DPCTRL:  return reg_dpctrl;
     case VB_VIP_BRTA:    return reg_brta;
     case VB_VIP_BRTB:    return reg_brtb;
     case VB_VIP_BRTC:    return reg_brtc;
     case VB_VIP_REST:    return reg_rest;
     case VB_VIP_FRMCYC:  return reg_frmcyc;
-    case VB_VIP_XPSTTS:  return reg_xpstts;
+    case VB_VIP_XPSTTS:  return reg_xpstts | 0x0040; /* Always report drawing done */
     case VB_VIP_XPCTRL:  return reg_xpctrl;
     case VB_VIP_SPT0:    return reg_spt[0];
     case VB_VIP_SPT1:    return reg_spt[1];
@@ -151,6 +151,19 @@ uint8_t vb_vip_read8(vb_addr_t addr) {
 
 uint16_t vb_vip_read16(vb_addr_t addr) {
     if (is_reg_addr(addr)) {
+        static uint32_t last_vip_addr = 0;
+        static int vip_repeat = 0;
+        if (addr == last_vip_addr) {
+            vip_repeat++;
+            if (vip_repeat == 100000) {
+                uint16_t val = reg_read((addr - VB_VIP_REG_BASE) & ~1);
+                fprintf(stderr, "VIP POLL: reg 0x%04X = 0x%04X (100K reads)\n",
+                        (unsigned)(addr - VB_VIP_REG_BASE), val);
+            }
+        } else {
+            vip_repeat = 0;
+            last_vip_addr = addr;
+        }
         return reg_read((addr - VB_VIP_REG_BASE) & ~1);
     }
     if (is_vram_addr(addr)) {
