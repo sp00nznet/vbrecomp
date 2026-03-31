@@ -183,15 +183,16 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                 fprintf(out, "    /* Jump table dispatch (%d entries) */\n",
                         ctx->jump_tables[jt_idx].num_entries);
                 fprintf(out, "    switch (%s) {\n", r1);
-                /* Deduplicate: don't emit the same case value twice */
+                /* Use raw addresses for case values, mapped for function names */
                 for (int e = 0; e < ctx->jump_tables[jt_idx].num_entries; e++) {
-                    uint32_t t = ctx->jump_tables[jt_idx].targets[e];
+                    uint32_t raw = ctx->jump_tables[jt_idx].raw_targets[e];
+                    uint32_t mapped = ctx->jump_tables[jt_idx].targets[e];
                     bool dup = false;
                     for (int p = 0; p < e; p++) {
-                        if (ctx->jump_tables[jt_idx].targets[p] == t) { dup = true; break; }
+                        if (ctx->jump_tables[jt_idx].raw_targets[p] == raw) { dup = true; break; }
                     }
                     if (!dup) {
-                        fprintf(out, "    case 0x%08X: vb_func_%08X(); break;\n", t, t);
+                        fprintf(out, "    case 0x%08Xu: vb_func_%08X(); break;\n", raw, mapped);
                     }
                 }
                 fprintf(out, "    default: break; /* unhandled */\n");
@@ -411,17 +412,8 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
             /* NOP */
             fprintf(out, "    /* nop */\n");
         } else {
-            /* Check if target is within function or is a known external function */
-            int ext_func = find_func_by_addr(ctx, target);
-            if (ext_func >= 0) {
-                /* Branch to another function = conditional tail call */
-                if (insn->cond == 0x05) {
-                    fprintf(out, "    vb_func_%08X(); return;\n", target);
-                } else {
-                    fprintf(out, "    if (%s) { vb_func_%08X(); return; }\n",
-                            cond_expr[insn->cond], target);
-                }
-            } else if (emit_labels && label_set_has(emit_labels, target)) {
+            /* Check label set first (intraprocedural takes priority) */
+            if (emit_labels && label_set_has(emit_labels, target)) {
                 /* Intraprocedural branch */
                 if (insn->cond == 0x05) {
                     fprintf(out, "    goto label_%08X;\n", target);
@@ -429,13 +421,21 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                     fprintf(out, "    if (%s) goto label_%08X;\n",
                             cond_expr[insn->cond], target);
                 }
+            } else if (find_func_by_addr(ctx, target) >= 0) {
+                /* Branch to a known function = conditional tail call */
+                if (insn->cond == 0x05) {
+                    fprintf(out, "    vb_func_%08X(); return;\n", target);
+                } else {
+                    fprintf(out, "    if (%s) { vb_func_%08X(); return; }\n",
+                            cond_expr[insn->cond], target);
+                }
             } else {
                 /* External branch to unknown code */
-                fprintf(out, "    /* WARNING: branch to 0x%08X outside function */\n", target);
                 if (insn->cond == 0x05) {
-                    fprintf(out, "    return;\n");
+                    fprintf(out, "    return; /* branch to 0x%08X outside function */\n", target);
                 } else {
-                    fprintf(out, "    if (%s) return;\n", cond_expr[insn->cond]);
+                    fprintf(out, "    if (%s) return; /* branch to 0x%08X */\n",
+                            cond_expr[insn->cond], target);
                 }
             }
         }
@@ -445,10 +445,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
     /* --- Format IV: JR / JAL --- */
     case 0x2A: { /* JR */
         uint32_t target = insn->addr + insn->imm;
-        if (find_func_by_addr(ctx, target) >= 0) {
-            fprintf(out, "    vb_func_%08X(); return; /* tail call */\n", target);
-        } else if (emit_labels && label_set_has(emit_labels, target)) {
+        if (emit_labels && label_set_has(emit_labels, target)) {
             fprintf(out, "    goto label_%08X;\n", target);
+        } else if (find_func_by_addr(ctx, target) >= 0) {
+            fprintf(out, "    vb_func_%08X(); return; /* tail call */\n", target);
         } else {
             /* External JR to unknown code — likely shared prologue or
              * code above function start. Emit as unresolved return. */
@@ -849,6 +849,30 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
             }
         }
     }
+    /* Declare ALL JAL targets from confirmed function bodies */
+    for (int i = 0; i < ctx->num_funcs; i++) {
+        if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
+        if (ctx->funcs[i].addr < ctx->rom_base) continue;
+        uint32_t foff = ctx->funcs[i].addr;
+        if (foff >= 0xFFF00000) foff &= 0x07FFFFFF;
+        foff -= ctx->rom_base;
+        uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
+        if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
+        uint32_t off = foff;
+        while (off < fend && off < ctx->rom_size) {
+            v810_insn_t insn;
+            if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
+            insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+            if (insn.opcode == 0x2B) {
+                uint32_t target = insn.addr + insn.imm;
+                if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                if (target >= ctx->rom_base && target < ROM_REGION_END) {
+                    fprintf(out, "void vb_func_%08X(void);\n", target);
+                }
+            }
+            off += insn.size;
+        }
+    }
     fprintf(out, "\n");
 
     /* Emit each function */
@@ -891,16 +915,20 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "}\n");
     }
 
-    /* Also generate stubs for jump table targets not yet emitted */
+    /* Generate stubs for ALL referenced but undefined functions.
+     * Scan confirmed function bodies for JAL targets and jump table entries. */
     {
-        /* Collect all addresses that have already been emitted or stubbed */
-        uint32_t *emitted_addrs = malloc((ctx->num_funcs + 256) * sizeof(uint32_t));
+        uint32_t *emitted_addrs = malloc((ctx->num_funcs + 2048) * sizeof(uint32_t));
         int n_emitted = 0;
+
+        /* Collect everything we've already emitted */
         for (int i = 0; i < ctx->num_funcs; i++) {
             if (ctx->funcs[i].confirmed) {
                 emitted_addrs[n_emitted++] = ctx->funcs[i].addr;
             }
         }
+
+        /* Scan jump table targets */
         for (int jt = 0; jt < ctx->num_jump_tables; jt++) {
             for (int e = 0; e < ctx->jump_tables[jt].num_entries; e++) {
                 uint32_t t = ctx->jump_tables[jt].targets[e];
@@ -909,11 +937,41 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                     if (emitted_addrs[k] == t) { already = true; break; }
                 }
                 if (!already) {
-                    fprintf(out, "\nvoid vb_func_%08X(void) {\n", t);
-                    fprintf(out, "    /* STUB: jump table target */\n");
-                    fprintf(out, "}\n");
+                    fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: jump table target */ }\n", t);
                     emitted_addrs[n_emitted++] = t;
                 }
+            }
+        }
+
+        /* Scan all confirmed function bodies for JAL targets that need stubs */
+        for (int i = 0; i < ctx->num_funcs; i++) {
+            if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
+            if (ctx->funcs[i].addr < ctx->rom_base) continue;
+            uint32_t foff = ctx->funcs[i].addr;
+            if (foff >= 0xFFF00000) foff &= 0x07FFFFFF;
+            foff -= ctx->rom_base;
+            uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
+            if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
+
+            uint32_t off = foff;
+            while (off < fend && off < ctx->rom_size) {
+                v810_insn_t insn;
+                if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
+                insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+
+                if (insn.opcode == 0x2B) { /* JAL */
+                    uint32_t target = insn.addr + insn.imm;
+                    if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                    bool already = false;
+                    for (int k = 0; k < n_emitted; k++) {
+                        if (emitted_addrs[k] == target) { already = true; break; }
+                    }
+                    if (!already && target >= ctx->rom_base && target < ROM_REGION_END) {
+                        fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: callee */ }\n", target);
+                        emitted_addrs[n_emitted++] = target;
+                    }
+                }
+                off += insn.size;
             }
         }
         free(emitted_addrs);

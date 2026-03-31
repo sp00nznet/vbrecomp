@@ -82,7 +82,8 @@ typedef struct {
         uint32_t jmp_addr;      /* Address of the JMP instruction */
         uint32_t table_addr;    /* ROM address of the jump table */
         int      num_entries;   /* Number of entries */
-        uint32_t *targets;      /* Array of target addresses */
+        uint32_t *targets;      /* Array of mapped target addresses (for function registration) */
+        uint32_t *raw_targets;  /* Array of raw target addresses (for switch case values) */
     } *jump_tables;
     int num_jump_tables;
     int max_jump_tables;

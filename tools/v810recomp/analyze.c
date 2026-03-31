@@ -39,6 +39,7 @@ void v810_ctx_free(v810_ctx_t *ctx) {
     free(ctx->resolved_jumps);
     for (int i = 0; i < ctx->num_jump_tables; i++) {
         free(ctx->jump_tables[i].targets);
+        free(ctx->jump_tables[i].raw_targets);
     }
     free(ctx->jump_tables);
     memset(ctx, 0, sizeof(*ctx));
@@ -385,7 +386,7 @@ void v810_analyze(v810_ctx_t *ctx) {
             if (off >= ctx->rom_size || end > ctx->rom_size) continue;
 
             /* Look for LD.W + JMP pattern near unresolved indirect jumps */
-            while (off + 8 <= end && off + 8 <= ctx->rom_size) {
+            while (off + 6 <= end && off + 6 <= ctx->rom_size) {
                 v810_insn_t insns[2];
                 if (!v810_decode(ctx->rom, off, ctx->rom_size, &insns[0])) break;
                 insns[0].addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
@@ -441,6 +442,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                                 /* Read entries until we hit an invalid address */
                                 int max_entries = 64;
                                 uint32_t *targets = malloc(max_entries * sizeof(uint32_t));
+                                uint32_t *raw_targets = malloc(max_entries * sizeof(uint32_t));
                                 int n = 0;
 
                                 for (int e = 0; e < max_entries; e++) {
@@ -452,7 +454,9 @@ void v810_analyze(v810_ctx_t *ctx) {
                                     if (mapped >= 0xFFF00000) mapped &= 0x07FFFFFF;
                                     if (mapped < ctx->rom_base || mapped >= ROM_REGION_END) break;
                                     if (mapped & 1) break; /* Unaligned = end of table */
-                                    targets[n++] = mapped;
+                                    raw_targets[n] = entry;
+                                    targets[n] = mapped;
+                                    n++;
                                 }
 
                                 if (n > 0) {
@@ -470,6 +474,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                                     ctx->jump_tables[jti].table_addr = tbl_cpu;
                                     ctx->jump_tables[jti].num_entries = n;
                                     ctx->jump_tables[jti].targets = targets;
+                                    ctx->jump_tables[jti].raw_targets = raw_targets;
 
                                     /* Add each target as a function and mark confirmed */
                                     for (int e = 0; e < n; e++) {
@@ -480,6 +485,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                                     }
                                 } else {
                                     free(targets);
+                                    free(raw_targets);
                                 }
                             }
                         }

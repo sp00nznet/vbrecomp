@@ -67,7 +67,10 @@
       "Bash(/c/vcpkg/vcpkg.exe list:*)",
       "Bash(taskkill //IM mariotennis.exe //F)",
       "Bash(python3:*)",
-      "Bash(./vbrecomp_build/Debug/v810recomp.exe \"D:\\\\recomp\\\\vb\\\\mariotennis\\\\Mario''''s Tennis \\(Japan, USA\\).vb\" D:recompvbmariotennisgenerated)"
+      "Bash(./vbrecomp_build/Debug/v810recomp.exe \"D:\\\\recomp\\\\vb\\\\mariotennis\\\\Mario''''s Tennis \\(Japan, USA\\).vb\" D:recompvbmariotennisgenerated)",
+      "Bash(git rm:*)",
+      "Bash(./Debug/v810recomp.exe \"D:\\\\recomp\\\\vb\\\\mariotennis\\\\Mario''''s Tennis \\(Japan, USA\\).vb\" /dev/null)",
+      "Bash(./vbrecomp_build/Debug/v810recomp.exe \"D:\\\\recomp\\\\vb\\\\mariotennis\\\\Mario''''s Tennis \\(Japan, USA\\).vb\" /dev/null)"
     ]
   }
 }
