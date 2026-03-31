@@ -197,7 +197,9 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                 }
                 fprintf(out, "    default: break; /* unhandled */\n");
                 fprintf(out, "    }\n");
-                fprintf(out, "    return;\n");
+                /* After dispatch, the stub JR's back to the calling loop.
+                 * Since the stub returns to us, continue to next instruction
+                 * (fall through, don't return). */
                 break;
             }
             uint32_t resolved = lookup_resolved_jump(ctx, insn->addr);
