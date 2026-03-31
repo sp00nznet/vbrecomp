@@ -74,7 +74,8 @@
       "Bash(timeout 5 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
       "Bash(timeout 8 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
       "Bash(timeout 10 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
-      "Bash(timeout 15 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")"
+      "Bash(timeout 15 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
+      "Bash(timeout 6 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")"
     ]
   }
 }
