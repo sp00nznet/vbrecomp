@@ -23,11 +23,24 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->num_funcs = 0;
 
     ctx->code_map = calloc(rom_size, 1);
+
+    ctx->max_resolved = 256;
+    ctx->resolved_jumps = calloc(ctx->max_resolved, sizeof(ctx->resolved_jumps[0]));
+    ctx->num_resolved = 0;
+
+    ctx->max_jump_tables = 64;
+    ctx->jump_tables = calloc(ctx->max_jump_tables, sizeof(ctx->jump_tables[0]));
+    ctx->num_jump_tables = 0;
 }
 
 void v810_ctx_free(v810_ctx_t *ctx) {
     free(ctx->funcs);
     free(ctx->code_map);
+    free(ctx->resolved_jumps);
+    for (int i = 0; i < ctx->num_jump_tables; i++) {
+        free(ctx->jump_tables[i].targets);
+    }
+    free(ctx->jump_tables);
     memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -139,7 +152,7 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             uint32_t next_addr = insn.addr + insn.size;
             if (next_addr > func->end_addr) {
                 /* Cap function size at 16KB to prevent runaway analysis */
-                if (next_addr - func->addr > 0x4000) {
+                if (next_addr - func->addr > 0x10000) {
                     goto next_path;
                 }
                 func->end_addr = next_addr;
@@ -207,6 +220,15 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                         uint32_t target_off = addr_to_offset(ctx, target);
                         printf("  Resolved JMP [r%d] at 0x%08X -> 0x%08X\n",
                                insn.reg1, insn.addr, target);
+                        /* Record the resolution for the emitter */
+                        if (ctx->num_resolved >= ctx->max_resolved) {
+                            ctx->max_resolved *= 2;
+                            ctx->resolved_jumps = realloc(ctx->resolved_jumps,
+                                ctx->max_resolved * sizeof(ctx->resolved_jumps[0]));
+                        }
+                        ctx->resolved_jumps[ctx->num_resolved].from_addr = insn.addr;
+                        ctx->resolved_jumps[ctx->num_resolved].to_addr = target;
+                        ctx->num_resolved++;
                         /* Treat as intraprocedural jump or tail call */
                         if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
                             if (num_targets < 1024) {
@@ -347,6 +369,135 @@ void v810_analyze(v810_ctx_t *ctx) {
             if (!ctx->funcs[i].visited) {
                 analyze_func(ctx, i);
                 progress = true;
+            }
+        }
+    }
+
+    /* Scan confirmed functions for jump tables:
+     * Pattern: SHL 2, rX / MOVHI imm, rX, rY / LD.W disp[rY], rZ / JMP [rZ]
+     * The table address is (imm<<16) + disp, entries are 32-bit target addresses. */
+    {
+        for (int fi = 0; fi < ctx->num_funcs; fi++) {
+            if (!ctx->funcs[fi].visited) continue;
+            if (ctx->funcs[fi].addr < ctx->rom_base) continue;
+            uint32_t off = addr_to_offset(ctx, ctx->funcs[fi].addr);
+            uint32_t end = addr_to_offset(ctx, ctx->funcs[fi].end_addr);
+            if (off >= ctx->rom_size || end > ctx->rom_size) continue;
+
+            /* Look for LD.W + JMP pattern near unresolved indirect jumps */
+            while (off + 8 <= end && off + 8 <= ctx->rom_size) {
+                v810_insn_t insns[2];
+                if (!v810_decode(ctx->rom, off, ctx->rom_size, &insns[0])) break;
+                insns[0].addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+
+                /* Check for LD.W disp[r], rZ followed by JMP [rZ] */
+                if (insns[0].opcode == 0x33 && /* LD.W */
+                    off + insns[0].size + 2 <= ctx->rom_size) {
+
+                    uint32_t next_off = off + insns[0].size;
+                    if (!v810_decode(ctx->rom, next_off, ctx->rom_size, &insns[1])) {
+                        off += insns[0].size;
+                        continue;
+                    }
+                    insns[1].addr = ROM_OFF_TO_ADDR(next_off, ctx->rom_base);
+
+                    if (insns[1].opcode == 0x06 && /* JMP [reg] */
+                        insns[1].reg1 == insns[0].reg2 && /* Same register */
+                        insns[1].reg1 != 31) {
+
+                        /* We found a LD.W + JMP pattern!
+                         * Now look backwards for MOVHI to compute table base.
+                         * Walk back up to 10 instructions to find MOVHI. */
+                        int32_t disp = insns[0].imm;
+                        uint8_t base_reg = insns[0].reg1;
+                        uint32_t table_base = 0;
+                        bool found_base = false;
+
+                        /* Scan backwards for MOVHI writing to base_reg */
+                        uint32_t scan = off > 40 ? off - 40 : 0;
+                        while (scan < off) {
+                            v810_insn_t prev;
+                            if (!v810_decode(ctx->rom, scan, ctx->rom_size, &prev)) break;
+                            if (prev.opcode == 0x2F && prev.reg2 == base_reg) {
+                                /* MOVHI imm, regS, base_reg */
+                                uint32_t hi = (uint32_t)(uint16_t)prev.imm << 16;
+                                /* Check if regS is known (usually r0 or from SHL) */
+                                table_base = hi + (uint32_t)disp;
+                                found_base = true;
+                            }
+                            scan += prev.size;
+                        }
+
+                        if (found_base) {
+                            /* Convert table address to ROM offset.
+                             * The table base has the SHL'd index baked in at runtime,
+                             * but for table_base we use the base without index (index=0). */
+                            uint32_t tbl_cpu = table_base;
+                            if (tbl_cpu >= 0xFFF00000) tbl_cpu &= 0x07FFFFFF;
+
+                            if (tbl_cpu >= ctx->rom_base && tbl_cpu < ROM_REGION_END) {
+                                uint32_t tbl_off = tbl_cpu - ctx->rom_base;
+
+                                /* Read entries until we hit an invalid address */
+                                int max_entries = 64;
+                                uint32_t *targets = malloc(max_entries * sizeof(uint32_t));
+                                int n = 0;
+
+                                for (int e = 0; e < max_entries; e++) {
+                                    if (tbl_off + e * 4 + 4 > ctx->rom_size) break;
+                                    const uint8_t *ep = ctx->rom + tbl_off + e * 4;
+                                    uint32_t entry = ((uint16_t)ep[0] | ((uint16_t)ep[1] << 8))
+                                                   | (((uint32_t)ep[2] | ((uint32_t)ep[3] << 8)) << 16);
+                                    uint32_t mapped = entry;
+                                    if (mapped >= 0xFFF00000) mapped &= 0x07FFFFFF;
+                                    if (mapped < ctx->rom_base || mapped >= ROM_REGION_END) break;
+                                    if (mapped & 1) break; /* Unaligned = end of table */
+                                    targets[n++] = mapped;
+                                }
+
+                                if (n > 0) {
+                                    printf("  Jump table at 0x%08X (ROM 0x%05X): %d entries from JMP at 0x%08X\n",
+                                           tbl_cpu, tbl_off, n, insns[1].addr);
+
+                                    /* Store jump table */
+                                    if (ctx->num_jump_tables >= ctx->max_jump_tables) {
+                                        ctx->max_jump_tables *= 2;
+                                        ctx->jump_tables = realloc(ctx->jump_tables,
+                                            ctx->max_jump_tables * sizeof(ctx->jump_tables[0]));
+                                    }
+                                    int jti = ctx->num_jump_tables++;
+                                    ctx->jump_tables[jti].jmp_addr = insns[1].addr;
+                                    ctx->jump_tables[jti].table_addr = tbl_cpu;
+                                    ctx->jump_tables[jti].num_entries = n;
+                                    ctx->jump_tables[jti].targets = targets;
+
+                                    /* Add each target as a function and mark confirmed */
+                                    for (int e = 0; e < n; e++) {
+                                        int idx = v810_ctx_add_func(ctx, targets[e], false, -1);
+                                        if (idx >= 0 && ctx->funcs[fi].confirmed) {
+                                            ctx->funcs[idx].confirmed = true;
+                                        }
+                                    }
+                                } else {
+                                    free(targets);
+                                }
+                            }
+                        }
+                    }
+                }
+                off += insns[0].size;
+            }
+        }
+
+        /* Re-analyze newly discovered functions */
+        progress = true;
+        while (progress) {
+            progress = false;
+            for (int i = 0; i < ctx->num_funcs; i++) {
+                if (!ctx->funcs[i].visited) {
+                    analyze_func(ctx, i);
+                    progress = true;
+                }
             }
         }
     }

@@ -6,6 +6,7 @@
  */
 
 #include "vbrecomp/platform.h"
+#include "vbrecomp/vip.h"
 #include "vbrecomp/types.h"
 
 #ifdef VBRECOMP_NO_SDL

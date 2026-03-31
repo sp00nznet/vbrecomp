@@ -9,6 +9,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Forward declarations */
+typedef struct {
+    uint32_t *addrs;
+    int count;
+    int cap;
+} label_set_t;
+
+static void label_set_add(label_set_t *ls, uint32_t addr);
+static bool label_set_has(label_set_t *ls, uint32_t addr);
+
 /* Condition code expressions for Bcond/SETF */
 static const char *cond_expr[16] = {
     /* 0x0 BV  */ "(vb_cpu.sr[5] & VB_PSW_OV)",
@@ -102,7 +112,24 @@ static int find_func_by_addr(v810_ctx_t *ctx, uint32_t addr) {
 }
 
 /* Emit a single instruction as C code */
-static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn) {
+/* Look up a jump table for a JMP address. Returns index or -1. */
+static int lookup_jump_table(v810_ctx_t *ctx, uint32_t jmp_addr) {
+    for (int i = 0; i < ctx->num_jump_tables; i++) {
+        if (ctx->jump_tables[i].jmp_addr == jmp_addr) return i;
+    }
+    return -1;
+}
+
+/* Look up a resolved indirect jump target. Returns 0 if not found. */
+static uint32_t lookup_resolved_jump(v810_ctx_t *ctx, uint32_t from_addr) {
+    for (int i = 0; i < ctx->num_resolved; i++) {
+        if (ctx->resolved_jumps[i].from_addr == from_addr)
+            return ctx->resolved_jumps[i].to_addr;
+    }
+    return 0;
+}
+
+static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label_set_t *emit_labels) {
     char r1[32], r2[32];
     snprintf(r1, sizeof(r1), "vb_cpu.r[%d]", insn->reg1);
     snprintf(r2, sizeof(r2), "vb_cpu.r[%d]", insn->reg2);
@@ -150,9 +177,59 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn) {
         if (insn->reg1 == 31) {
             fprintf(out, "    return; /* jmp [r31] */\n");
         } else {
-            fprintf(out, "    /* WARNING: indirect jump [%s] - needs jump table */\n", r1);
-            fprintf(out, "    vb_cpu.pc = %s & 0xFFFFFFFE;\n", r1);
-            fprintf(out, "    return; /* indirect jump - FIXME */\n");
+            /* Check for jump table first */
+            int jt_idx = lookup_jump_table(ctx, insn->addr);
+            if (jt_idx >= 0) {
+                fprintf(out, "    /* Jump table dispatch (%d entries) */\n",
+                        ctx->jump_tables[jt_idx].num_entries);
+                fprintf(out, "    switch (%s) {\n", r1);
+                /* Deduplicate: don't emit the same case value twice */
+                for (int e = 0; e < ctx->jump_tables[jt_idx].num_entries; e++) {
+                    uint32_t t = ctx->jump_tables[jt_idx].targets[e];
+                    bool dup = false;
+                    for (int p = 0; p < e; p++) {
+                        if (ctx->jump_tables[jt_idx].targets[p] == t) { dup = true; break; }
+                    }
+                    if (!dup) {
+                        fprintf(out, "    case 0x%08X: vb_func_%08X(); break;\n", t, t);
+                    }
+                }
+                fprintf(out, "    default: break; /* unhandled */\n");
+                fprintf(out, "    }\n");
+                fprintf(out, "    return;\n");
+                break;
+            }
+            uint32_t resolved = lookup_resolved_jump(ctx, insn->addr);
+            if (resolved) {
+                /* Check if target is another function (tail call) or intraprocedural */
+                if (find_func_by_addr(ctx, resolved) >= 0) {
+                    fprintf(out, "    vb_func_%08X(); return; /* resolved tail call */\n", resolved);
+                } else {
+                    /* Check if target is within the current function's emitted range */
+                    uint32_t func_start = ctx->funcs[0].addr; /* placeholder */
+                    /* Find our function to check range */
+                    for (int fi = 0; fi < ctx->num_funcs; fi++) {
+                        if (insn->addr >= ctx->funcs[fi].addr &&
+                            insn->addr < ctx->funcs[fi].end_addr) {
+                            func_start = ctx->funcs[fi].addr;
+                            if (resolved >= ctx->funcs[fi].addr &&
+                                resolved < ctx->funcs[fi].end_addr) {
+                                fprintf(out, "    goto label_%08X; /* resolved jmp [r%d] */\n",
+                                        resolved, insn->reg1);
+                                goto jmp_done;
+                            }
+                            break;
+                        }
+                    }
+                    /* Target outside function: treat as return/reset */
+                    fprintf(out, "    return; /* resolved jmp to 0x%08X (outside function) */\n", resolved);
+                jmp_done:;
+                }
+            } else {
+                fprintf(out, "    /* WARNING: unresolved indirect jump [%s] */\n", r1);
+                fprintf(out, "    vb_cpu.pc = %s & 0xFFFFFFFE;\n", r1);
+                fprintf(out, "    return; /* indirect jump - FIXME */\n");
+            }
         }
         break;
 
@@ -330,14 +407,37 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn) {
     case 0x20: case 0x21: case 0x22: case 0x23:
     case 0x24: case 0x25: case 0x26: case 0x27: {
         uint32_t target = insn->addr + insn->imm;
-        if (insn->cond == 0x05) {
-            /* BR - unconditional */
-            fprintf(out, "    goto label_%08X;\n", target);
-        } else if (insn->cond == 0x0D) {
+        if (insn->cond == 0x0D) {
             /* NOP */
             fprintf(out, "    /* nop */\n");
         } else {
-            fprintf(out, "    if (%s) goto label_%08X;\n", cond_expr[insn->cond], target);
+            /* Check if target is within function or is a known external function */
+            int ext_func = find_func_by_addr(ctx, target);
+            if (ext_func >= 0) {
+                /* Branch to another function = conditional tail call */
+                if (insn->cond == 0x05) {
+                    fprintf(out, "    vb_func_%08X(); return;\n", target);
+                } else {
+                    fprintf(out, "    if (%s) { vb_func_%08X(); return; }\n",
+                            cond_expr[insn->cond], target);
+                }
+            } else if (emit_labels && label_set_has(emit_labels, target)) {
+                /* Intraprocedural branch */
+                if (insn->cond == 0x05) {
+                    fprintf(out, "    goto label_%08X;\n", target);
+                } else {
+                    fprintf(out, "    if (%s) goto label_%08X;\n",
+                            cond_expr[insn->cond], target);
+                }
+            } else {
+                /* External branch to unknown code */
+                fprintf(out, "    /* WARNING: branch to 0x%08X outside function */\n", target);
+                if (insn->cond == 0x05) {
+                    fprintf(out, "    return;\n");
+                } else {
+                    fprintf(out, "    if (%s) return;\n", cond_expr[insn->cond]);
+                }
+            }
         }
         break;
     }
@@ -345,11 +445,15 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn) {
     /* --- Format IV: JR / JAL --- */
     case 0x2A: { /* JR */
         uint32_t target = insn->addr + insn->imm;
-        /* Check if this is a tail call to another function */
         if (find_func_by_addr(ctx, target) >= 0) {
             fprintf(out, "    vb_func_%08X(); return; /* tail call */\n", target);
-        } else {
+        } else if (emit_labels && label_set_has(emit_labels, target)) {
             fprintf(out, "    goto label_%08X;\n", target);
+        } else {
+            /* External JR to unknown code — likely shared prologue or
+             * code above function start. Emit as unresolved return. */
+            fprintf(out, "    /* WARNING: JR to 0x%08X outside function */\n", target);
+            fprintf(out, "    return;\n");
         }
         break;
     }
@@ -574,13 +678,6 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn) {
     }
 }
 
-/* Collect all branch targets within a function for label generation */
-typedef struct {
-    uint32_t *addrs;
-    int count;
-    int cap;
-} label_set_t;
-
 static void label_set_add(label_set_t *ls, uint32_t addr) {
     /* Cap at 4096 labels per function */
     if (ls->count >= 4096) return;
@@ -648,11 +745,21 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
 
         /* Branches within this function need labels */
         if (insn.format == FMT_III && insn.cond != 0x0D) {
-            label_set_add(&labels, insn.addr + insn.imm);
+            uint32_t btarget = insn.addr + insn.imm;
+            if (btarget >= func->addr && btarget < func->end_addr) {
+                label_set_add(&labels, btarget);
+            }
+            /* External Bcond targets handled in emit via find_func_by_addr */
         } else if (insn.opcode == 0x2A) { /* JR */
             uint32_t target = insn.addr + insn.imm;
-            if (find_func_by_addr(ctx, target) < 0) {
+            if (target >= func->addr && target < func->end_addr) {
                 label_set_add(&labels, target);
+            }
+            /* External targets handled in emit via find_func_by_addr */
+        } else if (insn.opcode == 0x06 && insn.reg1 != 31) { /* JMP [reg] */
+            uint32_t resolved = lookup_resolved_jump(ctx, insn.addr);
+            if (resolved && find_func_by_addr(ctx, resolved) < 0) {
+                label_set_add(&labels, resolved);
             }
         }
 
@@ -686,7 +793,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
             }
         }
 
-        emit_insn(ctx, out, &insn);
+        emit_insn(ctx, out, &insn, &labels);
         off += insn.size;
         insn_count++;
 
@@ -715,12 +822,103 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         if (!ctx->funcs[i].confirmed) continue;
         fprintf(out, "void vb_func_%08X(void);\n", ctx->funcs[i].addr);
     }
+    /* Also declare jump table targets */
+    for (int jt = 0; jt < ctx->num_jump_tables; jt++) {
+        for (int e = 0; e < ctx->jump_tables[jt].num_entries; e++) {
+            uint32_t t = ctx->jump_tables[jt].targets[e];
+            bool already = false;
+            for (int i = 0; i < ctx->num_funcs; i++) {
+                if (ctx->funcs[i].addr == t && ctx->funcs[i].confirmed) {
+                    already = true; break;
+                }
+            }
+            /* Check for duplicates within jump tables too */
+            if (!already) {
+                for (int jt2 = 0; jt2 < jt; jt2++) {
+                    for (int e2 = 0; e2 < ctx->jump_tables[jt2].num_entries; e2++) {
+                        if (ctx->jump_tables[jt2].targets[e2] == t) { already = true; break; }
+                    }
+                    if (already) break;
+                }
+                for (int e2 = 0; e2 < e; e2++) {
+                    if (ctx->jump_tables[jt].targets[e2] == t) { already = true; break; }
+                }
+            }
+            if (!already) {
+                fprintf(out, "void vb_func_%08X(void);\n", t);
+            }
+        }
+    }
     fprintf(out, "\n");
 
     /* Emit each function */
+    int emitted = 0;
+    bool *was_emitted = calloc(ctx->num_funcs, sizeof(bool));
     for (int i = 0; i < ctx->num_funcs; i++) {
+        if (!ctx->funcs[i].confirmed) continue;
+
+        /* Check if function has code to emit */
+        uint32_t start_off = 0, end_off = 0;
+        bool valid = false;
+        if (ctx->funcs[i].addr >= ctx->rom_base && ctx->funcs[i].addr < ROM_REGION_END &&
+            ctx->funcs[i].end_addr > ctx->funcs[i].addr) {
+            start_off = ctx->funcs[i].addr - ctx->rom_base;
+            if (ctx->funcs[i].addr >= 0xFFF00000)
+                start_off = (ctx->funcs[i].addr & 0x07FFFFFF) - ctx->rom_base;
+            end_off = start_off + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
+            if (start_off < ctx->rom_size && end_off <= ctx->rom_size && start_off < end_off)
+                valid = true;
+        }
+
         emit_function(ctx, out, i);
+
+        /* Check if emit_function actually wrote something */
+        if (valid && ctx->funcs[i].visited) {
+            was_emitted[i] = true;
+            emitted++;
+        }
     }
+
+    /* Generate stubs for any referenced-but-undefined functions.
+     * This includes jump table targets that were confirmed but
+     * not analyzed/emitted, and functions referenced by switch cases. */
+    for (int i = 0; i < ctx->num_funcs; i++) {
+        if (was_emitted[i]) continue;
+        /* Check if this function was forward-declared (confirmed) */
+        if (!ctx->funcs[i].confirmed) continue;
+        fprintf(out, "\nvoid vb_func_%08X(void) {\n", ctx->funcs[i].addr);
+        fprintf(out, "    /* STUB: function not yet analyzed */\n");
+        fprintf(out, "}\n");
+    }
+
+    /* Also generate stubs for jump table targets not yet emitted */
+    {
+        /* Collect all addresses that have already been emitted or stubbed */
+        uint32_t *emitted_addrs = malloc((ctx->num_funcs + 256) * sizeof(uint32_t));
+        int n_emitted = 0;
+        for (int i = 0; i < ctx->num_funcs; i++) {
+            if (ctx->funcs[i].confirmed) {
+                emitted_addrs[n_emitted++] = ctx->funcs[i].addr;
+            }
+        }
+        for (int jt = 0; jt < ctx->num_jump_tables; jt++) {
+            for (int e = 0; e < ctx->jump_tables[jt].num_entries; e++) {
+                uint32_t t = ctx->jump_tables[jt].targets[e];
+                bool already = false;
+                for (int k = 0; k < n_emitted; k++) {
+                    if (emitted_addrs[k] == t) { already = true; break; }
+                }
+                if (!already) {
+                    fprintf(out, "\nvoid vb_func_%08X(void) {\n", t);
+                    fprintf(out, "    /* STUB: jump table target */\n");
+                    fprintf(out, "}\n");
+                    emitted_addrs[n_emitted++] = t;
+                }
+            }
+        }
+        free(emitted_addrs);
+    }
+    free(was_emitted);
     fprintf(stderr, "\n");
 }
 
