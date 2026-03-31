@@ -6,9 +6,11 @@
  *
  * In a normal emulator, interrupts are checked between instructions.
  * In static recomp, we check at function boundaries and loop headers.
+ * A tick counter fires VIP frame interrupts periodically.
  */
 
 #include "vbrecomp/interrupt.h"
+#include "vbrecomp/vip.h"
 #include "vbrecomp/cpu.h"
 #include <string.h>
 
@@ -17,9 +19,25 @@
 static uint32_t pending;  /* Bitmask of pending interrupt levels */
 static vb_int_handler_t handlers[MAX_INT_LEVELS];
 
+/* Frame timing */
+static uint32_t frame_ticks;       /* Ticks between frame events (0 = disabled) */
+static uint32_t tick_counter;      /* Current tick count */
+static vb_frame_callback_t frame_cb;
+
 void vb_interrupt_init(void) {
     pending = 0;
     memset(handlers, 0, sizeof(handlers));
+    frame_ticks = 20000;  /* Default: ~20K checks per frame */
+    tick_counter = 0;
+    frame_cb = NULL;
+}
+
+void vb_interrupt_set_frame_ticks(uint32_t ticks) {
+    frame_ticks = ticks;
+}
+
+void vb_interrupt_set_frame_callback(vb_frame_callback_t cb) {
+    frame_cb = cb;
 }
 
 void vb_interrupt_request(int level) {
@@ -35,6 +53,25 @@ void vb_interrupt_clear(int level) {
 }
 
 void vb_interrupt_check(void) {
+    /* Advance frame tick counter */
+    if (frame_ticks > 0) {
+        tick_counter++;
+        if (tick_counter >= frame_ticks) {
+            tick_counter = 0;
+
+            /* Advance VIP state (sets interrupt pending flags) */
+            vb_vip_frame_advance();
+
+            /* Fire VIP interrupt if VIP interrupts are enabled */
+            vb_interrupt_request(VB_INT_VIP);
+
+            /* Call frame callback for rendering/input */
+            if (frame_cb) {
+                frame_cb();
+            }
+        }
+    }
+
     if (pending == 0) return;
 
     uint32_t psw = vb_cpu_get_psw();

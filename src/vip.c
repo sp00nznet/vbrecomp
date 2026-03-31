@@ -114,6 +114,7 @@ static void reg_write(vb_addr_t offset, uint16_t val) {
         /* If drawing requested, immediately mark as done (stub) */
         if (val & 0x0002) {
             reg_xpstts |= 0x0002;  /* Drawing started */
+            reg_xpstts |= 0x0040;  /* Drawing complete / SBOUT ready */
             reg_xpstts &= ~0x000C; /* Clear "drawing in progress" */
             reg_intpnd |= VB_VIP_INT_XPEND; /* Drawing finished */
         }
@@ -256,7 +257,12 @@ void vb_vip_frame_advance(void) {
     reg_intpnd |= VB_VIP_INT_FRAMESTART;
     reg_intpnd |= VB_VIP_INT_LFBEND;
     reg_intpnd |= VB_VIP_INT_RFBEND;
+    reg_intpnd |= VB_VIP_INT_XPEND;
 
-    /* Toggle DPSTTS scan-ready bit to prevent games from polling forever */
-    reg_dpstts ^= 0x003C; /* Toggle SCANRDY bits */
+    /* Set display and drawing status bits that games poll for */
+    reg_dpstts |= 0x0002;  /* Display on */
+    reg_dpstts ^= 0x003C;  /* Toggle SCANRDY bits */
+
+    /* Mark drawing complete so games don't poll XPSTTS forever */
+    reg_xpstts |= 0x0042;  /* XPEN + bit 6 (drawing done) */
 }
