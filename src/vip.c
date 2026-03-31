@@ -9,6 +9,7 @@
 
 #include "vbrecomp/vip.h"
 #include <string.h>
+#include <stdio.h>
 
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];
@@ -93,10 +94,18 @@ static uint16_t reg_read(vb_addr_t offset) {
 static void reg_write(vb_addr_t offset, uint16_t val) {
     switch (offset) {
     case VB_VIP_INTPND:  break; /* Read-only */
-    case VB_VIP_INTENB:  reg_intenb = val; break;
+    case VB_VIP_INTENB:
+        if (val != reg_intenb) {
+            fprintf(stderr, "VIP: INTENB changed 0x%04X -> 0x%04X\n", reg_intenb, val);
+        }
+        reg_intenb = val;
+        break;
     case VB_VIP_INTCLR:  reg_intpnd &= ~val; break;
     case VB_VIP_DPSTTS:  break; /* Read-only */
     case VB_VIP_DPCTRL:
+        if (val != reg_dpctrl) {
+            fprintf(stderr, "VIP: DPCTRL changed 0x%04X -> 0x%04X\n", reg_dpctrl, val);
+        }
         reg_dpctrl = val;
         /* If display enabled, set DPSTTS to reflect it */
         if (val & 0x0002) {

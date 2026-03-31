@@ -11,8 +11,10 @@
 
 #include "vbrecomp/interrupt.h"
 #include "vbrecomp/vip.h"
+#include "vbrecomp/mem.h"
 #include "vbrecomp/cpu.h"
 #include <string.h>
+#include <stdio.h>
 
 #define MAX_INT_LEVELS 5
 
@@ -59,11 +61,19 @@ void vb_interrupt_check(void) {
         if (tick_counter >= frame_ticks) {
             tick_counter = 0;
 
-            /* Advance VIP state (sets interrupt pending flags) */
+            /* Advance VIP state (sets interrupt pending flags in INTPND) */
             vb_vip_frame_advance();
 
-            /* Fire VIP interrupt if VIP interrupts are enabled */
-            vb_interrupt_request(VB_INT_VIP);
+            /* Only request VIP interrupt if the game has enabled VIP interrupts.
+             * The game writes to INTENB to enable, and the handler clears it
+             * after processing. Check INTPND & INTENB. */
+            {
+                uint16_t intpnd = vb_mem_read16(0x0005F800);  /* INTPND */
+                uint16_t intenb = vb_mem_read16(0x0005F802);  /* INTENB */
+                if (intpnd & intenb) {
+                    vb_interrupt_request(VB_INT_VIP);
+                }
+            }
 
             /* Call frame callback for rendering/input */
             if (frame_cb) {
@@ -75,6 +85,20 @@ void vb_interrupt_check(void) {
     if (pending == 0) return;
 
     uint32_t psw = vb_cpu_get_psw();
+
+    /* Debug: log why interrupts are blocked */
+    {
+        static int block_count = 0;
+        block_count++;
+        if (block_count == 50000) {
+            int il = (psw & VB_PSW_I_MASK) >> VB_PSW_I_SHIFT;
+            fprintf(stderr, "INT blocked: pending=0x%X PSW=0x%08X (ID=%d EP=%d NP=%d IL=%d)\n",
+                    pending, psw,
+                    !!(psw & VB_PSW_ID), !!(psw & VB_PSW_EP),
+                    !!(psw & VB_PSW_NP), il);
+            block_count = 0;
+        }
+    }
 
     /* Interrupts disabled? */
     if (psw & VB_PSW_ID) return;
@@ -88,10 +112,10 @@ void vb_interrupt_check(void) {
     for (int i = 0; i < MAX_INT_LEVELS; i++) {
         if (!(pending & (1u << i))) continue;
 
-        /* V810 interrupt levels map to priority: the pending interrupt's
-         * priority must be higher than the current masking level.
-         * Lower interrupt number = higher priority. */
-        if (i >= current_level) continue;
+        /* V810: IL in PSW is the masking threshold. Interrupts with
+         * level >= IL are blocked. Level 0 = highest priority.
+         * IL=0 means accept all interrupts. */
+        if (current_level > 0 && i >= current_level) continue;
 
         /* Accept the interrupt */
         pending &= ~(1u << i);
@@ -110,6 +134,12 @@ void vb_interrupt_check(void) {
 
         /* Call handler if registered */
         if (handlers[i]) {
+            static int int_count[MAX_INT_LEVELS] = {0};
+            int_count[i]++;
+            if (int_count[i] <= 3 || int_count[i] % 100 == 0) {
+                fprintf(stderr, "INT: level %d fired (count=%d, PSW was 0x%08X)\n",
+                        i, int_count[i], psw);
+            }
             handlers[i]();
         }
         return; /* Handle one interrupt at a time */
