@@ -44,6 +44,21 @@ void vb_interrupt_clear(int level);
 void vb_interrupt_check(void);
 
 /*
+ * Set the number of interrupt_check() calls between VIP frame events.
+ * The VB runs at ~50Hz with ~400K cycles/frame. Since each check
+ * represents ~1-10 instructions, a good default is ~20000-50000.
+ * Set to 0 to disable automatic VIP interrupts.
+ */
+void vb_interrupt_set_frame_ticks(uint32_t ticks);
+
+/*
+ * Frame callback: called once per frame tick for rendering/input.
+ * Return false to request game exit.
+ */
+typedef bool (*vb_frame_callback_t)(void);
+void vb_interrupt_set_frame_callback(vb_frame_callback_t cb);
+
+/*
  * Register an interrupt handler (recompiled function) for a given vector.
  * The handler is the recompiled function at the V810 interrupt vector address.
  */
