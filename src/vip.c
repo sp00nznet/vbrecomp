@@ -208,7 +208,11 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
         return;
     }
     if (is_vram_addr(addr)) {
-        vram[addr & (VB_VRAM_SIZE - 1)] = val;
+        uint32_t off = addr;
+        if (off >= 0x40000) {
+            off = ((off & 0x3FFFF) >= 0x20000) ? (off & 0x3FFFF) : (off & 0x1FFFF);
+        }
+        if (off < VB_VRAM_SIZE) vram[off] = val;
     }
 }
 
@@ -218,19 +222,38 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
         return;
     }
     if (is_vram_addr(addr)) {
-        uint32_t off = addr & (VB_VRAM_SIZE - 1);
-        vram[off]     = (uint8_t)(val);
-        vram[off + 1] = (uint8_t)(val >> 8);
+        /* VB has 128KB framebuffer/CHR VRAM (0x00000-0x1FFFF)
+         * and separate BGMap/World/OAM area (0x20000-0x3FFFF).
+         * Addresses 0x40000+ mirror: FB/CHR mirrors with & 0x1FFFF,
+         * BGMap mirrors with & 0x3FFFF for the BGMap portion. */
+        uint32_t off = addr;
+        if (off >= 0x40000) {
+            /* Mirror: if addr >= 0x60000, check if it maps to BGMap or FB */
+            if ((off & 0x3FFFF) >= 0x20000) {
+                off = off & 0x3FFFF; /* BGMap region mirror */
+            } else {
+                off = off & 0x1FFFF; /* FB/CHR region mirror */
+            }
+        }
+        if (off < VB_VRAM_SIZE) {
+            vram[off]     = (uint8_t)(val);
+            vram[off + 1] = (uint8_t)(val >> 8);
+        }
     }
 }
 
 void vb_vip_write32(vb_addr_t addr, uint32_t val) {
     if (is_vram_addr(addr)) {
-        uint32_t off = addr & (VB_VRAM_SIZE - 1);
-        vram[off]     = (uint8_t)(val);
-        vram[off + 1] = (uint8_t)(val >> 8);
-        vram[off + 2] = (uint8_t)(val >> 16);
-        vram[off + 3] = (uint8_t)(val >> 24);
+        uint32_t off = addr;
+        if (off >= 0x40000) {
+            off = ((off & 0x3FFFF) >= 0x20000) ? (off & 0x3FFFF) : (off & 0x1FFFF);
+        }
+        if (off + 3 < VB_VRAM_SIZE) {
+            vram[off]     = (uint8_t)(val);
+            vram[off + 1] = (uint8_t)(val >> 8);
+            vram[off + 2] = (uint8_t)(val >> 16);
+            vram[off + 3] = (uint8_t)(val >> 24);
+        }
         return;
     }
     vb_vip_write16(addr, (uint16_t)(val));
