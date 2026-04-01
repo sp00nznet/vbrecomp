@@ -237,36 +237,170 @@ void vb_vip_write32(vb_addr_t addr, uint32_t val) {
     vb_vip_write16(addr + 2, (uint16_t)(val >> 16));
 }
 
+/*
+ * Read a 16-bit value from VRAM (little-endian)
+ */
+static inline uint16_t vram_read16(uint32_t addr) {
+    addr &= (VB_VRAM_SIZE - 1);
+    return (uint16_t)vram[addr] | ((uint16_t)vram[addr + 1] << 8);
+}
+
+/*
+ * Get a 2-bit pixel from a character (8x8 tile).
+ * Characters are stored as 8 rows of 2 bytes each (16 bytes per char).
+ * Each row has 8 pixels × 2 bits = 16 bits.
+ */
+static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
+    /* CHR data: 4 segments, 512 chars each
+     * Segment 0-1: 0x06000 (chars 0-511)
+     * Segment 2-3: 0x0E000 (chars 512-1023)
+     */
+    uint32_t chr_base;
+    if (chr_index < 512) {
+        chr_base = 0x06000 + chr_index * 16;
+    } else {
+        chr_base = 0x0E000 + (chr_index - 512) * 16;
+    }
+    /* Each row: 2 bytes, pixel data in 2-bit pairs */
+    uint16_t row_data = vram_read16(chr_base + py * 2);
+    return (row_data >> (px * 2)) & 0x03;
+}
+
+/*
+ * Apply palette: map 2-bit pixel through palette register
+ * Palette format: bits [7:6]=color3, [5:4]=color2, [3:2]=color1, [1:0]=color0
+ * Color 0 is always transparent (0)
+ */
+static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
+    if (pixel == 0) return 0; /* Transparent */
+    return (palette >> (pixel * 2)) & 0x03;
+}
+
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
-    /* TODO: Proper world/layer/OBJ rendering */
-    /* For now, just dump the raw framebuffer contents as grayscale-ish red */
-
-    /* Select which framebuffer based on eye and current display buffer */
-    /* Left FB0: 0x00000, Left FB1: 0x08000 */
-    /* Right FB0: 0x10000, Right FB1: 0x18000 */
-    uint32_t fb_base = eye ? 0x10000 : 0x00000;
-    /* TODO: double-buffer selection based on VIP state */
+    /* Clear to background color */
+    uint8_t bkcol = reg_bkcol & 0x03;
+    uint8_t bg_intensity = bkcol * 85;
+    uint32_t bg_color = (0xFF << 24) | bg_intensity; /* ABGR */
+    for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
+        out_rgba[i] = bg_color;
+    }
 
     /*
-     * VB framebuffer format: 384x224, 2 bits per pixel
-     * Stored column-major: each column is 224 pixels = 56 bytes (224*2/8)
-     * 384 columns total = 384 * 56 = 21504 bytes per framebuffer
+     * Render worlds (display layers).
+     * World attributes are at VRAM 0x3D800, 32 bytes per world, 32 worlds.
+     * Worlds are rendered from 31 down to 0 (31 = backmost).
+     *
+     * World attribute format (16 bytes used):
+     *   +0 (HEAD): bits 15:14=BGM type, bit 13=right eye, bit 12=left eye,
+     *              bits 11:10=SCX (size), bits 9:8=SCY, bit 6=OVER,
+     *              bit 5:4=END (1=last world)
+     *   +2 (GX):   signed 16-bit, screen X position
+     *   +4 (GP):   signed 16-bit, parallax
+     *   +6 (GY):   signed 16-bit, screen Y position
+     *   +8 (MX):   signed 16-bit, map X scroll
+     *   +10 (MP):  signed 16-bit, map parallax
+     *   +12 (MY):  signed 16-bit, map Y scroll
+     *   +14 (W):   width in pixels - 1
+     *   +16 (H):   height in pixels - 1
+     *   +28 (PARAM): BGMap base
+     *   +30 (OVERPLN): overplane char
      */
-    for (int col = 0; col < VB_SCREEN_WIDTH; col++) {
-        uint32_t col_base = fb_base + col * 56; /* Not exact, simplified */
-        for (int row = 0; row < VB_SCREEN_HEIGHT; row++) {
-            int bit_offset = row * 2;
-            int byte_idx = bit_offset / 8;
-            int bit_pos = bit_offset % 8;
-            uint8_t byte = vram[col_base + byte_idx];
-            uint8_t pixel = (byte >> bit_pos) & 0x03;
+    for (int w = 31; w >= 0; w--) {
+        uint32_t wa = 0x3D800 + w * 32;
 
-            /* Map 2-bit pixel to RGBA red channel */
-            uint8_t intensity = pixel * 85; /* 0, 85, 170, 255 */
-            out_rgba[row * VB_SCREEN_WIDTH + col] =
-                (0xFF << 24) | (intensity << 0); /* ABGR: alpha=FF, R=intensity */
+        uint16_t head = vram_read16(wa + 0);
+
+        /* Check END bit — if set, stop rendering */
+        if (head & 0x0040) break; /* LON=0: skip this world */
+
+        /* Check if this world is active for the requested eye */
+        int lon = (head >> 15) & 1;  /* Left eye on */
+        /* For now render all active worlds regardless of eye */
+        if (!lon && !(head & 0x4000)) continue; /* Neither eye enabled */
+
+        int bgm_type = (head >> 12) & 0x03; /* Background type */
+
+        int16_t gx = (int16_t)vram_read16(wa + 2);
+        int16_t gy = (int16_t)vram_read16(wa + 6);
+        int16_t mx = (int16_t)vram_read16(wa + 8);
+        int16_t my = (int16_t)vram_read16(wa + 12);
+        uint16_t w_width = vram_read16(wa + 14);
+        uint16_t w_height = vram_read16(wa + 16);
+
+        uint16_t param = vram_read16(wa + 28);
+        int bgmap_base = (param & 0x0F) * 0x2000; /* BGMap segment × 8KB */
+
+        /* Palette selection from GPLT registers */
+        uint16_t pal0 = reg_gplt[0], pal1 = reg_gplt[1];
+        uint16_t pal2 = reg_gplt[2], pal3 = reg_gplt[3];
+
+        if (bgm_type == 0 || bgm_type == 1) {
+            /* Normal or H-bias background */
+            int scx = 1 << (((head >> 10) & 0x03) + 6); /* 64, 128, 256, 512 cells */
+            int scy = 1 << (((head >> 8) & 0x03) + 6);
+
+            for (int sy = 0; sy <= (int)w_height && sy < VB_SCREEN_HEIGHT; sy++) {
+                int screen_y = gy + sy;
+                if (screen_y < 0 || screen_y >= VB_SCREEN_HEIGHT) continue;
+
+                for (int sx = 0; sx <= (int)w_width && sx < VB_SCREEN_WIDTH; sx++) {
+                    int screen_x = gx + sx;
+                    if (screen_x < 0 || screen_x >= VB_SCREEN_WIDTH) continue;
+
+                    /* Map coordinates */
+                    int map_x = (mx + sx) & ((scx * 8) - 1);
+                    int map_y = (my + sy) & ((scy * 8) - 1);
+
+                    /* Which cell in the BGMap */
+                    int cell_x = map_x / 8;
+                    int cell_y = map_y / 8;
+
+                    /* BGMap segment: 64 cells wide */
+                    int seg_x = cell_x / 64;
+                    int seg_y = cell_y / 64;
+                    int local_x = cell_x % 64;
+                    int local_y = cell_y % 64;
+
+                    /* BGMap entry address */
+                    int seg_cols = scx / 64;
+                    int seg_idx = seg_y * seg_cols + seg_x;
+                    uint32_t bgmap_addr = 0x20000 + (bgmap_base + seg_idx * 0x2000);
+                    bgmap_addr &= (VB_VRAM_SIZE - 1);
+                    uint32_t cell_addr = bgmap_addr + (local_y * 64 + local_x) * 2;
+                    cell_addr &= (VB_VRAM_SIZE - 1);
+
+                    uint16_t cell = vram_read16(cell_addr);
+                    if (cell == 0) continue; /* Empty cell */
+
+                    int chr_index = cell & 0x07FF;
+                    int hflip = (cell >> 13) & 1;
+                    int vflip = (cell >> 12) & 1;
+                    int pal_idx = (cell >> 14) & 0x03;
+
+                    /* Pixel within tile */
+                    int tile_x = map_x % 8;
+                    int tile_y = map_y % 8;
+                    if (hflip) tile_x = 7 - tile_x;
+                    if (vflip) tile_y = 7 - tile_y;
+
+                    uint8_t pixel = chr_get_pixel(chr_index, tile_x, tile_y);
+                    if (pixel == 0) continue; /* Transparent */
+
+                    /* Apply palette */
+                    uint16_t pal = (pal_idx == 0) ? pal0 :
+                                   (pal_idx == 1) ? pal1 :
+                                   (pal_idx == 2) ? pal2 : pal3;
+                    uint8_t color = apply_palette(pixel, pal);
+                    if (color == 0) continue;
+
+                    /* Map to red intensity */
+                    uint8_t intensity = color * 85;
+                    out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
+                        (0xFF << 24) | intensity;
+                }
+            }
         }
     }
 }
