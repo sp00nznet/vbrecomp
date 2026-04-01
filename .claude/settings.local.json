@@ -78,7 +78,8 @@
       "Bash(timeout 6 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
       "Bash(timeout 30 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
       "Bash(tee /tmp/vram_dump.txt)",
-      "Bash(timeout 15 Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")"
+      "Bash(timeout 15 Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
+      "Bash(git stash:*)"
     ]
   }
 }
