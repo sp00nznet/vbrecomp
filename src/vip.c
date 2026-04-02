@@ -324,10 +324,22 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
-    /* Clear to background color */
+    /* Copy tile pixel data from BGMap segment 3 (0x26000) to CHR 0-1 (0x06000)
+     * if CHR is empty but BGMap segment 3 has tile data.
+     * Mario's Tennis stores CHR data in the BGMap area. */
+    if (vram[0x06000] == 0 && vram[0x06001] == 0 && vram[0x26000] != 0) {
+        memcpy(&vram[0x06000], &vram[0x26000], 0x2000); /* 8KB = 512 tiles */
+    }
+    /* Also try segment at 0x24000 → CHR 2-3 (0x0E000) */
+    if (vram[0x0E000] == 0 && vram[0x0E001] == 0 && vram[0x24000] != 0) {
+        memcpy(&vram[0x0E000], &vram[0x24000], 0x2000);
+    }
+
+    /* Clear to background color
+     * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
     uint8_t bkcol = reg_bkcol & 0x03;
     uint8_t bg_intensity = bkcol * 85;
-    uint32_t bg_color = (0xFF << 24) | bg_intensity; /* ABGR */
+    uint32_t bg_color = ((uint32_t)bg_intensity << 24) | 0xFF; /* R=intensity, A=FF */
     for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
         out_rgba[i] = bg_color;
     }
@@ -352,13 +364,19 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
      *   +28 (PARAM): BGMap base
      *   +30 (OVERPLN): overplane char
      */
+    static int render_dbg = 0;
+    render_dbg++;
+
     for (int w = 31; w >= 0; w--) {
         uint32_t wa = 0x3D800 + w * 32;
 
         uint16_t head = vram_read16(wa + 0);
 
         /* Check END bit — if set, stop rendering */
-        if (head & 0x0040) break; /* LON=0: skip this world */
+        if (head & 0x0040) {
+            if (render_dbg <= 3) fprintf(stderr, "RENDER: World %d END (HEAD=%04X)\n", w, head);
+            break;
+        }
 
         /* Check if this world is active for the requested eye */
         int lon = (head >> 15) & 1;  /* Left eye on */
@@ -381,7 +399,12 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         uint16_t pal0 = reg_gplt[0], pal1 = reg_gplt[1];
         uint16_t pal2 = reg_gplt[2], pal3 = reg_gplt[3];
 
-        if (bgm_type == 0 || bgm_type == 1) {
+        if (render_dbg <= 3) {
+            fprintf(stderr, "RENDER: World %d HEAD=%04X type=%d GX=%d GY=%d W=%d H=%d PARAM=%04X bgmap=0x%05X\n",
+                    w, head, bgm_type, gx, gy, w_width, w_height, param, 0x20000 + bgmap_base);
+        }
+
+        if (bgm_type <= 2) { /* Normal, H-bias, or Affine (treat all as normal for now) */
             /* Normal or H-bias background */
             int scx = 1 << (((head >> 10) & 0x03) + 6); /* 64, 128, 256, 512 cells */
             int scy = 1 << (((head >> 8) & 0x03) + 6);
@@ -431,11 +454,6 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     if (vflip) tile_y = 7 - tile_y;
 
                     uint8_t pixel = chr_get_pixel(chr_index, tile_x, tile_y);
-                    /* If CHR data is empty, use tile index as a debug visualization */
-                    if (pixel == 0 && chr_index > 0) {
-                        /* Show non-zero tile indices as colored blocks */
-                        pixel = ((chr_index * 7) & 0x03) | 1; /* Ensure nonzero */
-                    }
                     if (pixel == 0) continue; /* Transparent */
 
                     /* Apply palette */
@@ -445,10 +463,10 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     uint8_t color = apply_palette(pixel, pal);
                     if (color == 0) continue;
 
-                    /* Map to red intensity */
+                    /* Map to red intensity (RGBA8888: R high byte, A low byte) */
                     uint8_t intensity = color * 85;
                     out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
-                        (0xFF << 24) | intensity;
+                        ((uint32_t)intensity << 24) | 0xFF;
                 }
             }
         }
