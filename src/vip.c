@@ -14,6 +14,56 @@
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];
 
+/*
+ * Map a VIP address to the actual VRAM offset, handling mirrors.
+ *
+ * VB VRAM layout (128KB framebuffer/CHR + 128KB BGMap/World/OAM):
+ *   0x00000-0x05FFF: Left framebuffer 0
+ *   0x06000-0x07FFF: CHR segments 0-1 (8KB, 512 chars)
+ *   0x08000-0x0DFFF: Left framebuffer 1
+ *   0x0E000-0x0FFFF: CHR segments 2-3 (8KB, 512 chars)
+ *   0x10000-0x15FFF: Right framebuffer 0
+ *   0x16000-0x17FFF: MIRROR of CHR 0-1 (same memory as 0x06000)
+ *   0x18000-0x1DFFF: Right framebuffer 1
+ *   0x1E000-0x1FFFF: MIRROR of CHR 2-3 (same memory as 0x0E000)
+ *   0x20000-0x3D7FF: BGMap segments 0-13
+ *   0x3D800-0x3DBFF: World attributes
+ *   0x3E000-0x3FFFF: OAM
+ *
+ * Addresses >= 0x40000 mirror: FB/CHR portion via & 0x1FFFF,
+ * BGMap portion stays in 0x20000-0x3FFFF range.
+ */
+static inline uint32_t vip_map_addr(uint32_t addr) {
+    /* The VB VIP has two memory regions:
+     * - FB/CHR bank: 128KB at 0x00000-0x1FFFF (physical)
+     * - BGMap/World/OAM bank: 128KB at 0x20000-0x3FFFF (physical)
+     *
+     * For addresses >= 0x40000, determine which bank:
+     * - If the address modulo 0x40000 falls in 0x20000-0x3FFFF → BGMap
+     * - Otherwise → FB/CHR, masked to 0x1FFFF
+     */
+    if (addr >= 0x40000) {
+        uint32_t in_block = addr & 0x3FFFF;
+        if (in_block >= 0x20000) {
+            addr = in_block; /* BGMap bank */
+        } else {
+            /* FB/CHR bank — wrap within 128KB */
+            addr = addr & 0x1FFFF;
+        }
+    }
+
+    /* CHR mirror within FB/CHR bank:
+     * 0x16000-0x17FFF mirrors 0x06000-0x07FFF (same physical CHR RAM)
+     * 0x1E000-0x1FFFF mirrors 0x0E000-0x0FFFF */
+    if (addr >= 0x16000 && addr < 0x18000) {
+        addr -= 0x10000;
+    } else if (addr >= 0x1E000 && addr < 0x20000) {
+        addr -= 0x10000;
+    }
+
+    return addr;
+}
+
 /* VIP registers */
 static uint16_t reg_intpnd;
 static uint16_t reg_intenb;
@@ -153,42 +203,32 @@ uint8_t vb_vip_read8(vb_addr_t addr) {
         return (addr & 1) ? (uint8_t)(val >> 8) : (uint8_t)(val);
     }
     if (is_vram_addr(addr)) {
-        return vram[addr & (VB_VRAM_SIZE - 1)];
+        uint32_t off = vip_map_addr(addr);
+        return (off < VB_VRAM_SIZE) ? vram[off] : 0;
     }
     return 0;
 }
 
 uint16_t vb_vip_read16(vb_addr_t addr) {
     if (is_reg_addr(addr)) {
-        static uint32_t last_vip_addr = 0;
-        static int vip_repeat = 0;
-        if (addr == last_vip_addr) {
-            vip_repeat++;
-            if (vip_repeat == 100000) {
-                uint16_t val = reg_read((addr - VB_VIP_REG_BASE) & ~1);
-                fprintf(stderr, "VIP POLL: reg 0x%04X = 0x%04X (100K reads)\n",
-                        (unsigned)(addr - VB_VIP_REG_BASE), val);
-            }
-        } else {
-            vip_repeat = 0;
-            last_vip_addr = addr;
-        }
         return reg_read((addr - VB_VIP_REG_BASE) & ~1);
     }
     if (is_vram_addr(addr)) {
-        uint32_t off = addr & (VB_VRAM_SIZE - 1);
-        return (uint16_t)vram[off] | ((uint16_t)vram[off + 1] << 8);
+        uint32_t off = vip_map_addr(addr);
+        if (off + 1 < VB_VRAM_SIZE)
+            return (uint16_t)vram[off] | ((uint16_t)vram[off + 1] << 8);
     }
     return 0;
 }
 
 uint32_t vb_vip_read32(vb_addr_t addr) {
     if (is_vram_addr(addr)) {
-        uint32_t off = addr & (VB_VRAM_SIZE - 1);
-        return (uint32_t)vram[off]
-             | ((uint32_t)vram[off + 1] << 8)
-             | ((uint32_t)vram[off + 2] << 16)
-             | ((uint32_t)vram[off + 3] << 24);
+        uint32_t off = vip_map_addr(addr);
+        if (off + 3 < VB_VRAM_SIZE)
+            return (uint32_t)vram[off]
+                 | ((uint32_t)vram[off + 1] << 8)
+                 | ((uint32_t)vram[off + 2] << 16)
+                 | ((uint32_t)vram[off + 3] << 24);
     }
     /* 32-bit register reads: just compose from two 16-bit reads */
     return (uint32_t)vb_vip_read16(addr) | ((uint32_t)vb_vip_read16(addr + 2) << 16);
@@ -208,10 +248,7 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
         return;
     }
     if (is_vram_addr(addr)) {
-        uint32_t off = addr;
-        if (off >= 0x40000) {
-            off = ((off & 0x3FFFF) >= 0x20000) ? (off & 0x3FFFF) : (off & 0x1FFFF);
-        }
+        uint32_t off = vip_map_addr(addr);
         if (off < VB_VRAM_SIZE) vram[off] = val;
     }
 }
@@ -222,20 +259,8 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
         return;
     }
     if (is_vram_addr(addr)) {
-        /* VB has 128KB framebuffer/CHR VRAM (0x00000-0x1FFFF)
-         * and separate BGMap/World/OAM area (0x20000-0x3FFFF).
-         * Addresses 0x40000+ mirror: FB/CHR mirrors with & 0x1FFFF,
-         * BGMap mirrors with & 0x3FFFF for the BGMap portion. */
-        uint32_t off = addr;
-        if (off >= 0x40000) {
-            /* Mirror: if addr >= 0x60000, check if it maps to BGMap or FB */
-            if ((off & 0x3FFFF) >= 0x20000) {
-                off = off & 0x3FFFF; /* BGMap region mirror */
-            } else {
-                off = off & 0x1FFFF; /* FB/CHR region mirror */
-            }
-        }
-        if (off < VB_VRAM_SIZE) {
+        uint32_t off = vip_map_addr(addr);
+        if (off + 1 < VB_VRAM_SIZE) {
             vram[off]     = (uint8_t)(val);
             vram[off + 1] = (uint8_t)(val >> 8);
         }
@@ -244,10 +269,7 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
 
 void vb_vip_write32(vb_addr_t addr, uint32_t val) {
     if (is_vram_addr(addr)) {
-        uint32_t off = addr;
-        if (off >= 0x40000) {
-            off = ((off & 0x3FFFF) >= 0x20000) ? (off & 0x3FFFF) : (off & 0x1FFFF);
-        }
+        uint32_t off = vip_map_addr(addr);
         if (off + 3 < VB_VRAM_SIZE) {
             vram[off]     = (uint8_t)(val);
             vram[off + 1] = (uint8_t)(val >> 8);
@@ -409,6 +431,11 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     if (vflip) tile_y = 7 - tile_y;
 
                     uint8_t pixel = chr_get_pixel(chr_index, tile_x, tile_y);
+                    /* If CHR data is empty, use tile index as a debug visualization */
+                    if (pixel == 0 && chr_index > 0) {
+                        /* Show non-zero tile indices as colored blocks */
+                        pixel = ((chr_index * 7) & 0x03) | 1; /* Ensure nonzero */
+                    }
                     if (pixel == 0) continue; /* Transparent */
 
                     /* Apply palette */
