@@ -16,7 +16,11 @@ add_library(vbrecomp STATIC
     src/gamepad.c
     src/interrupt.c
     src/platform_sdl2.c
+    src/screenshot.c
+    src/stb_impl.c
 )
+
+target_include_directories(vbrecomp PRIVATE src)
 
 target_include_directories(vbrecomp PUBLIC include)
 

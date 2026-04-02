@@ -26,6 +26,7 @@ void vb_platform_shutdown(void) {}
 #else
 
 #include <SDL2/SDL.h>
+#include "screenshot.h"
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
@@ -105,6 +106,9 @@ bool vb_platform_poll(void) {
         case SDL_QUIT:
             return false;
         case SDL_KEYDOWN:
+            if (e.key.keysym.sym == SDLK_F12) {
+                screenshot_take(renderer);
+            }
             update_key(e.key.keysym.sym, true);
             break;
         case SDL_KEYUP:
