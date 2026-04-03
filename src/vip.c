@@ -13,6 +13,8 @@
 
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];
+static int bgmap_writes_per_frame = 0;
+static int bgmap_write_frame_log = 0;
 
 uint8_t *vb_vip_get_vram(void) { return vram; }
 
@@ -242,6 +244,10 @@ uint32_t vb_vip_read32(vb_addr_t addr) {
 }
 
 void vb_vip_write8(vb_addr_t addr, uint8_t val) {
+    if (val != 0) {
+        uint32_t mapped = vip_map_addr(addr);
+        if (mapped >= 0x20000 && mapped < 0x3D800) bgmap_writes_per_frame++;
+    }
     if (is_reg_addr(addr)) {
         /* Byte write to register: read-modify-write the 16-bit register */
         uint16_t offset = (addr - VB_VIP_REG_BASE) & ~1;
@@ -260,17 +266,7 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
 }
 
-static int w4_write_count = 0;
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
-    /* Count writes to world 4 specifically */
-    {
-        uint32_t mapped = vip_map_addr(addr);
-        if (mapped == 0x3D880) { /* world 4, offset 0 (HEAD) */
-            w4_write_count++;
-            if (w4_write_count <= 20)
-                fprintf(stderr, "W4 WRITE #%d: addr=%05X val=%04X\n", w4_write_count, addr, val);
-        }
-    }
     if (is_reg_addr(addr)) {
         reg_write((addr - VB_VIP_REG_BASE) & ~1, val);
         return;
@@ -351,10 +347,16 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
-    /* Sync CHR from game's tile staging area every frame.
-     * Always copy — the staging area is the authoritative tile source. */
-    memcpy(&vram[0x06000], &vram[0x38000], 0x2000); /* CHR 0-1: tiles 0-511 */
-    memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000); /* CHR 2-3: tiles 512-1023 */
+    /* Log BGMap writes per frame */
+    if (bgmap_writes_per_frame > 0 && bgmap_write_frame_log < 30) {
+        bgmap_write_frame_log++;
+        fprintf(stderr, "BGMAP: %d writes this frame\n", bgmap_writes_per_frame);
+    }
+    bgmap_writes_per_frame = 0;
+
+    /* Sync CHR from game's tile staging area every frame. */
+    memcpy(&vram[0x06000], &vram[0x38000], 0x2000);
+    memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000);
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
@@ -424,6 +426,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
      */
     static int render_dbg = 0;
     static int tiles_drawn = 0;
+    int world_pixels[32]; memset(world_pixels, 0, sizeof(world_pixels));
     render_dbg++;
     tiles_drawn = 0;
 
@@ -458,6 +461,14 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         uint16_t param = vram_read16(wa + 18); /* PARAM at offset 0x12 */
         int bgmap_base = (param & 0x0F) * 0x2000; /* BGMap segment × 8KB */
 
+        /* Skip worlds with clearly invalid dimensions (decompression garbage) */
+        if (w_width > 512 || w_height > 512) continue;
+        if (gx < -512 || gx > 512 || gy < -512 || gy > 512) continue;
+
+        /* DEBUG: isolate specific worlds to diagnose rendering
+         * Set to -1 to render all, or a world number to render only that world */
+        /* No world filter — render all valid worlds */
+
         /* Palette selection from GPLT registers */
         uint16_t pal0 = reg_gplt[0], pal1 = reg_gplt[1];
         uint16_t pal2 = reg_gplt[2], pal3 = reg_gplt[3];
@@ -475,8 +486,39 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             fprintf(stderr, "\n");
         }
     }
+    if (render_dbg == 2500) {
+        /* Scan BGMap segment 0 for nonzero rows */
+        fprintf(stderr, "BGMap seg 0 nonzero rows:\n");
+        for (int row = 0; row < 64; row++) {
+            int nz = 0;
+            for (int col = 0; col < 64; col++) {
+                if (vram_read16(0x20000 + (row * 64 + col) * 2) != 0) nz++;
+            }
+            if (nz > 0)
+                fprintf(stderr, "  row %2d: %d/64 cells\n", row, nz);
+        }
+    }
+    if (render_dbg == 2400) {
+        /* Dump ALL active worlds during gameplay */
+        fprintf(stderr, "=== GAMEPLAY WORLDS F%d ===\n", render_dbg);
+        for (int _w = 31; _w >= 0; _w--) {
+            uint32_t _wa = 0x3D800 + _w * 32;
+            uint16_t _head = vram_read16(_wa);
+            if (_head == 0 || (_head & 0x0040)) continue;
+            int _lon = (_head >> 15) & 1;
+            int _ron = (_head >> 14) & 1;
+            int _bgm = (_head >> 12) & 3;
+            int16_t _gx = (int16_t)vram_read16(_wa + 2);
+            int16_t _gy = (int16_t)vram_read16(_wa + 6);
+            uint16_t _ww = vram_read16(_wa + 14);
+            uint16_t _wh = vram_read16(_wa + 16);
+            uint16_t _param = vram_read16(_wa + 18);
+            fprintf(stderr, "  W%2d: HEAD=%04X L=%d R=%d BGM=%d GX=%d GY=%d W=%d H=%d P=%04X\n",
+                    _w, _head, _lon, _ron, _bgm, _gx, _gy, _ww, _wh, _param);
+        }
+    }
     if (render_dbg == 300 || render_dbg == 500 || render_dbg == 800 ||
-        render_dbg == 1000 || render_dbg == 1200) {
+        render_dbg == 1000 || render_dbg == 1200 || render_dbg == 2400) {
             fprintf(stderr, "RENDER F%d: World %d HEAD=%04X type=%d GX=%d GY=%d MX=%d MY=%d W=%d H=%d PARAM=%04X bgmap=0x%05X\n",
                     render_dbg, w, head, bgm_type, gx, gy, mx, my, w_width, w_height, param, 0x20000 + bgmap_base);
             if (bgm_type == 2) {
@@ -568,7 +610,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                         uint8_t intensity = 64 + color * 64;
                         out_rgba[sy * VB_SCREEN_WIDTH + sx] =
                             ((uint32_t)intensity << 24) | 0xFF;
-                        tiles_drawn++;
+                        tiles_drawn++; world_pixels[w]++;
                     }
                 }
             }
@@ -655,7 +697,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                                 uint8_t intensity = 64 + color * 64;
                                 out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
                                     ((uint32_t)intensity << 24) | 0xFF;
-                                tiles_drawn++;
+                                tiles_drawn++; world_pixels[w]++;
                             }
                         }
                     }
@@ -716,37 +758,53 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     uint8_t intensity = 64 + color * 64;
                     out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
                         ((uint32_t)intensity << 24) | 0xFF;
-                    tiles_drawn++;
+                    tiles_drawn++; world_pixels[w]++;
                 }
             }
         }
     }
 
     if (render_dbg == 300) {
-        fprintf(stderr, "RENDER F%d: %d pixels drawn, CHR[0x06000]=%02X%02X\n",
-                render_dbg, tiles_drawn, vram[0x06000], vram[0x06001]);
+        fprintf(stderr, "RENDER F%d: %d pixels drawn\n", render_dbg, tiles_drawn);
+        if (render_dbg == 2400) {
+            fprintf(stderr, "Per-world pixels: ");
+            for (int _w = 31; _w >= 0; _w--)
+                if (world_pixels[_w] > 0)
+                    fprintf(stderr, "W%d=%d ", _w, world_pixels[_w]);
+            fprintf(stderr, "\n");
+        }
     }
 
     /* VB LED glow post-process: simulate the red LED bloom effect.
-     * Each lit pixel spreads some intensity to its neighbors, making
-     * sparse tile patterns look more solid like on real VB hardware. */
+     * Two-pass box blur to spread pixel intensity, making sparse
+     * tile patterns look more solid like on real VB hardware. */
     {
-        static uint8_t glow_buf[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
-        /* Extract red channel to work buffer */
+        static uint8_t src[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
+        static uint8_t tmp[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
+        /* Extract red channel */
         for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++)
-            glow_buf[i] = (out_rgba[i] >> 24) & 0xFF;
+            src[i] = (out_rgba[i] >> 24) & 0xFF;
 
+        /* Pass 1: horizontal blur */
         for (int y = 0; y < VB_SCREEN_HEIGHT; y++) {
             for (int x = 0; x < VB_SCREEN_WIDTH; x++) {
                 int idx = y * VB_SCREEN_WIDTH + x;
-                int val = glow_buf[idx];
-                /* Add neighbor contributions */
-                if (x > 0) val += glow_buf[idx - 1] / 3;
-                if (x < VB_SCREEN_WIDTH - 1) val += glow_buf[idx + 1] / 3;
-                if (y > 0) val += glow_buf[idx - VB_SCREEN_WIDTH] / 3;
-                if (y < VB_SCREEN_HEIGHT - 1) val += glow_buf[idx + VB_SCREEN_WIDTH] / 3;
-                if (val > 255) val = 255;
-                out_rgba[idx] = ((uint32_t)val << 24) | 0xFF;
+                int val = src[idx] * 2;
+                if (x > 0) val += src[idx - 1];
+                if (x < VB_SCREEN_WIDTH - 1) val += src[idx + 1];
+                tmp[idx] = (val > 510) ? 255 : val / 2;
+            }
+        }
+        /* Pass 2: vertical blur */
+        for (int y = 0; y < VB_SCREEN_HEIGHT; y++) {
+            for (int x = 0; x < VB_SCREEN_WIDTH; x++) {
+                int idx = y * VB_SCREEN_WIDTH + x;
+                int val = tmp[idx] * 2;
+                if (y > 0) val += tmp[idx - VB_SCREEN_WIDTH];
+                if (y < VB_SCREEN_HEIGHT - 1) val += tmp[idx + VB_SCREEN_WIDTH];
+                int result = val / 2;
+                if (result > 255) result = 255;
+                out_rgba[idx] = ((uint32_t)result << 24) | 0xFF;
             }
         }
     }
