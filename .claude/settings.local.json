@@ -94,7 +94,8 @@
       "Bash(rm -f screenshot_*.png)",
       "Bash(rm -f auto_*.png)",
       "Bash(taskkill /f /im mariotennis.exe)",
-      "Bash(grep -n \"movea.*0x[0-9A-F]\\\\{4,5\\\\}\" \"D:/recomp/vb/mariotennis/generated/recomp_funcs.c\")"
+      "Bash(grep -n \"movea.*0x[0-9A-F]\\\\{4,5\\\\}\" \"D:/recomp/vb/mariotennis/generated/recomp_funcs.c\")",
+      "Bash(awk 'NR>=3800 && NR<=4200')"
     ]
   }
 }
