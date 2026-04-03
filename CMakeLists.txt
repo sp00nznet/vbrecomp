@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(vbrecomp C)
+project(vbrecomp C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # --- Library ---
 
@@ -29,6 +31,20 @@ find_package(SDL2 QUIET)
 if(SDL2_FOUND)
     target_link_libraries(vbrecomp PUBLIC SDL2::SDL2)
     message(STATUS "SDL2 found: platform backend enabled")
+
+    # ImGui + menu system (requires SDL2)
+    add_library(vbrecomp_menu STATIC
+        src/menu.cpp
+        src/imgui/imgui.cpp
+        src/imgui/imgui_draw.cpp
+        src/imgui/imgui_tables.cpp
+        src/imgui/imgui_widgets.cpp
+        src/imgui/backends/imgui_impl_sdl2.cpp
+        src/imgui/backends/imgui_impl_sdlrenderer2.cpp
+    )
+    target_include_directories(vbrecomp_menu PUBLIC src src/imgui src/imgui/backends)
+    target_link_libraries(vbrecomp_menu PUBLIC SDL2::SDL2)
+    target_link_libraries(vbrecomp PUBLIC vbrecomp_menu)
 else()
     target_compile_definitions(vbrecomp PRIVATE VBRECOMP_NO_SDL)
     message(STATUS "SDL2 not found: platform backend disabled (stub)")

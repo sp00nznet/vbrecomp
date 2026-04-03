@@ -27,6 +27,7 @@ void vb_platform_shutdown(void) {}
 
 #include <SDL2/SDL.h>
 #include "screenshot.h"
+#include "menu.h"
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
@@ -34,6 +35,13 @@ static SDL_Texture *texture;
 static uint16_t button_state;
 static vb_audio_callback_t audio_cb;
 static SDL_AudioDeviceID audio_dev;
+
+static void screenshot_toast(const char *filename, void *userdata) {
+    (void)userdata;
+    char msg[512];
+    snprintf(msg, sizeof(msg), "Saved: %s", filename);
+    menu_show_toast(msg);
+}
 
 bool vb_platform_init(const char *title, int scale) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
@@ -59,6 +67,13 @@ bool vb_platform_init(const char *title, int scale) {
     );
     if (!texture) return false;
 
+    /* Init ImGui menu system */
+    MenuConfig mcfg = menu_config_default(title);
+    mcfg.enable_open_file = false;
+    mcfg.enable_debug_menu = false;
+    mcfg.enable_about_menu = false;
+    menu_init(window, renderer, &mcfg);
+
     button_state = 0;
     audio_cb = NULL;
     audio_dev = 0;
@@ -70,6 +85,7 @@ void vb_platform_present(const uint32_t *framebuffer) {
     SDL_UpdateTexture(texture, NULL, framebuffer, VB_SCREEN_WIDTH * sizeof(uint32_t));
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
+    menu_draw();
     SDL_RenderPresent(renderer);
 }
 
@@ -102,12 +118,16 @@ static void update_key(SDL_Keycode key, bool pressed) {
 bool vb_platform_poll(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
+        menu_process_event(&e);
         switch (e.type) {
         case SDL_QUIT:
             return false;
         case SDL_KEYDOWN:
-            if (e.key.keysym.sym == SDLK_F12) {
-                screenshot_take(renderer);
+            if (e.key.keysym.sym == SDLK_F12 || menu_screenshot_requested()) {
+                menu_clear_screenshot_request();
+                ScreenshotConfig cfg = screenshot_config_default();
+                cfg.on_save = screenshot_toast;
+                screenshot_take_ex(renderer, &cfg);
             }
             update_key(e.key.keysym.sym, true);
             break;
@@ -115,6 +135,13 @@ bool vb_platform_poll(void) {
             update_key(e.key.keysym.sym, false);
             break;
         }
+    }
+    if (menu_quit_requested()) return false;
+    if (menu_screenshot_requested()) {
+        menu_clear_screenshot_request();
+        ScreenshotConfig cfg = screenshot_config_default();
+        cfg.on_save = screenshot_toast;
+        screenshot_take_ex(renderer, &cfg);
     }
     return true;
 }
@@ -159,6 +186,7 @@ void vb_platform_audio_stop(void) {
 }
 
 void vb_platform_shutdown(void) {
+    menu_shutdown();
     vb_platform_audio_stop();
     if (texture) { SDL_DestroyTexture(texture); texture = NULL; }
     if (renderer) { SDL_DestroyRenderer(renderer); renderer = NULL; }
