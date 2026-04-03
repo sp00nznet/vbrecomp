@@ -79,7 +79,22 @@
       "Bash(timeout 30 ./Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
       "Bash(tee /tmp/vram_dump.txt)",
       "Bash(timeout 15 Debug/mariotennis.exe \"../Mario''''s Tennis \\(Japan, USA\\).vb\")",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(tasklist)",
+      "Bash(ls:*)",
+      "Read(//d/recomp/vb/**)",
+      "Read(//d/recomp/**)",
+      "Bash(vcpkg list:*)",
+      "Bash(where vcpkg:*)",
+      "Bash(./build/Debug/mariotennis.exe)",
+      "Read(//d//**)",
+      "Bash(find /d -maxdepth 3 -name \"tool\" -type d)",
+      "Bash(xargs -I{} dirname {})",
+      "Bash(echo \"exit: $?\")",
+      "Bash(rm -f screenshot_*.png)",
+      "Bash(rm -f auto_*.png)",
+      "Bash(taskkill /f /im mariotennis.exe)",
+      "Bash(grep -n \"movea.*0x[0-9A-F]\\\\{4,5\\\\}\" \"D:/recomp/vb/mariotennis/generated/recomp_funcs.c\")"
     ]
   }
 }
