@@ -46,7 +46,16 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
      * - If the address modulo 0x40000 falls in 0x20000-0x3FFFF → BGMap
      * - Otherwise → FB/CHR, masked to 0x1FFFF
      */
-    if (addr >= 0x40000) {
+    /* CHR RAM mirrors at 0x78000-0x7FFFF map to CHR pattern tables */
+    if (addr >= 0x78000 && addr < 0x7A000) {
+        addr = 0x06000 + (addr - 0x78000);  /* CHR 0 */
+    } else if (addr >= 0x7A000 && addr < 0x7C000) {
+        addr = 0x0E000 + (addr - 0x7A000);  /* CHR 1 */
+    } else if (addr >= 0x7C000 && addr < 0x7E000) {
+        addr = 0x16000 + (addr - 0x7C000);  /* CHR 2 (mirror of 0) */
+    } else if (addr >= 0x7E000 && addr < 0x80000) {
+        addr = 0x1E000 + (addr - 0x7E000);  /* CHR 3 (mirror of 1) */
+    } else if (addr >= 0x40000) {
         uint32_t in_block = addr & 0x3FFFF;
         if (in_block >= 0x20000) {
             addr = in_block; /* BGMap bank */
@@ -311,25 +320,12 @@ static inline uint16_t vram_read16(uint32_t addr) {
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
     /* VB has 1024 unique characters; indices 1024-2047 mirror 0-1023 */
     chr_index &= 0x3FF;
-
-    /* Try standard CHR locations first */
     uint32_t chr_base;
     if (chr_index < 512) {
         chr_base = 0x06000 + chr_index * 16;
     } else {
         chr_base = 0x0E000 + (chr_index - 512) * 16;
     }
-
-    /* If standard CHR is empty, read from the contiguous staging area
-     * at 0x38000 where the game stores all decompressed tile data */
-    if (vram[chr_base] == 0 && vram[chr_base + 1] == 0) {
-        /* Try contiguous layout from 0x38000 (tiles 0-1023 in sequence) */
-        uint32_t alt = 0x38000 + chr_index * 16;
-        if (alt + 15 < VB_VRAM_SIZE && (vram[alt] != 0 || vram[alt + 1] != 0)) {
-            chr_base = alt;
-        }
-    }
-
     uint16_t row_data = vram_read16(chr_base + py * 2);
     return (row_data >> (px * 2)) & 0x03;
 }
@@ -354,9 +350,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     }
     bgmap_writes_per_frame = 0;
 
-    /* Sync CHR from game's tile staging area every frame. */
-    memcpy(&vram[0x06000], &vram[0x38000], 0x2000);
-    memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000);
+    /* CHR data now goes directly to CHR via the 0x78000 mirror mapping */
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
