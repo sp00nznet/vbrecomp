@@ -260,19 +260,15 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
 }
 
-static int hw_write_count = 0;
+static int w4_write_count = 0;
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
-    /* Track writes to high worlds (28-31) */
+    /* Count writes to world 4 specifically */
     {
         uint32_t mapped = vip_map_addr(addr);
-        if (mapped >= 0x3DB80 && mapped < 0x3DC00) { /* worlds 28-31 */
-            hw_write_count++;
-            if (hw_write_count <= 30) {
-                int world = (mapped - 0x3D800) / 32;
-                int offset = (mapped - 0x3D800) % 32;
-                fprintf(stderr, "HW WRITE: world=%d off=%d val=%04X (addr=%05X)\n",
-                        world, offset, val, addr);
-            }
+        if (mapped == 0x3D880) { /* world 4, offset 0 (HEAD) */
+            w4_write_count++;
+            if (w4_write_count <= 20)
+                fprintf(stderr, "W4 WRITE #%d: addr=%05X val=%04X\n", w4_write_count, addr, val);
         }
     }
     if (is_reg_addr(addr)) {
@@ -356,24 +352,9 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
     /* Sync CHR from game's tile staging area every frame.
-     * The game decompresses tile data to 0x38000+ (via addresses 0x78000+).
-     * Copy the full contiguous staging block to both CHR banks. */
-    if (vram[0x38000] != 0 || vram[0x38010] != 0) {
-        memcpy(&vram[0x06000], &vram[0x38000], 0x2000); /* CHR 0-1 */
-        memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000); /* CHR 2-3 */
-    }
-    /* Also copy from 0x3C000 region if it has tile data (overflow from staging) */
-    if (vram[0x3C000] != 0 || vram[0x3C010] != 0) {
-        /* Fill empty CHR tiles from extended staging at 0x3C000 */
-        for (uint32_t off = 0; off < 0x2000; off += 16) {
-            uint32_t dst = 0x0E000 + off;
-            if (vram[dst] == 0 && vram[dst+1] == 0 && vram[dst+2] == 0 && vram[dst+3] == 0) {
-                uint32_t src = 0x3C000 + off;
-                if (vram[src] != 0 || vram[src+1] != 0)
-                    memcpy(&vram[dst], &vram[src], 16);
-            }
-        }
-    }
+     * Always copy — the staging area is the authoritative tile source. */
+    memcpy(&vram[0x06000], &vram[0x38000], 0x2000); /* CHR 0-1: tiles 0-511 */
+    memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000); /* CHR 2-3: tiles 512-1023 */
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
@@ -418,16 +399,15 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
         /* Check END bit — if set, stop rendering */
         if (head & 0x0040) {
-            if (render_dbg == 300) fprintf(stderr, "RENDER: World %d END (HEAD=%04X)\n", w, head);
             break;
         }
 
         /* Check if this world is active for the requested eye */
         int lon = (head >> 15) & 1;  /* Left eye on */
         int ron = (head >> 14) & 1;  /* Right eye on */
-        if (eye == 0 && !lon) continue; /* Left eye render, world not enabled for left */
-        if (eye == 1 && !ron) continue; /* Right eye render, world not enabled for right */
-        if (!lon && !ron) continue;     /* Neither eye enabled */
+        if (eye == 0 && !lon) continue;
+        if (eye == 1 && !ron) continue;
+        if (!lon && !ron) continue;
 
         int bgm_type = (head >> 12) & 0x03; /* Background type */
 
