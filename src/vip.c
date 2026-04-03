@@ -63,6 +63,11 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
         addr -= 0x10000;
     }
 
+    /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF */
+    if (addr >= 0x3DC00 && addr < 0x3E000) {
+        addr = 0x3D800 + ((addr - 0x3DC00) & 0x3FF);
+    }
+
     return addr;
 }
 
