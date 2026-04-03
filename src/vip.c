@@ -14,6 +14,8 @@
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];
 
+uint8_t *vb_vip_get_vram(void) { return vram; }
+
 /*
  * Map a VIP address to the actual VRAM offset, handling mirrors.
  *
@@ -325,12 +327,19 @@ static inline uint16_t vram_read16(uint32_t addr) {
  * Each row has 8 pixels × 2 bits = 16 bits.
  */
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
-    /* Standard CHR locations */
+    /* VB has 1024 unique characters; indices 1024-2047 mirror 0-1023 */
+    chr_index &= 0x3FF;
     uint32_t chr_base;
     if (chr_index < 512) {
         chr_base = 0x06000 + chr_index * 16;
     } else {
         chr_base = 0x0E000 + (chr_index - 512) * 16;
+    }
+    /* If standard CHR is empty, also check the staging area at 0x38000 */
+    if (vram[chr_base] == 0 && vram[chr_base + 2] == 0 &&
+        vram[chr_base + 4] == 0 && vram[chr_base + 6] == 0) {
+        uint32_t alt = 0x38000 + chr_index * 16;
+        if (alt + 15 < VB_VRAM_SIZE) chr_base = alt;
     }
     uint16_t row_data = vram_read16(chr_base + py * 2);
     return (row_data >> (px * 2)) & 0x03;
