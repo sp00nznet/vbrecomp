@@ -445,19 +445,21 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
         int bgm_type = (head >> 12) & 0x03; /* Background type */
 
-        int16_t gx = (int16_t)vram_read16(wa + 2);
+        /* GX and parallax are 10-bit signed (sign-extend from bit 9) */
+        int16_t gx = (int16_t)((vram_read16(wa + 2) << 6)) >> 6;
+        int16_t gp = (int16_t)((vram_read16(wa + 4) << 6)) >> 6;
         int16_t gy = (int16_t)vram_read16(wa + 6);
         int16_t mx = (int16_t)vram_read16(wa + 8);
         int16_t my = (int16_t)vram_read16(wa + 12);
         uint16_t w_width = vram_read16(wa + 14);
         uint16_t w_height = vram_read16(wa + 16);
 
-        uint16_t param = vram_read16(wa + 18); /* PARAM at offset 0x12 */
-        int bgmap_base = (param & 0x0F) * 0x2000; /* BGMap segment × 8KB */
+        uint16_t param = vram_read16(wa + 18);
+        /* BGMap base segment comes from HEAD bits 3:0 (NOT param bits 3:0) */
+        int bgmap_base = (head & 0x0F) * 0x2000;
 
-        /* Skip worlds with clearly invalid dimensions (decompression garbage) */
+        /* Skip worlds with clearly invalid dimensions */
         if (w_width > 512 || w_height > 512) continue;
-        if (gx < -512 || gx > 512 || gy < -512 || gy > 512) continue;
 
         /* DEBUG: isolate specific worlds to diagnose rendering
          * Set to -1 to render all, or a world number to render only that world */
@@ -614,8 +616,8 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             int scy = 1 << (((head >> 8) & 0x03) + 6);
             int over = (head >> 7) & 1;
 
-            /* Parameter table: 8 halfwords per scanline (MX, MP, MY, DX, DY, pad, pad, pad) */
-            uint32_t param_table = 0x20000 + ((param & 0xFFF0) * 2);
+            /* Parameter table offset = param_base * 2 within BGMap/param memory */
+            uint32_t param_table = 0x20000 + (uint32_t)param * 2;
 
             for (int sy = 0; sy <= (int)w_height && sy < VB_SCREEN_HEIGHT; sy++) {
                 int screen_y = gy + sy;
