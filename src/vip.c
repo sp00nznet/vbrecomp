@@ -347,25 +347,35 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
 }
 
 /* Saved world attributes — used to restore after decompression corrupts them */
-static uint8_t saved_worlds[0x400]; /* 0x3D800-0x3DBFF = 1KB */
+static uint8_t saved_worlds[0x800]; /* 0x3D800-0x3DFFF = 2KB (worlds + mirror) */
 static bool worlds_saved = false;
+
+static bool worlds_look_valid(void) {
+    /* Check several worlds for plausible values */
+    for (int w = 28; w <= 31; w++) {
+        uint32_t wa = 0x3D800 + w * 32;
+        uint16_t head = vram_read16(wa);
+        if (head == 0 || head == 0x0040) continue; /* Empty or END marker */
+        /* Active world: check position/size are reasonable for 384x224 screen */
+        int16_t gx = (int16_t)vram_read16(wa + 2);
+        int16_t gy = (int16_t)vram_read16(wa + 6);
+        uint16_t ww = vram_read16(wa + 14);
+        uint16_t wh = vram_read16(wa + 16);
+        if (gx < -512 || gx > 512 || gy < -512 || gy > 512) return false;
+        if (ww > 1024 || wh > 1024) return false;
+    }
+    return true;
+}
 
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
-    /* Protect world attributes from decompression corruption.
-     * The game writes decompressed tile data to 0x3D000+ which bleeds
-     * into world attributes at 0x3D800. Save valid worlds and restore
-     * when corruption is detected. */
-    {
-        uint16_t head31 = vram_read16(0x3D800 + 31 * 32);
-        bool looks_valid = (head31 & 0xC000) != 0 || head31 == 0x0040 || head31 == 0;
-        if (looks_valid && head31 != 0) {
-            memcpy(saved_worlds, &vram[0x3D800], sizeof(saved_worlds));
-            worlds_saved = true;
-        } else if (worlds_saved) {
-            memcpy(&vram[0x3D800], saved_worlds, sizeof(saved_worlds));
-        }
+    /* Protect world attributes from decompression corruption */
+    if (worlds_look_valid()) {
+        memcpy(saved_worlds, &vram[0x3D800], sizeof(saved_worlds));
+        worlds_saved = true;
+    } else if (worlds_saved) {
+        memcpy(&vram[0x3D800], saved_worlds, sizeof(saved_worlds));
     }
 
     /* Sync CHR from game's staging area (0x38000/0x3A000) every frame.
@@ -427,8 +437,10 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
         /* Check if this world is active for the requested eye */
         int lon = (head >> 15) & 1;  /* Left eye on */
-        /* For now render all active worlds regardless of eye */
-        if (!lon && !(head & 0x4000)) continue; /* Neither eye enabled */
+        int ron = (head >> 14) & 1;  /* Right eye on */
+        if (eye == 0 && !lon) continue; /* Left eye render, world not enabled for left */
+        if (eye == 1 && !ron) continue; /* Right eye render, world not enabled for right */
+        if (!lon && !ron) continue;     /* Neither eye enabled */
 
         int bgm_type = (head >> 12) & 0x03; /* Background type */
 
@@ -459,7 +471,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             fprintf(stderr, "\n");
         }
     }
-    if (render_dbg == 300 || render_dbg == 500) {
+    if (render_dbg == 300 || render_dbg == 500 || render_dbg == 800) {
             fprintf(stderr, "RENDER F%d: World %d HEAD=%04X type=%d GX=%d GY=%d MX=%d MY=%d W=%d H=%d PARAM=%04X bgmap=0x%05X\n",
                     render_dbg, w, head, bgm_type, gx, gy, mx, my, w_width, w_height, param, 0x20000 + bgmap_base);
             if (bgm_type == 2) {
