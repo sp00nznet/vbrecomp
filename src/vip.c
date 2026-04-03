@@ -260,7 +260,21 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
 }
 
+static int hw_write_count = 0;
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
+    /* Track writes to high worlds (28-31) */
+    {
+        uint32_t mapped = vip_map_addr(addr);
+        if (mapped >= 0x3DB80 && mapped < 0x3DC00) { /* worlds 28-31 */
+            hw_write_count++;
+            if (hw_write_count <= 30) {
+                int world = (mapped - 0x3D800) / 32;
+                int offset = (mapped - 0x3D800) % 32;
+                fprintf(stderr, "HW WRITE: world=%d off=%d val=%04X (addr=%05X)\n",
+                        world, offset, val, addr);
+            }
+        }
+    }
     if (is_reg_addr(addr)) {
         reg_write((addr - VB_VIP_REG_BASE) & ~1, val);
         return;
@@ -444,7 +458,8 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             fprintf(stderr, "\n");
         }
     }
-    if (render_dbg == 300 || render_dbg == 500 || render_dbg == 800) {
+    if (render_dbg == 300 || render_dbg == 500 || render_dbg == 800 ||
+        render_dbg == 1000 || render_dbg == 1200) {
             fprintf(stderr, "RENDER F%d: World %d HEAD=%04X type=%d GX=%d GY=%d MX=%d MY=%d W=%d H=%d PARAM=%04X bgmap=0x%05X\n",
                     render_dbg, w, head, bgm_type, gx, gy, mx, my, w_width, w_height, param, 0x20000 + bgmap_base);
             if (bgm_type == 2) {
