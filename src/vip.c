@@ -236,7 +236,6 @@ uint32_t vb_vip_read32(vb_addr_t addr) {
     return (uint32_t)vb_vip_read16(addr) | ((uint32_t)vb_vip_read16(addr + 2) << 16);
 }
 
-static int world_write_count = 0;
 void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     if (is_reg_addr(addr)) {
         /* Byte write to register: read-modify-write the 16-bit register */
@@ -257,18 +256,6 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
 }
 
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
-    /* Track writes to world attributes */
-    {
-        uint32_t mapped = vip_map_addr(addr);
-        if (mapped >= 0x3D800 && mapped < 0x3DC00 && val != 0) {
-            world_write_count++;
-            if (world_write_count <= 5) {
-                int world = (mapped - 0x3D800) / 32;
-                int offset = (mapped - 0x3D800) % 32;
-                fprintf(stderr, "WORLD WRITE16: world=%d off=%d val=%04X\n", world, offset, val);
-            }
-        }
-    }
     if (is_reg_addr(addr)) {
         reg_write((addr - VB_VIP_REG_BASE) & ~1, val);
         return;
@@ -313,18 +300,25 @@ static inline uint16_t vram_read16(uint32_t addr) {
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
     /* VB has 1024 unique characters; indices 1024-2047 mirror 0-1023 */
     chr_index &= 0x3FF;
+
+    /* Try standard CHR locations first */
     uint32_t chr_base;
     if (chr_index < 512) {
         chr_base = 0x06000 + chr_index * 16;
     } else {
         chr_base = 0x0E000 + (chr_index - 512) * 16;
     }
-    /* If standard CHR is empty, also check the staging area at 0x38000 */
-    if (vram[chr_base] == 0 && vram[chr_base + 2] == 0 &&
-        vram[chr_base + 4] == 0 && vram[chr_base + 6] == 0) {
+
+    /* If standard CHR is empty, read from the contiguous staging area
+     * at 0x38000 where the game stores all decompressed tile data */
+    if (vram[chr_base] == 0 && vram[chr_base + 1] == 0) {
+        /* Try contiguous layout from 0x38000 (tiles 0-1023 in sequence) */
         uint32_t alt = 0x38000 + chr_index * 16;
-        if (alt + 15 < VB_VRAM_SIZE) chr_base = alt;
+        if (alt + 15 < VB_VRAM_SIZE && (vram[alt] != 0 || vram[alt + 1] != 0)) {
+            chr_base = alt;
+        }
     }
+
     uint16_t row_data = vram_read16(chr_base + py * 2);
     return (row_data >> (px * 2)) & 0x03;
 }
@@ -342,14 +336,24 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
-    /* Sync CHR from game's staging area (0x38000/0x3A000) every frame.
-     * The game dynamically updates tile data here and the VIP interrupt
-     * handler should copy it to CHR, but that handler doesn't fully run. */
+    /* Sync CHR from game's tile staging area every frame.
+     * The game decompresses tile data to 0x38000+ (via addresses 0x78000+).
+     * Copy the full contiguous staging block to both CHR banks. */
     if (vram[0x38000] != 0 || vram[0x38010] != 0) {
-        memcpy(&vram[0x06000], &vram[0x38000], 0x2000);
+        memcpy(&vram[0x06000], &vram[0x38000], 0x2000); /* CHR 0-1 */
+        memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000); /* CHR 2-3 */
     }
-    if (vram[0x3A000] != 0 || vram[0x3A010] != 0) {
-        memcpy(&vram[0x0E000], &vram[0x3A000], 0x2000);
+    /* Also copy from 0x3C000 region if it has tile data (overflow from staging) */
+    if (vram[0x3C000] != 0 || vram[0x3C010] != 0) {
+        /* Fill empty CHR tiles from extended staging at 0x3C000 */
+        for (uint32_t off = 0; off < 0x2000; off += 16) {
+            uint32_t dst = 0x0E000 + off;
+            if (vram[dst] == 0 && vram[dst+1] == 0 && vram[dst+2] == 0 && vram[dst+3] == 0) {
+                uint32_t src = 0x3C000 + off;
+                if (vram[src] != 0 || vram[src+1] != 0)
+                    memcpy(&vram[dst], &vram[src], 16);
+            }
+        }
     }
 
     /* Clear to background color
