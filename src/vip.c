@@ -346,8 +346,27 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
     return (palette >> (pixel * 2)) & 0x03;
 }
 
+/* Saved world attributes — used to restore after decompression corrupts them */
+static uint8_t saved_worlds[0x400]; /* 0x3D800-0x3DBFF = 1KB */
+static bool worlds_saved = false;
+
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
+
+    /* Protect world attributes from decompression corruption.
+     * The game writes decompressed tile data to 0x3D000+ which bleeds
+     * into world attributes at 0x3D800. Save valid worlds and restore
+     * when corruption is detected. */
+    {
+        uint16_t head31 = vram_read16(0x3D800 + 31 * 32);
+        bool looks_valid = (head31 & 0xC000) != 0 || head31 == 0x0040 || head31 == 0;
+        if (looks_valid && head31 != 0) {
+            memcpy(saved_worlds, &vram[0x3D800], sizeof(saved_worlds));
+            worlds_saved = true;
+        } else if (worlds_saved) {
+            memcpy(&vram[0x3D800], saved_worlds, sizeof(saved_worlds));
+        }
+    }
 
     /* Sync CHR from game's staging area (0x38000/0x3A000) every frame.
      * The game dynamically updates tile data here and the VIP interrupt
