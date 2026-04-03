@@ -236,20 +236,8 @@ uint32_t vb_vip_read32(vb_addr_t addr) {
     return (uint32_t)vb_vip_read16(addr) | ((uint32_t)vb_vip_read16(addr + 2) << 16);
 }
 
-static int chr_write_log = 0;
-static int chr_nonzero_writes = 0;
+static int world_write_count = 0;
 void vb_vip_write8(vb_addr_t addr, uint8_t val) {
-    /* Count all nonzero CHR writes */
-    if (val != 0) {
-        uint32_t mapped = vip_map_addr(addr);
-        if ((mapped >= 0x06000 && mapped < 0x08000) ||
-            (mapped >= 0x0E000 && mapped < 0x10000)) {
-            chr_nonzero_writes++;
-            if (chr_nonzero_writes <= 5) {
-                fprintf(stderr, "CHR WRITE8 NONZERO: addr=0x%05X mapped=0x%05X val=%02X\n", addr, mapped, val);
-            }
-        }
-    }
     if (is_reg_addr(addr)) {
         /* Byte write to register: read-modify-write the 16-bit register */
         uint16_t offset = (addr - VB_VIP_REG_BASE) & ~1;
@@ -269,12 +257,16 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
 }
 
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
-    if (chr_write_log < 20) {
+    /* Track writes to world attributes */
+    {
         uint32_t mapped = vip_map_addr(addr);
-        if ((mapped >= 0x06000 && mapped < 0x08000) ||
-            (mapped >= 0x0E000 && mapped < 0x10000)) {
-            fprintf(stderr, "CHR WRITE16: addr=0x%05X mapped=0x%05X val=%04X\n", addr, mapped, val);
-            chr_write_log++;
+        if (mapped >= 0x3D800 && mapped < 0x3DC00 && val != 0) {
+            world_write_count++;
+            if (world_write_count <= 5) {
+                int world = (mapped - 0x3D800) / 32;
+                int offset = (mapped - 0x3D800) % 32;
+                fprintf(stderr, "WORLD WRITE16: world=%d off=%d val=%04X\n", world, offset, val);
+            }
         }
     }
     if (is_reg_addr(addr)) {
@@ -291,14 +283,6 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
 }
 
 void vb_vip_write32(vb_addr_t addr, uint32_t val) {
-    if (chr_write_log < 20) {
-        uint32_t mapped = vip_map_addr(addr);
-        if ((mapped >= 0x06000 && mapped < 0x08000) ||
-            (mapped >= 0x0E000 && mapped < 0x10000)) {
-            fprintf(stderr, "CHR WRITE32: addr=0x%05X mapped=0x%05X val=%08X\n", addr, mapped, val);
-            chr_write_log++;
-        }
-    }
     if (is_vram_addr(addr)) {
         uint32_t off = vip_map_addr(addr);
         if (off + 3 < VB_VRAM_SIZE) {
@@ -355,37 +339,8 @@ static inline uint8_t apply_palette(uint8_t pixel, uint16_t palette) {
     return (palette >> (pixel * 2)) & 0x03;
 }
 
-/* Saved world attributes — used to restore after decompression corrupts them */
-static uint8_t saved_worlds[0x800]; /* 0x3D800-0x3DFFF = 2KB (worlds + mirror) */
-static bool worlds_saved = false;
-
-static bool worlds_look_valid(void) {
-    /* Check several worlds for plausible values */
-    for (int w = 28; w <= 31; w++) {
-        uint32_t wa = 0x3D800 + w * 32;
-        uint16_t head = vram_read16(wa);
-        if (head == 0 || head == 0x0040) continue; /* Empty or END marker */
-        /* Active world: check position/size are reasonable for 384x224 screen */
-        int16_t gx = (int16_t)vram_read16(wa + 2);
-        int16_t gy = (int16_t)vram_read16(wa + 6);
-        uint16_t ww = vram_read16(wa + 14);
-        uint16_t wh = vram_read16(wa + 16);
-        if (gx < -512 || gx > 512 || gy < -512 || gy > 512) return false;
-        if (ww > 1024 || wh > 1024) return false;
-    }
-    return true;
-}
-
 void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
-
-    /* Protect world attributes from decompression corruption */
-    if (worlds_look_valid()) {
-        memcpy(saved_worlds, &vram[0x3D800], sizeof(saved_worlds));
-        worlds_saved = true;
-    } else if (worlds_saved) {
-        memcpy(&vram[0x3D800], saved_worlds, sizeof(saved_worlds));
-    }
 
     /* Sync CHR from game's staging area (0x38000/0x3A000) every frame.
      * The game dynamically updates tile data here and the VIP interrupt
