@@ -644,9 +644,14 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     int screen_x = gx + sx;
                     if (screen_x < 0 || screen_x >= VB_SCREEN_WIDTH) { fx += src_dx; continue; }
 
-                    /* Source coordinates from fixed-point (>>9 for 7.9) */
+                    /* Source coordinates from fixed-point (>>9 for 7.9).
+                     * When zoomed out (DX>512), sample multiple source pixels
+                     * to avoid nearest-neighbor gaps. Use max of covered range. */
                     int map_x = fx >> 9;
                     int map_y = fy >> 9;
+                    /* How many extra source pixels this screen pixel covers */
+                    int dx_abs = src_dx < 0 ? -src_dx : src_dx;
+                    int extra_samples = (dx_abs > 512) ? (dx_abs / 512) : 0;
 
                     /* Bounds check / wrapping */
                     int map_w = scx * 8;
@@ -676,30 +681,44 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     uint32_t cell_addr = bgmap_addr + (local_y * 64 + local_x) * 2;
                     cell_addr &= (VB_VRAM_SIZE - 1);
 
-                    uint16_t cell = vram_read16(cell_addr);
-                    if (cell != 0) {
-                        int chr_index = cell & 0x07FF;
-                        int hflip = (cell >> 13) & 1;
-                        int vflip = (cell >> 12) & 1;
-                        int pal_idx = (cell >> 14) & 0x03;
-                        int tile_x = map_x % 8;
-                        int tile_y = map_y % 8;
-                        if (hflip) tile_x = 7 - tile_x;
-                        if (vflip) tile_y = 7 - tile_y;
-
-                        uint8_t pixel = chr_get_pixel(chr_index, tile_x, tile_y);
-                        if (pixel != 0) {
-                            uint16_t pal = (pal_idx == 0) ? pal0 :
-                                           (pal_idx == 1) ? pal1 :
-                                           (pal_idx == 2) ? pal2 : pal3;
-                            uint8_t color = apply_palette(pixel, pal);
-                            if (color != 0) {
-                                uint8_t intensity = 64 + color * 64;
-                                out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
-                                    ((uint32_t)intensity << 24) | 0xFF;
-                                tiles_drawn++; world_pixels[w]++;
-                            }
+                    /* Sample source pixel(s) — when zoomed out, check
+                     * multiple source pixels to avoid skipping content */
+                    uint8_t best_color = 0;
+                    uint16_t best_pal = pal0;
+                    for (int es = 0; es <= extra_samples; es++) {
+                        int sx_map = map_x + es;
+                        int sy_map = map_y;
+                        if (!over) {
+                            sx_map = sx_map & (map_w - 1);
+                            sy_map = sy_map & (map_h - 1);
+                        } else if (sx_map < 0 || sx_map >= map_w || sy_map < 0 || sy_map >= map_h) {
+                            continue;
                         }
+                        int cx = sx_map / 8, cy = sy_map / 8;
+                        int sgx = cx / 64, sgy = cy / 64;
+                        int lx = cx % 64, ly = cy % 64;
+                        int sgi = sgy * (scx / 64) + sgx;
+                        uint32_t ba = (0x20000 + (bgmap_base + sgi * 0x2000)) & (VB_VRAM_SIZE - 1);
+                        uint32_t ca = (ba + (ly * 64 + lx) * 2) & (VB_VRAM_SIZE - 1);
+                        uint16_t cell = vram_read16(ca);
+                        if (cell == 0) continue;
+                        int ci = cell & 0x07FF;
+                        int hf = (cell >> 13) & 1, vf = (cell >> 12) & 1;
+                        int pi = (cell >> 14) & 0x03;
+                        int tx = sx_map % 8, ty = sy_map % 8;
+                        if (hf) tx = 7 - tx;
+                        if (vf) ty = 7 - ty;
+                        uint8_t px = chr_get_pixel(ci, tx, ty);
+                        if (px == 0) continue;
+                        uint16_t p = (pi == 0) ? pal0 : (pi == 1) ? pal1 : (pi == 2) ? pal2 : pal3;
+                        uint8_t c = apply_palette(px, p);
+                        if (c > best_color) { best_color = c; best_pal = p; }
+                    }
+                    if (best_color != 0) {
+                        uint8_t intensity = 64 + best_color * 64;
+                        out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
+                            ((uint32_t)intensity << 24) | 0xFF;
+                        tiles_drawn++; world_pixels[w]++;
                     }
                     fx += src_dx;
                     fy += src_dy;
@@ -775,39 +794,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         }
     }
 
-    /* VB LED glow post-process: simulate the red LED bloom effect.
-     * Two-pass box blur to spread pixel intensity, making sparse
-     * tile patterns look more solid like on real VB hardware. */
-    {
-        static uint8_t src[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
-        static uint8_t tmp[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
-        /* Extract red channel */
-        for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++)
-            src[i] = (out_rgba[i] >> 24) & 0xFF;
-
-        /* Pass 1: horizontal blur */
-        for (int y = 0; y < VB_SCREEN_HEIGHT; y++) {
-            for (int x = 0; x < VB_SCREEN_WIDTH; x++) {
-                int idx = y * VB_SCREEN_WIDTH + x;
-                int val = src[idx] * 2;
-                if (x > 0) val += src[idx - 1];
-                if (x < VB_SCREEN_WIDTH - 1) val += src[idx + 1];
-                tmp[idx] = (val > 510) ? 255 : val / 2;
-            }
-        }
-        /* Pass 2: vertical blur */
-        for (int y = 0; y < VB_SCREEN_HEIGHT; y++) {
-            for (int x = 0; x < VB_SCREEN_WIDTH; x++) {
-                int idx = y * VB_SCREEN_WIDTH + x;
-                int val = tmp[idx] * 2;
-                if (y > 0) val += tmp[idx - VB_SCREEN_WIDTH];
-                if (y < VB_SCREEN_HEIGHT - 1) val += tmp[idx + VB_SCREEN_WIDTH];
-                int result = val / 2;
-                if (result > 255) result = 255;
-                out_rgba[idx] = ((uint32_t)result << 24) | 0xFF;
-            }
-        }
-    }
+    /* No post-processing blur — keep pixels sharp for text/1:1 content */
 }
 
 void vb_vip_frame_advance(void) {
