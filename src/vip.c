@@ -358,7 +358,46 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
+    /* Force palettes every frame */
+    reg_gplt[0] = reg_gplt[1] = reg_gplt[2] = reg_gplt[3] = 0xE4;
+    reg_jplt[0] = reg_jplt[1] = reg_jplt[2] = reg_jplt[3] = 0xE4;
+
+    /* Debug: verify tile 1 data at CHR */
+    static int chr_dbg = 0; chr_dbg++;
+    if (chr_dbg == 300) {
+        /* Check tile 461 (court surface, from BGMap entry 1485 → mirror 461) */
+        int test_idx = 1485 & 0x3FF; /* = 461 */
+        uint32_t chr_addr = 0x06000 + test_idx * 16;
+        uint32_t stg_addr = 0x38000 + test_idx * 16;
+        fprintf(stderr, "Tile %d (from BGMap 1485) CHR @%05X: %04X %04X %04X %04X\n",
+                test_idx, chr_addr,
+                vram_read16(chr_addr), vram_read16(chr_addr+2),
+                vram_read16(chr_addr+4), vram_read16(chr_addr+6));
+        fprintf(stderr, "Tile %d staging @%05X: %04X %04X %04X %04X\n",
+                test_idx, stg_addr,
+                vram_read16(stg_addr), vram_read16(stg_addr+2),
+                vram_read16(stg_addr+4), vram_read16(stg_addr+6));
+        /* Also check pixel extraction */
+        fprintf(stderr, "chr_get_pixel(461, 0..7, 0): ");
+        for (int px = 0; px < 8; px++)
+            fprintf(stderr, "%d", chr_get_pixel(461, px, 0));
+        fprintf(stderr, "\n");
+
+        fprintf(stderr, "BGMap at actual court source (rows 56-63, cols 50-63):\n");
+        for (int row = 56; row < 64; row++) {
+            fprintf(stderr, "  row %2d: ", row);
+            for (int col = 50; col < 64; col++) {
+                uint16_t cell = vram_read16(0x20000 + (row * 64 + col) * 2);
+                int chr_idx = cell & 0x7FF;
+                fprintf(stderr, "%3d ", chr_idx);
+            }
+            fprintf(stderr, "\n");
+        }
+    }
+
+    /* Use background color 1 if game hasn't set it — fills court surface */
     uint8_t bkcol = reg_bkcol & 0x03;
+    if (bkcol == 0) bkcol = 1;
     uint8_t bg_intensity = bkcol ? (64 + bkcol * 64) : 0;
     uint32_t bg_color = ((uint32_t)bg_intensity << 24) | 0xFF; /* R=intensity, A=FF */
     for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
