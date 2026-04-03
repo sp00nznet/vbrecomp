@@ -395,9 +395,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         }
     }
 
-    /* Use background color 1 if game hasn't set it — fills court surface */
     uint8_t bkcol = reg_bkcol & 0x03;
-    if (bkcol == 0) bkcol = 1;
     uint8_t bg_intensity = bkcol ? (64 + bkcol * 64) : 0;
     uint32_t bg_color = ((uint32_t)bg_intensity << 24) | 0xFF; /* R=intensity, A=FF */
     for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
@@ -727,6 +725,30 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     if (render_dbg == 300) {
         fprintf(stderr, "RENDER F%d: %d pixels drawn, CHR[0x06000]=%02X%02X\n",
                 render_dbg, tiles_drawn, vram[0x06000], vram[0x06001]);
+    }
+
+    /* VB LED glow post-process: simulate the red LED bloom effect.
+     * Each lit pixel spreads some intensity to its neighbors, making
+     * sparse tile patterns look more solid like on real VB hardware. */
+    {
+        static uint8_t glow_buf[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
+        /* Extract red channel to work buffer */
+        for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++)
+            glow_buf[i] = (out_rgba[i] >> 24) & 0xFF;
+
+        for (int y = 0; y < VB_SCREEN_HEIGHT; y++) {
+            for (int x = 0; x < VB_SCREEN_WIDTH; x++) {
+                int idx = y * VB_SCREEN_WIDTH + x;
+                int val = glow_buf[idx];
+                /* Add neighbor contributions */
+                if (x > 0) val += glow_buf[idx - 1] / 3;
+                if (x < VB_SCREEN_WIDTH - 1) val += glow_buf[idx + 1] / 3;
+                if (y > 0) val += glow_buf[idx - VB_SCREEN_WIDTH] / 3;
+                if (y < VB_SCREEN_HEIGHT - 1) val += glow_buf[idx + VB_SCREEN_WIDTH] / 3;
+                if (val > 255) val = 255;
+                out_rgba[idx] = ((uint32_t)val << 24) | 0xFF;
+            }
+        }
     }
 }
 
