@@ -518,7 +518,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             fprintf(stderr, "RENDER F%d: World %d HEAD=%04X type=%d GX=%d GY=%d MX=%d MY=%d W=%d H=%d PARAM=%04X bgmap=0x%05X\n",
                     render_dbg, w, head, bgm_type, gx, gy, mx, my, w_width, w_height, param, 0x20000 + bgmap_base);
             if (bgm_type == 2) {
-                uint32_t pt = 0x20000 + ((param & 0xFFF0) * 2);
+                uint32_t pt = 0x20000 + (uint32_t)param * 2;
                 for (int i = 0; i < 3 && i <= (int)w_height; i++) {
                     uint32_t pe = (pt + i * 16) & (VB_VRAM_SIZE - 1);
                     fprintf(stderr, "  scanline %d: MX=%d MP=%d MY=%d DX=%d DY=%d\n", i,
@@ -563,26 +563,27 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             for (int o = obj_end; o >= obj_start; o--) {
                 uint32_t oa = 0x3E000 + o * 8;
 
-                /* Halfword 0: JX[9:0] — signed 10-bit X */
-                int16_t jx = (int16_t)(vram_read16(oa + 0) & 0x03FF);
-                if (jx & 0x0200) jx |= (int16_t)0xFC00; /* Sign extend */
+                /* OAM format (from rustual-boy):
+                 * Word 0: X position (16-bit signed)
+                 * Word 1: [15]=LON [14]=RON [13:0]=parallax (14-bit signed)
+                 * Word 2: Y position (16-bit signed)
+                 * Word 3: [15:14]=palette [13]=hflip [12]=vflip [10:0]=char */
+                int16_t jx = (int16_t)vram_read16(oa + 0);
 
-                /* Halfword 1: [15]=JLON [14]=JRON [13:10]=JP [7:0]=JY */
                 uint16_t hw1 = vram_read16(oa + 2);
                 int jlon = (hw1 >> 15) & 1;
                 int jron = (hw1 >> 14) & 1;
+                if (eye == 0 && !jlon) continue;
+                if (eye == 1 && !jron) continue;
                 if (!jlon && !jron) continue;
-                int16_t jy = (int16_t)(hw1 & 0xFF);
 
-                /* Halfword 2: [15]=JHFLP [14]=JVFLP [10:0]=JCA */
-                uint16_t hw2 = vram_read16(oa + 4);
-                int jhflp = (hw2 >> 15) & 1;
-                int jvflp = (hw2 >> 14) & 1;
-                int jca = hw2 & 0x07FF;
+                int16_t jy = (int16_t)vram_read16(oa + 4);
 
-                /* Halfword 3: [15:14]=JPAL */
                 uint16_t hw3 = vram_read16(oa + 6);
                 int jpal = (hw3 >> 14) & 0x03;
+                int jhflp = (hw3 >> 13) & 1;
+                int jvflp = (hw3 >> 12) & 1;
+                int jca = hw3 & 0x07FF;
 
                 uint16_t pal = reg_jplt[jpal];
 
