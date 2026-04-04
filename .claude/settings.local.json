@@ -97,7 +97,11 @@
       "Bash(grep -n \"movea.*0x[0-9A-F]\\\\{4,5\\\\}\" \"D:/recomp/vb/mariotennis/generated/recomp_funcs.c\")",
       "Bash(awk 'NR>=3800 && NR<=4200')",
       "Read(//c/Users/nedch/AppData/Local/Temp/rustual-boy/**)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(cargo build:*)",
+      "Bash(C:/Users/nedch/AppData/Local/Temp/vb-harness/target/release/vb-harness.exe \"Mario's Tennis \\(Japan, USA\\).vb\")"
     ]
   }
 }

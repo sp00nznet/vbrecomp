@@ -67,11 +67,11 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
         }
     }
 
-    /* CHR within-bank mirrors DISABLED: keep CHR 0-3 as separate memory.
-     * On real VB, 0x16000 mirrors 0x06000 and 0x1E000 mirrors 0x0E000.
-     * But the game uses block-based rendering where different tile sets
-     * occupy CHR 0 vs CHR 2. We need both to coexist for whole-frame
-     * rendering, so treat CHR 2/3 as independent storage. */
+    /* CHR within-bank mirrors DISABLED for writes.
+     * Real VB mirrors CHR 2→0 and CHR 3→1, but the game does
+     * block-based rendering where copy #11 overwrites copy #10 via
+     * the mirror mid-frame. We keep them separate so both tile sets
+     * coexist for whole-frame rendering. Reads handle both segments. */
 
     /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF.
      * NOTE: The VIP handler writes clear/END values through this mirror
@@ -338,27 +338,41 @@ static inline uint16_t vram_read16(uint32_t addr) {
  * Each row has 8 pixels × 2 bits = 16 bits.
  */
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
-    /* 4 CHR segments, each 512 chars. With mirrors disabled,
-     * all 2048 indices map to unique memory locations. */
+    /* With CHR write mirrors disabled, 4 separate segments exist.
+     * Try the exact segment for the index. If it's empty (row=0),
+     * try the mirrored segment as fallback. */
     uint32_t chr_base;
-    if (chr_index < 512) {
-        chr_base = 0x06000 + chr_index * 16;         /* CHR 0 */
-    } else if (chr_index < 1024) {
-        chr_base = 0x0E000 + (chr_index - 512) * 16; /* CHR 1 */
-    } else if (chr_index < 1536) {
-        chr_base = 0x16000 + (chr_index - 1024) * 16; /* CHR 2 */
+    if (chr_index < 0x200) {
+        chr_base = 0x06000 + chr_index * 16;
+    } else if (chr_index < 0x400) {
+        chr_base = 0x0E000 + (chr_index - 0x200) * 16;
+    } else if (chr_index < 0x600) {
+        chr_base = 0x16000 + (chr_index - 0x400) * 16;
     } else {
-        chr_base = 0x1E000 + (chr_index - 1536) * 16; /* CHR 3 */
+        chr_base = 0x1E000 + (chr_index - 0x600) * 16;
     }
-    /* Try primary location; if empty, fall back to mirror */
     uint16_t row_data = vram_read16(chr_base + py * 2);
-    if (row_data == 0 && chr_index >= 1024) {
-        /* Fall back to CHR 0/1 if CHR 2/3 is empty */
-        int mirrored = chr_index & 0x3FF;
-        uint32_t alt_base = (mirrored < 512) ?
-            0x06000 + mirrored * 16 :
-            0x0E000 + (mirrored - 512) * 16;
-        row_data = vram_read16(alt_base + py * 2);
+    /* If this segment is empty, try the mirrored segment */
+    if (row_data == 0 && chr_index >= 0x400) {
+        uint32_t mirror_base;
+        int mi = chr_index - 0x400; /* 0-1023 in the mirror */
+        if (mi < 0x200) {
+            mirror_base = 0x06000 + mi * 16;
+        } else {
+            mirror_base = 0x0E000 + (mi - 0x200) * 16;
+        }
+        row_data = vram_read16(mirror_base + py * 2);
+    } else if (row_data == 0 && chr_index < 0x400) {
+        /* Try CHR 2/3 as fallback for indices 0-1023 */
+        uint32_t mirror_base;
+        int mi = chr_index + 0x400;
+        if (mi < 0x600) {
+            mirror_base = 0x16000 + (mi - 0x400) * 16;
+        } else {
+            mirror_base = 0x1E000 + (mi - 0x600) * 16;
+        }
+        uint16_t alt = vram_read16(mirror_base + py * 2);
+        if (alt != 0) row_data = alt;
     }
     return (row_data >> (px * 2)) & 0x03;
 }
