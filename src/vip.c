@@ -46,15 +46,17 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
      * - If the address modulo 0x40000 falls in 0x20000-0x3FFFF → BGMap
      * - Otherwise → FB/CHR, masked to 0x1FFFF
      */
-    /* CHR RAM mirrors at 0x78000-0x7FFFF (from rustual-boy reference) */
+    /* CHR RAM mirrors at 0x78000-0x7FFFF → CHR 0-3.
+     * With CHR within-bank mirrors disabled, CHR 2/3 are separate from 0/1,
+     * allowing both tile sets to coexist for whole-frame rendering. */
     if (addr >= 0x78000 && addr < 0x7A000) {
         addr = 0x06000 + (addr - 0x78000);  /* CHR 0 */
     } else if (addr >= 0x7A000 && addr < 0x7C000) {
         addr = 0x0E000 + (addr - 0x7A000);  /* CHR 1 */
     } else if (addr >= 0x7C000 && addr < 0x7E000) {
-        addr = 0x16000 + (addr - 0x7C000);  /* CHR 2 (mirror of 0) */
+        addr = 0x16000 + (addr - 0x7C000);  /* CHR 2 (separate from CHR 0) */
     } else if (addr >= 0x7E000 && addr < 0x80000) {
-        addr = 0x1E000 + (addr - 0x7E000);  /* CHR 3 (mirror of 1) */
+        addr = 0x1E000 + (addr - 0x7E000);  /* CHR 3 (separate from CHR 1) */
     } else if (addr >= 0x40000) {
         uint32_t in_block = addr & 0x3FFFF;
         if (in_block >= 0x20000) {
@@ -65,14 +67,11 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
         }
     }
 
-    /* CHR mirror within FB/CHR bank:
-     * 0x16000-0x17FFF mirrors 0x06000-0x07FFF (same physical CHR RAM)
-     * 0x1E000-0x1FFFF mirrors 0x0E000-0x0FFFF */
-    if (addr >= 0x16000 && addr < 0x18000) {
-        addr -= 0x10000;
-    } else if (addr >= 0x1E000 && addr < 0x20000) {
-        addr -= 0x10000;
-    }
+    /* CHR within-bank mirrors DISABLED: keep CHR 0-3 as separate memory.
+     * On real VB, 0x16000 mirrors 0x06000 and 0x1E000 mirrors 0x0E000.
+     * But the game uses block-based rendering where different tile sets
+     * occupy CHR 0 vs CHR 2. We need both to coexist for whole-frame
+     * rendering, so treat CHR 2/3 as independent storage. */
 
     /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF.
      * NOTE: The VIP handler writes clear/END values through this mirror
@@ -339,15 +338,28 @@ static inline uint16_t vram_read16(uint32_t addr) {
  * Each row has 8 pixels × 2 bits = 16 bits.
  */
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
-    /* VB has 1024 unique characters; indices 1024-2047 mirror 0-1023 */
-    chr_index &= 0x3FF;
+    /* 4 CHR segments, each 512 chars. With mirrors disabled,
+     * all 2048 indices map to unique memory locations. */
     uint32_t chr_base;
     if (chr_index < 512) {
-        chr_base = 0x06000 + chr_index * 16;
+        chr_base = 0x06000 + chr_index * 16;         /* CHR 0 */
+    } else if (chr_index < 1024) {
+        chr_base = 0x0E000 + (chr_index - 512) * 16; /* CHR 1 */
+    } else if (chr_index < 1536) {
+        chr_base = 0x16000 + (chr_index - 1024) * 16; /* CHR 2 */
     } else {
-        chr_base = 0x0E000 + (chr_index - 512) * 16;
+        chr_base = 0x1E000 + (chr_index - 1536) * 16; /* CHR 3 */
     }
+    /* Try primary location; if empty, fall back to mirror */
     uint16_t row_data = vram_read16(chr_base + py * 2);
+    if (row_data == 0 && chr_index >= 1024) {
+        /* Fall back to CHR 0/1 if CHR 2/3 is empty */
+        int mirrored = chr_index & 0x3FF;
+        uint32_t alt_base = (mirrored < 512) ?
+            0x06000 + mirrored * 16 :
+            0x0E000 + (mirrored - 512) * 16;
+        row_data = vram_read16(alt_base + py * 2);
+    }
     return (row_data >> (px * 2)) & 0x03;
 }
 
@@ -484,6 +496,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         int16_t gy = (int16_t)vram_read16(wa + 6);
         int16_t mx = (int16_t)vram_read16(wa + 8);
         int16_t my = (int16_t)vram_read16(wa + 12);
+
         uint16_t w_width = vram_read16(wa + 14);
         uint16_t w_height = vram_read16(wa + 16);
 
@@ -815,8 +828,10 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
     if (render_dbg == 300) {
         fprintf(stderr, "RENDER F%d: %d pixels drawn\n", render_dbg, tiles_drawn);
-        if (render_dbg == 2400) {
-            fprintf(stderr, "Per-world pixels: ");
+        static int pw_log = 0;
+        if (pw_log < 30 && tiles_drawn > 0) {
+            pw_log++;
+            fprintf(stderr, "per-world (total=%d): ", tiles_drawn);
             for (int _w = 31; _w >= 0; _w--)
                 if (world_pixels[_w] > 0)
                     fprintf(stderr, "W%d=%d ", _w, world_pixels[_w]);
