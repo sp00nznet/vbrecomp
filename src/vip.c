@@ -133,7 +133,7 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_INTPND:  return reg_intpnd;
     case VB_VIP_INTENB:  return reg_intenb;
     case VB_VIP_INTCLR:  return 0; /* Write-only */
-    case VB_VIP_DPSTTS:  return reg_dpstts | 0x003E; /* Always report display ready */
+    case VB_VIP_DPSTTS:  return reg_dpstts | 0x007E; /* Report display ready + scan ready */
     case VB_VIP_DPCTRL:  return reg_dpctrl;
     case VB_VIP_BRTA:    return reg_brta;
     case VB_VIP_BRTB:    return reg_brtb;
@@ -358,7 +358,10 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
-    /* Don't force palettes — game sets them via correct VIP register offsets now */
+    /* Force palettes — the game writes its own palette values but our
+     * intensity mapping (ignoring BRTA/BRTB/BRTC) requires identity palettes */
+    reg_gplt[0] = reg_gplt[1] = reg_gplt[2] = reg_gplt[3] = 0xE4;
+    reg_jplt[0] = reg_jplt[1] = reg_jplt[2] = reg_jplt[3] = 0xE4;
 
     /* Debug: verify tile 1 data at CHR */
     static int chr_dbg = 0; chr_dbg++;
