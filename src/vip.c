@@ -252,10 +252,12 @@ uint32_t vb_vip_read32(vb_addr_t addr) {
     return (uint32_t)vb_vip_read16(addr) | ((uint32_t)vb_vip_read16(addr + 2) << 16);
 }
 
+static int chr_writes_per_frame = 0;
 void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     if (val != 0) {
         uint32_t mapped = vip_map_addr(addr);
         if (mapped >= 0x20000 && mapped < 0x3D800) bgmap_writes_per_frame++;
+        if (mapped >= 0x06000 && mapped < 0x10000) chr_writes_per_frame++;
     }
     if (is_reg_addr(addr)) {
         /* Byte write to register: read-modify-write the 16-bit register */
@@ -344,19 +346,19 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
     /* Log BGMap writes per frame */
-    if (bgmap_writes_per_frame > 0 && bgmap_write_frame_log < 30) {
+    if ((bgmap_writes_per_frame > 0 || chr_writes_per_frame > 0) && bgmap_write_frame_log < 50) {
         bgmap_write_frame_log++;
-        fprintf(stderr, "BGMAP: %d writes this frame\n", bgmap_writes_per_frame);
+        fprintf(stderr, "VRAM WRITES: BGMap=%d CHR=%d (render %d)\n",
+                bgmap_writes_per_frame, chr_writes_per_frame, frame_count);
     }
     bgmap_writes_per_frame = 0;
+    chr_writes_per_frame = 0;
 
     /* CHR data now goes directly to CHR via the 0x78000 mirror mapping */
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
-    /* Force palettes every frame */
-    reg_gplt[0] = reg_gplt[1] = reg_gplt[2] = reg_gplt[3] = 0xE4;
-    reg_jplt[0] = reg_jplt[1] = reg_jplt[2] = reg_jplt[3] = 0xE4;
+    /* Don't force palettes — game sets them via correct VIP register offsets now */
 
     /* Debug: verify tile 1 data at CHR */
     static int chr_dbg = 0; chr_dbg++;
