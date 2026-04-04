@@ -41,34 +41,34 @@
 #define VB_SCREEN_WIDTH     384
 #define VB_SCREEN_HEIGHT    224
 
-/* VIP register offsets (from 0x0005F800) */
+/* VIP register offsets (from 0x0005F800) — from rustual-boy reference */
 #define VB_VIP_REG_BASE     0x0005F800
 #define VB_VIP_INTPND       0x00  /* Interrupt pending */
 #define VB_VIP_INTENB       0x02  /* Interrupt enable */
 #define VB_VIP_INTCLR       0x04  /* Interrupt clear */
-#define VB_VIP_DPSTTS       0x10  /* Display status */
-#define VB_VIP_DPCTRL       0x12  /* Display control */
-#define VB_VIP_BRTA         0x14  /* Brightness A */
-#define VB_VIP_BRTB         0x16  /* Brightness B */
-#define VB_VIP_BRTC         0x18  /* Brightness C */
-#define VB_VIP_REST          0x1A  /* Rest value */
-#define VB_VIP_FRMCYC       0x1C  /* Frame repeat */
+#define VB_VIP_DPSTTS       0x20  /* Display status */
+#define VB_VIP_DPCTRL       0x22  /* Display control */
+#define VB_VIP_BRTA         0x24  /* Brightness A */
+#define VB_VIP_BRTB         0x26  /* Brightness B */
+#define VB_VIP_BRTC         0x28  /* Brightness C */
+#define VB_VIP_REST         0x2A  /* Rest value */
+#define VB_VIP_FRMCYC       0x2E  /* Frame repeat */
 #define VB_VIP_CTA          0x1E  /* Column table index */
-#define VB_VIP_XPSTTS       0x20  /* Drawing status */
-#define VB_VIP_XPCTRL       0x22  /* Drawing control */
-#define VB_VIP_SPT0         0x24  /* OBJ group 0 end */
-#define VB_VIP_SPT1         0x26  /* OBJ group 1 end */
-#define VB_VIP_SPT2         0x28  /* OBJ group 2 end */
-#define VB_VIP_SPT3         0x2A  /* OBJ group 3 end */
-#define VB_VIP_GPLT0        0x30  /* Background palette 0 */
-#define VB_VIP_GPLT1        0x32  /* Background palette 1 */
-#define VB_VIP_GPLT2        0x34  /* Background palette 2 */
-#define VB_VIP_GPLT3        0x36  /* Background palette 3 */
-#define VB_VIP_JPLT0        0x38  /* OBJ palette 0 */
-#define VB_VIP_JPLT1        0x3A  /* OBJ palette 1 */
-#define VB_VIP_JPLT2        0x3C  /* OBJ palette 2 */
-#define VB_VIP_JPLT3        0x3E  /* OBJ palette 3 */
-#define VB_VIP_BKCOL        0x40  /* Background color */
+#define VB_VIP_XPSTTS       0x40  /* Drawing status */
+#define VB_VIP_XPCTRL       0x42  /* Drawing control */
+#define VB_VIP_SPT0         0x48  /* OBJ group 0 end */
+#define VB_VIP_SPT1         0x4A  /* OBJ group 1 end */
+#define VB_VIP_SPT2         0x4C  /* OBJ group 2 end */
+#define VB_VIP_SPT3         0x4E  /* OBJ group 3 end */
+#define VB_VIP_GPLT0        0x60  /* Background palette 0 */
+#define VB_VIP_GPLT1        0x62  /* Background palette 1 */
+#define VB_VIP_GPLT2        0x64  /* Background palette 2 */
+#define VB_VIP_GPLT3        0x66  /* Background palette 3 */
+#define VB_VIP_JPLT0        0x68  /* OBJ palette 0 */
+#define VB_VIP_JPLT1        0x6A  /* OBJ palette 1 */
+#define VB_VIP_JPLT2        0x6C  /* OBJ palette 2 */
+#define VB_VIP_JPLT3        0x6E  /* OBJ palette 3 */
+#define VB_VIP_BKCOL        0x70  /* Background color */
 
 /* Interrupt bits */
 #define VB_VIP_INT_SCANERR  (1 << 0)   /* Scan error */
