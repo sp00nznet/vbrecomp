@@ -388,13 +388,15 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     chr_writes_per_frame = 0;
     memset(bgmap_seg_writes, 0, sizeof(bgmap_seg_writes));
 
-    /* Track which BGMap segments get writes */
-    static int seg_write_log = 0;
-    if (bgmap_writes_per_frame > 0 && seg_write_log < 5) {
-        seg_write_log++;
-        /* Count writes per segment */
-        /* Segments tracked via bgmap_writes_per_frame counter above */
+    /* Track CHR tile 1 (solid fill) — if it changes, tiles are getting corrupted */
+    static uint16_t last_tile1 = 0;
+    uint16_t cur_tile1 = vram_read16(0x06010); /* tile 1 row 0 */
+    static int tile_change_log = 0;
+    if (cur_tile1 != last_tile1 && tile_change_log < 20) {
+        tile_change_log++;
+        fprintf(stderr, "CHR TILE 1 CHANGED: %04X → %04X (frame %d)\n", last_tile1, cur_tile1, frame_count);
     }
+    last_tile1 = cur_tile1;
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
@@ -509,7 +511,6 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
 
         /* DEBUG: isolate specific worlds to diagnose rendering
          * Set to -1 to render all, or a world number to render only that world */
-        /* No world filter — render all valid worlds */
 
         /* Palette selection from GPLT registers */
         uint16_t pal0 = reg_gplt[0], pal1 = reg_gplt[1];
