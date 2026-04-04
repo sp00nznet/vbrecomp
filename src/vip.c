@@ -46,15 +46,17 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
      * - If the address modulo 0x40000 falls in 0x20000-0x3FFFF → BGMap
      * - Otherwise → FB/CHR, masked to 0x1FFFF
      */
-    /* CHR RAM mirrors at 0x78000-0x7FFFF map to CHR pattern tables */
+    /* CHR RAM mirrors at 0x78000-0x7FFFF map to CHR pattern tables.
+     * 0x78000-0x79FFF → CHR 0 (0x06000), 0x7A000-0x7BFFF → CHR 1 (0x0E000)
+     * 0x7C000-0x7DFFF → CHR 2 (0x16000, mirror of 0), 0x7E000-0x7FFFF → CHR 3 (0x1E000, mirror of 1)
+     *
+     * NOTE: only map 0x78000-0x7BFFF as CHR mirrors. 0x7C000+ is used by the
+     * game for world attrs/OAM data (copy #11 at 0x7D000). Mapping those to
+     * CHR would corrupt tile patterns with world data. */
     if (addr >= 0x78000 && addr < 0x7A000) {
         addr = 0x06000 + (addr - 0x78000);  /* CHR 0 */
     } else if (addr >= 0x7A000 && addr < 0x7C000) {
         addr = 0x0E000 + (addr - 0x7A000);  /* CHR 1 */
-    } else if (addr >= 0x7C000 && addr < 0x7E000) {
-        addr = 0x16000 + (addr - 0x7C000);  /* CHR 2 (mirror of 0) */
-    } else if (addr >= 0x7E000 && addr < 0x80000) {
-        addr = 0x1E000 + (addr - 0x7E000);  /* CHR 3 (mirror of 1) */
     } else if (addr >= 0x40000) {
         uint32_t in_block = addr & 0x3FFFF;
         if (in_block >= 0x20000) {
