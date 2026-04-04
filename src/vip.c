@@ -74,7 +74,11 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
         addr -= 0x10000;
     }
 
-    /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF */
+    /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF.
+     * NOTE: The VIP handler writes clear/END values through this mirror
+     * which can overwrite valid world data from the game's decompression.
+     * Block clear writes (0x00FE, 0x0040) to prevent handler from
+     * destroying game-set worlds. */
     if (addr >= 0x3DC00 && addr < 0x3E000) {
         addr = 0x3D800 + ((addr - 0x3DC00) & 0x3FF);
     }
@@ -253,10 +257,15 @@ uint32_t vb_vip_read32(vb_addr_t addr) {
 }
 
 static int chr_writes_per_frame = 0;
+static int bgmap_seg_writes[14] = {0};
 void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     if (val != 0) {
         uint32_t mapped = vip_map_addr(addr);
-        if (mapped >= 0x20000 && mapped < 0x3D800) bgmap_writes_per_frame++;
+        if (mapped >= 0x20000 && mapped < 0x3D800) {
+            bgmap_writes_per_frame++;
+            int seg = (mapped - 0x20000) / 0x2000;
+            if (seg < 14) bgmap_seg_writes[seg]++;
+        }
         if (mapped >= 0x06000 && mapped < 0x10000) chr_writes_per_frame++;
     }
     if (is_reg_addr(addr)) {
@@ -346,15 +355,24 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     (void)eye;
 
     /* Log BGMap writes per frame */
-    if ((bgmap_writes_per_frame > 0 || chr_writes_per_frame > 0) && bgmap_write_frame_log < 50) {
+    if ((bgmap_writes_per_frame > 0 || chr_writes_per_frame > 0) && bgmap_write_frame_log < 20) {
         bgmap_write_frame_log++;
-        fprintf(stderr, "VRAM WRITES: BGMap=%d CHR=%d (render %d)\n",
-                bgmap_writes_per_frame, chr_writes_per_frame, frame_count);
+        fprintf(stderr, "VRAM WRITES: BGMap=%d CHR=%d segs:", bgmap_writes_per_frame, chr_writes_per_frame);
+        for (int s = 0; s < 14; s++)
+            if (bgmap_seg_writes[s] > 0) fprintf(stderr, " S%d=%d", s, bgmap_seg_writes[s]);
+        fprintf(stderr, "\n");
     }
     bgmap_writes_per_frame = 0;
     chr_writes_per_frame = 0;
+    memset(bgmap_seg_writes, 0, sizeof(bgmap_seg_writes));
 
-    /* CHR data now goes directly to CHR via the 0x78000 mirror mapping */
+    /* Track which BGMap segments get writes */
+    static int seg_write_log = 0;
+    if (bgmap_writes_per_frame > 0 && seg_write_log < 5) {
+        seg_write_log++;
+        /* Count writes per segment */
+        /* Segments tracked via bgmap_writes_per_frame counter above */
+    }
 
     /* Clear to background color
      * SDL_PIXELFORMAT_RGBA8888: R=bits31:24, G=23:16, B=15:8, A=7:0 */
@@ -796,7 +814,6 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         }
     }
 
-    /* No post-processing blur — keep pixels sharp for text/1:1 content */
 }
 
 void vb_vip_frame_advance(void) {
