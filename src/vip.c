@@ -286,7 +286,17 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
 }
 
+static int w30_log = 0;
 void vb_vip_write16(vb_addr_t addr, uint16_t val) {
+    /* Track writes to world 30 */
+    {
+        uint32_t mapped = vip_map_addr(addr);
+        if (mapped >= 0x3DBC0 && mapped < 0x3DBE0 && w30_log < 20) {
+            w30_log++;
+            int off = mapped - 0x3DBC0;
+            fprintf(stderr, "W30 WRITE: off=%d val=%04X (frame %d)\n", off, val, frame_count);
+        }
+    }
     if (is_reg_addr(addr)) {
         reg_write((addr - VB_VIP_REG_BASE) & ~1, val);
         return;
