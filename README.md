@@ -59,7 +59,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 | Game | Repo | Status |
 |------|------|--------|
 | Mario's Tennis | [vb-mariotennis](https://github.com/sp00nznet/vb-mariotennis) | Demo mode runs, rendering WIP |
-| Red Alarm | Coming soon | Not started |
+| Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Scaffolded, 217 functions recompiled |
 
 The Virtual Boy library is only 22 games. Once the core libraries are solid, porting additional titles should be straightforward.
 
