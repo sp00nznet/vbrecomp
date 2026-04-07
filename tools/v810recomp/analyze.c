@@ -57,6 +57,17 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
     /* V810 instructions are 16-bit aligned */
     if (addr & 1) return -1;
 
+    /* Normalize mirrored ROM addresses to canonical range.
+     * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF.
+     * High addresses (0xFFF00000+) also map into ROM. */
+    if (addr >= 0xFFF00000) {
+        addr = addr & 0x07FFFFFF;
+    }
+    if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
+        uint32_t offset = (addr - ROM_REGION_BASE) % ctx->rom_size;
+        addr = ctx->rom_base + offset;
+    }
+
     /* Already known? */
     int idx = find_func(ctx, addr);
     if (idx >= 0) return idx;
@@ -83,22 +94,28 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
     return idx;
 }
 
+/* Normalize a ROM address by resolving mirrors to the canonical range.
+ * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF and at 0xFFF00000+. */
+static uint32_t normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
+    if (addr >= 0xFFF00000) {
+        addr = addr & 0x07FFFFFF;
+    }
+    if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
+        uint32_t offset = (addr - ROM_REGION_BASE) % ctx->rom_size;
+        addr = ctx->rom_base + offset;
+    }
+    return addr;
+}
+
 /* Check if an address is a valid ROM code address */
 static bool is_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
-    /* Handle high addresses (0xFFF80000+) that map to ROM */
-    if (addr >= 0xFFF00000) {
-        /* These map into ROM via mirroring: addr & 0x07FFFFFF */
-        uint32_t mapped = addr & 0x07FFFFFF;
-        return mapped >= ctx->rom_base && mapped < ROM_REGION_END;
-    }
+    addr = normalize_rom_addr(ctx, addr);
     return addr >= ctx->rom_base && addr < ROM_REGION_END;
 }
 
 /* Convert any valid code address to ROM offset */
 static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
-    if (addr >= 0xFFF00000) {
-        addr = addr & 0x07FFFFFF;
-    }
+    addr = normalize_rom_addr(ctx, addr);
     return addr - ctx->rom_base;
 }
 

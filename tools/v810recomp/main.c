@@ -107,9 +107,12 @@ static uint32_t find_entry_point(const uint8_t *rom, uint32_t rom_size, uint32_t
         uint32_t lo = (uint32_t)(int32_t)(int16_t)insns[1].imm;
         uint32_t entry = hi + lo;
 
-        /* Resolve to ROM address if needed */
+        /* Resolve mirrored address to canonical ROM range */
         if (entry >= 0xFFF00000) {
             entry = entry & 0x07FFFFFF;
+        }
+        if (entry >= ROM_REGION_BASE && entry < rom_base) {
+            entry = rom_base + (entry - ROM_REGION_BASE) % rom_size;
         }
 
         printf("Reset vector: MOVHI 0x%04X + MOVEA 0x%04X -> entry at 0x%08X\n",
@@ -121,6 +124,9 @@ static uint32_t find_entry_point(const uint8_t *rom, uint32_t rom_size, uint32_t
     if (count >= 1 && insns[0].opcode == 0x2A) {
         uint32_t entry = insns[0].addr + insns[0].imm;
         if (entry >= 0xFFF00000) entry &= 0x07FFFFFF;
+        if (entry >= ROM_REGION_BASE && entry < rom_base) {
+            entry = rom_base + (entry - ROM_REGION_BASE) % rom_size;
+        }
         printf("Reset vector: JR -> entry at 0x%08X\n", entry);
         return entry;
     }
