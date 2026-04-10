@@ -37,6 +37,7 @@ The VIP renderer is the core of the project and is actively under development:
 | CHR RAM mirrors | Working — 0x78000-0x7FFFF validated against rustual-boy |
 | Separate CHR segments | Working — CHR 0-3 independent for block-based tile swapping |
 | World attribute mirror | Working — 0x3DC00 for dynamic world updates |
+| Direct frame buffer | Working — column-major 2bpp planar format for wireframe games |
 
 ### Key Technical Fixes
 
@@ -59,7 +60,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 | Game | Repo | Status |
 |------|------|--------|
 | Mario's Tennis | [vb-mariotennis](https://github.com/sp00nznet/vb-mariotennis) | Demo mode runs, rendering WIP |
-| Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Scaffolded, 217 functions recompiled |
+| Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Boots to title, frame buffer rendering WIP |
 
 The Virtual Boy library is only 22 games. Once the core libraries are solid, porting additional titles should be straightforward.
 

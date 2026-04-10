@@ -460,6 +460,53 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     }
 
     /*
+     * Render direct frame buffer.
+     * VB has two frame buffers per eye; the active one depends on DPCTRL.
+     * Frame buffer layout: 384 columns x 224 rows, 2 bits per pixel.
+     * Each column is stored as 224/8 = 28 halfwords (16 bits each, 8 pixels vertical).
+     * Column-major: base + column * 0x40 + row_group * 2.
+     *
+     * Left eye FB0: 0x00000, FB1: 0x08000
+     * Right eye FB0: 0x10000, FB1: 0x18000
+     */
+    {
+        /* Check both frame buffers — use the one with more data.
+         * Games double-buffer: write to one while displaying the other. */
+        uint32_t fb0_base = (eye == 0) ? 0x00000 : 0x10000;
+        uint32_t fb1_base = (eye == 0) ? 0x08000 : 0x18000;
+        int fb0_count = 0, fb1_count = 0;
+        for (int i = 0; i < 0x6000; i += 2) {
+            if (vram_read16(fb0_base + i)) fb0_count++;
+            if (vram_read16(fb1_base + i)) fb1_count++;
+        }
+        uint32_t fb_base = (fb1_count > fb0_count) ? fb1_base : fb0_base;
+        /* Intensity LUT: 2-bit pixel → 8-bit red intensity */
+        static const uint8_t fb_lut[4] = {0, 85, 170, 255};
+
+        for (int col = 0; col < 384; col++) {
+            uint32_t col_base = fb_base + col * 0x40;
+            for (int row_grp = 0; row_grp < 28; row_grp++) {
+                uint16_t hw = vram_read16(col_base + row_grp * 2);
+                if (hw == 0) continue; /* skip empty */
+                /* VB framebuffer is planar:
+                 * Low byte (bits 0-7): bit 0 of pixels 0-7
+                 * High byte (bits 8-15): bit 1 of pixels 0-7 */
+                uint8_t lo = hw & 0xFF;
+                uint8_t hi = (hw >> 8) & 0xFF;
+                for (int bit = 0; bit < 8; bit++) {
+                    int pixel = ((hi >> bit) & 1) << 1 | ((lo >> bit) & 1);
+                    if (pixel == 0) continue; /* transparent */
+                    int row = row_grp * 8 + bit;
+                    if (row < 224) {
+                        uint8_t intensity = fb_lut[pixel];
+                        out_rgba[row * 384 + col] = ((uint32_t)intensity << 24) | 0xFF;
+                    }
+                }
+            }
+        }
+    }
+
+    /*
      * Render worlds (display layers).
      * World attributes are at VRAM 0x3D800, 32 bytes per world, 32 worlds.
      * Worlds are rendered from 31 down to 0 (31 = backmost).
