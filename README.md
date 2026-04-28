@@ -52,6 +52,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 - Param table offset uses `param_base * 2` (was masking with 0xFFF0)
 - v810recomp emitter: only add JMP-table label targets when they fall inside the current function (cross-function targets handled by tail call instead) — fixes undefined-label C compile errors on Galactic Pinball
 - v810recomp emitter: emit orphan-label stubs at end of function for branch targets that fall mid-instruction (off the decoder's 4-byte walk) — keeps generated C compilable when the analyzer extends a function into data
+- v810recomp: `--hints <file>` flag to manually resolve indirect jumps and add function entry points the static analyzer can't reach (e.g. function pointers stored in WRAM and dispatched later) — needed for Galactic Pinball's main dispatch
 
 ### Open Problems
 
@@ -63,7 +64,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 |------|------|--------|
 | Mario's Tennis | [vb-mariotennis](https://github.com/sp00nznet/vb-mariotennis) | Demo mode runs, rendering WIP |
 | Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Boots to title, frame buffer rendering WIP |
-| Galactic Pinball | vb-galacticpinball (private) | Recompiled (597 funcs), builds; runtime bring-up next |
+| Galactic Pinball | vb-galacticpinball (private) | Reset executes, VIP interrupt loop firing; BGMap rendering next |
 
 The Virtual Boy library is only 22 games. Once the core libraries are solid, porting additional titles should be straightforward.
 

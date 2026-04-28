@@ -227,14 +227,78 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
     }
 }
 
+/* Parse a hex address (with or without 0x prefix). */
+static bool parse_hex_addr(const char *s, uint32_t *out) {
+    char *end = NULL;
+    unsigned long v = strtoul(s, &end, 16);
+    if (end == s || *end != 0) return false;
+    *out = (uint32_t)v;
+    return true;
+}
+
+/* Read a hints file, applying entries to the context.
+ * Format (one per line, '#' for comments):
+ *   jmp <from_hex> <to_hex>     # resolve JMP [reg] at from_hex to to_hex
+ *   entry <addr_hex>             # add a function entry point
+ */
+static void load_hints(v810_ctx_t *ctx, const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    printf("Loading hints from %s\n", path);
+    char line[256];
+    int n_jmp = 0, n_entry = 0;
+    while (fgets(line, sizeof(line), f)) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '#' || *p == '\n' || *p == 0) continue;
+
+        char tok[32], a1[32], a2[32];
+        int n = sscanf(p, "%31s %31s %31s", tok, a1, a2);
+        if (n < 2) continue;
+
+        if (strcmp(tok, "jmp") == 0 && n == 3) {
+            uint32_t from, to;
+            if (!parse_hex_addr(a1, &from) || !parse_hex_addr(a2, &to)) continue;
+            if (ctx->num_resolved >= ctx->max_resolved) {
+                ctx->max_resolved *= 2;
+                ctx->resolved_jumps = realloc(ctx->resolved_jumps,
+                    ctx->max_resolved * sizeof(ctx->resolved_jumps[0]));
+            }
+            ctx->resolved_jumps[ctx->num_resolved].from_addr = from;
+            ctx->resolved_jumps[ctx->num_resolved].to_addr = to;
+            ctx->num_resolved++;
+            int idx = v810_ctx_add_func(ctx, to, false, -1);
+            if (idx >= 0) ctx->funcs[idx].confirmed = true;
+            n_jmp++;
+        } else if (strcmp(tok, "entry") == 0 && n >= 2) {
+            uint32_t a;
+            if (!parse_hex_addr(a1, &a)) continue;
+            int idx = v810_ctx_add_func(ctx, a, false, -1);
+            if (idx >= 0) ctx->funcs[idx].confirmed = true;
+            n_entry++;
+        }
+    }
+    fclose(f);
+    printf("  hints applied: %d jmp, %d entry\n", n_jmp, n_entry);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: v810recomp <rom.vb> [output_dir]\n");
+        fprintf(stderr, "Usage: v810recomp <rom.vb> [output_dir] [--hints <file>]\n");
         return 1;
     }
 
     const char *rom_path = argv[1];
-    const char *out_dir = argc > 2 ? argv[2] : ".";
+    const char *out_dir = ".";
+    const char *hints_path = NULL;
+
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--hints") == 0 && i + 1 < argc) {
+            hints_path = argv[++i];
+        } else if (argv[i][0] != '-') {
+            out_dir = argv[i];
+        }
+    }
 
     /* Load ROM */
     uint32_t rom_size;
@@ -260,6 +324,9 @@ int main(int argc, char **argv) {
     /* Find interrupt handlers */
     printf("Interrupt handlers:\n");
     find_interrupt_handlers(&ctx);
+
+    /* Apply user hints (extra entry points + manual JMP-target resolutions) */
+    if (hints_path) load_hints(&ctx, hints_path);
     /* Mark all interrupt handlers as confirmed */
     for (int i = 0; i < ctx.num_funcs; i++) {
         if (ctx.funcs[i].is_interrupt) ctx.funcs[i].confirmed = true;
