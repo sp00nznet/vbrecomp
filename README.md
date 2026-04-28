@@ -53,6 +53,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 - v810recomp emitter: only add JMP-table label targets when they fall inside the current function (cross-function targets handled by tail call instead) — fixes undefined-label C compile errors on Galactic Pinball
 - v810recomp emitter: emit orphan-label stubs at end of function for branch targets that fall mid-instruction (off the decoder's 4-byte walk) — keeps generated C compilable when the analyzer extends a function into data
 - v810recomp: `--hints <file>` flag to manually resolve indirect jumps and add function entry points the static analyzer can't reach (e.g. function pointers stored in WRAM and dispatched later) — needed for Galactic Pinball's main dispatch
+- v810recomp: `skip <target> <bytes>` hint for "inline-data-after-JAL" helpers (functions that read N bytes of data immediately following the JAL and bump r31 past them before returning) — without this, the data bytes get analyzed as instructions, producing garbage code. Galactic Pinball uses this pattern for graphics decompression — `vb_func_07F417B8` consumes 8 bytes (src + dst pointers) after every JAL, hit at 31 sites in the ROM
 
 ### Open Problems
 
