@@ -87,6 +87,14 @@ typedef struct {
     } *jump_tables;
     int num_jump_tables;
     int max_jump_tables;
+
+    /* "Skip-after-JAL" helpers: functions that read inline data placed
+     * immediately after the JAL instruction in the caller's code stream,
+     * then advance r31 past the data before returning. v810recomp must
+     * not analyze or emit those bytes as instructions. */
+    struct { uint32_t target; uint32_t skip_bytes; } *skip_funcs;
+    int num_skip_funcs;
+    int max_skip_funcs;
 } v810_ctx_t;
 
 /* Decode a single instruction */
@@ -104,6 +112,10 @@ void v810_ctx_free(v810_ctx_t *ctx);
 
 /* Add a function entry point */
 int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int_level);
+
+/* Look up how many bytes of inline data a JAL target consumes after the call.
+ * Returns 0 if the target is not a registered skip-after-JAL helper. */
+uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target);
 
 /* Analyze: discover functions by following calls from known entry points */
 void v810_analyze(v810_ctx_t *ctx);

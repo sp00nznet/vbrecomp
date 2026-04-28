@@ -246,7 +246,7 @@ static void load_hints(v810_ctx_t *ctx, const char *path) {
     if (!f) return;
     printf("Loading hints from %s\n", path);
     char line[256];
-    int n_jmp = 0, n_entry = 0;
+    int n_jmp = 0, n_entry = 0, n_skip = 0;
     while (fgets(line, sizeof(line), f)) {
         char *p = line;
         while (*p == ' ' || *p == '\t') p++;
@@ -276,10 +276,22 @@ static void load_hints(v810_ctx_t *ctx, const char *path) {
             int idx = v810_ctx_add_func(ctx, a, false, -1);
             if (idx >= 0) ctx->funcs[idx].confirmed = true;
             n_entry++;
+        } else if (strcmp(tok, "skip") == 0 && n == 3) {
+            uint32_t target, bytes;
+            if (!parse_hex_addr(a1, &target) || !parse_hex_addr(a2, &bytes)) continue;
+            if (ctx->num_skip_funcs >= ctx->max_skip_funcs) {
+                ctx->max_skip_funcs *= 2;
+                ctx->skip_funcs = realloc(ctx->skip_funcs,
+                    ctx->max_skip_funcs * sizeof(ctx->skip_funcs[0]));
+            }
+            ctx->skip_funcs[ctx->num_skip_funcs].target = target;
+            ctx->skip_funcs[ctx->num_skip_funcs].skip_bytes = bytes;
+            ctx->num_skip_funcs++;
+            n_skip++;
         }
     }
     fclose(f);
-    printf("  hints applied: %d jmp, %d entry\n", n_jmp, n_entry);
+    printf("  hints applied: %d jmp, %d entry, %d skip\n", n_jmp, n_entry, n_skip);
 }
 
 int main(int argc, char **argv) {

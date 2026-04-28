@@ -462,8 +462,12 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
 
     case 0x2B: { /* JAL */
         uint32_t target = insn->addr + insn->imm;
-        fprintf(out, "    vb_cpu.r[31] = 0x%08X;\n", insn->addr + 4);
+        uint32_t skip = v810_get_skip_bytes(ctx, target);
+        fprintf(out, "    vb_cpu.r[31] = 0x%08X;\n", insn->addr + 4 + skip);
         fprintf(out, "    vb_func_%08X();\n", target);
+        if (skip > 0) {
+            fprintf(out, "    /* skip %u bytes of inline data after JAL */\n", skip);
+        }
         break;
     }
 
@@ -764,6 +768,9 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
                          && resolved >= func->addr && resolved < func->end_addr) {
                 label_set_add(&labels, resolved);
             }
+        } else if (insn.opcode == 0x2B) { /* JAL - skip inline data */
+            uint32_t target = insn.addr + insn.imm;
+            off += v810_get_skip_bytes(ctx, target);
         }
 
         off += insn.size;
@@ -803,6 +810,10 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
 
         emit_insn(ctx, out, &insn, &labels);
         off += insn.size;
+        if (insn.opcode == 0x2B) { /* JAL - skip inline data, don't emit it as code */
+            uint32_t target = insn.addr + insn.imm;
+            off += v810_get_skip_bytes(ctx, target);
+        }
         insn_count++;
 
         /* Safety: cap at 10000 instructions per function */

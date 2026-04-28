@@ -31,6 +31,17 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->max_jump_tables = 64;
     ctx->jump_tables = calloc(ctx->max_jump_tables, sizeof(ctx->jump_tables[0]));
     ctx->num_jump_tables = 0;
+
+    ctx->max_skip_funcs = 16;
+    ctx->skip_funcs = calloc(ctx->max_skip_funcs, sizeof(ctx->skip_funcs[0]));
+    ctx->num_skip_funcs = 0;
+}
+
+uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target) {
+    for (int i = 0; i < ctx->num_skip_funcs; i++) {
+        if (ctx->skip_funcs[i].target == target) return ctx->skip_funcs[i].skip_bytes;
+    }
+    return 0;
 }
 
 void v810_ctx_free(v810_ctx_t *ctx) {
@@ -42,6 +53,7 @@ void v810_ctx_free(v810_ctx_t *ctx) {
         free(ctx->jump_tables[i].raw_targets);
     }
     free(ctx->jump_tables);
+    free(ctx->skip_funcs);
     memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -265,6 +277,19 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     if (callee >= 0 && func->confirmed) {
                         ctx->funcs[callee].confirmed = true;
                     }
+                }
+                /* Skip-after-JAL helpers consume N bytes of inline data
+                 * after the call. Don't analyze those bytes as code. */
+                uint32_t skip = v810_get_skip_bytes(ctx, target);
+                if (skip > 0) {
+                    /* Mark the skipped bytes as data and advance offset
+                     * (insn.size is added by the loop's normal step). */
+                    for (uint32_t i = 0; i < skip; i++) {
+                        if (offset + insn.size + i < ctx->rom_size) {
+                            ctx->code_map[offset + insn.size + i] = 'D';
+                        }
+                    }
+                    offset += skip;
                 }
                 /* Fall through to next instruction after call */
                 break;
