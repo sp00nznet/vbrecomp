@@ -760,7 +760,8 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
             /* External targets handled in emit via find_func_by_addr */
         } else if (insn.opcode == 0x06 && insn.reg1 != 31) { /* JMP [reg] */
             uint32_t resolved = lookup_resolved_jump(ctx, insn.addr);
-            if (resolved && find_func_by_addr(ctx, resolved) < 0) {
+            if (resolved && find_func_by_addr(ctx, resolved) < 0
+                         && resolved >= func->addr && resolved < func->end_addr) {
                 label_set_add(&labels, resolved);
             }
         }
@@ -778,7 +779,11 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     /* Interrupt check at function entry */
     fprintf(out, "    vb_interrupt_check();\n");
 
-    /* Second pass: emit code */
+    /* Second pass: emit code, tracking which labels get declared.
+     * Branch targets that fall mid-instruction (decoder skipped over them
+     * because we walked instruction-by-instruction) need an orphan stub
+     * emitted at end of function so the goto compiles. */
+    label_set_t declared = { .addrs = malloc(256 * sizeof(uint32_t)), .count = 0, .cap = 256 };
     off = start_off;
     int insn_count = 0;
     while (off < end_off && off < ctx->rom_size) {
@@ -789,6 +794,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         /* Emit label if this address is a branch target */
         if (label_set_has(&labels, insn.addr)) {
             fprintf(out, "label_%08X:\n", insn.addr);
+            label_set_add(&declared, insn.addr);
             /* Add interrupt check at backward branch targets */
             if (insn.addr < func->addr + (end_off - start_off)) {
                 fprintf(out, "    vb_interrupt_check();\n");
@@ -806,8 +812,18 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         }
     }
 
+    /* Emit orphan label stubs for any branch target that wasn't an
+     * instruction boundary in our walk (would otherwise be undefined). */
+    for (int i = 0; i < labels.count; i++) {
+        if (!label_set_has(&declared, labels.addrs[i])) {
+            fprintf(out, "label_%08X:\n", labels.addrs[i]);
+            fprintf(out, "    return; /* orphan label - target not on instruction boundary */\n");
+        }
+    }
+
     fprintf(out, "}\n");
     free(labels.addrs);
+    free(declared.addrs);
 }
 
 void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
