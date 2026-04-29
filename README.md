@@ -65,7 +65,7 @@ All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) r
 |------|------|--------|
 | Mario's Tennis | [vb-mariotennis](https://github.com/sp00nznet/vb-mariotennis) | Demo mode runs, rendering WIP |
 | Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Boots to title, frame buffer rendering WIP |
-| Galactic Pinball | vb-galacticpinball (private) | Per-frame dispatcher running, CHR tiles streaming; BGMap path next |
+| Galactic Pinball | vb-galacticpinball (private) | First pixels on screen — boots through 4-state dispatch machine, BGMap populated |
 
 The Virtual Boy library is only 22 games. Once the core libraries are solid, porting additional titles should be straightforward.
 
