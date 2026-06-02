@@ -10,9 +10,44 @@
 #include "vbrecomp/gamepad.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 uint8_t vb_wram[VB_WRAM_SIZE];
 uint8_t vb_sram[VB_SRAM_SIZE];
+
+/* --- Read-address tracer (VBRECOMP_HEARTBEAT=1) ------------------------------
+ * Counts reads by address into a small open-addressed table so a stalled boot's
+ * poll loop reveals exactly what it's waiting on. vb_mem_dump_hot_reads() prints
+ * the busiest addresses and resets the window; the heartbeat calls it. */
+#define HOT_N 1024
+static uint32_t hot_addr[HOT_N];
+static uint32_t hot_cnt[HOT_N];
+static int hot_enabled = -1;
+
+static inline void hot_track(uint32_t addr) {
+    if (hot_enabled < 0) {
+        const char *e = getenv("VBRECOMP_HEARTBEAT");
+        hot_enabled = (e && e[0] && e[0] != '0');
+    }
+    if (!hot_enabled) return;
+    uint32_t h = (addr * 2654435761u) & (HOT_N - 1);
+    for (uint32_t i = 0; i < HOT_N; i++) {
+        uint32_t j = (h + i) & (HOT_N - 1);
+        if (hot_cnt[j] == 0) { hot_addr[j] = addr; hot_cnt[j] = 1; return; }
+        if (hot_addr[j] == addr) { hot_cnt[j]++; return; }
+    }
+}
+
+void vb_mem_dump_hot_reads(void) {
+    for (int k = 0; k < 8; k++) {
+        int best = -1; uint32_t bc = 0;
+        for (uint32_t i = 0; i < HOT_N; i++) if (hot_cnt[i] > bc) { bc = hot_cnt[i]; best = (int)i; }
+        if (best < 0) break;
+        fprintf(stderr, "  hot read 0x%08X x%u\n", hot_addr[best], hot_cnt[best]);
+        hot_cnt[best] = 0;
+    }
+    memset(hot_cnt, 0, sizeof(hot_cnt));
+}
 
 static const uint8_t *rom_ptr;
 static uint32_t rom_sz;
@@ -113,6 +148,7 @@ static void hw_write8(vb_addr_t offset, uint8_t val) {
 #define REGION(addr) (((addr) >> 24) & 0x07)
 
 uint8_t vb_mem_read8(vb_addr_t addr) {
+    hot_track(addr);
     switch (REGION(addr)) {
     case 0: return vb_vip_read8(addr & 0x00FFFFFF);
     case 1: return vb_vsu_read8(addr & 0x00FFFFFF);
@@ -125,6 +161,7 @@ uint8_t vb_mem_read8(vb_addr_t addr) {
 }
 
 uint16_t vb_mem_read16(vb_addr_t addr) {
+    hot_track(addr);
     switch (REGION(addr)) {
     case 0: return vb_vip_read16(addr & 0x00FFFFFF);
     case 5: {
@@ -147,6 +184,7 @@ uint16_t vb_mem_read16(vb_addr_t addr) {
 }
 
 uint32_t vb_mem_read32(vb_addr_t addr) {
+    hot_track(addr);
     switch (REGION(addr)) {
     case 0: return vb_vip_read32(addr & 0x00FFFFFF);
     case 5: {

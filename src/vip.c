@@ -143,7 +143,17 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_BRTC:    return reg_brtc;
     case VB_VIP_REST:    return reg_rest;
     case VB_VIP_FRMCYC:  return reg_frmcyc;
-    case VB_VIP_XPSTTS:  return reg_xpstts | 0x007E; /* Always report drawing done + DPBSY/SCANRDY */
+    /* XPSTTS drawing status. The XPBSY0/1 bits (0x000C) must TRANSITION, not
+     * hold a constant value: games sync a frame by waiting for drawing to start
+     * (XPBSY set) and then finish (XPBSY clear). A static value deadlocks one of
+     * the two waits (Mario Clash has both: `while (XPSTTS & 0xC)` and
+     * `while (!(XPSTTS & 0xC))`). We have no real drawing clock, so alternate
+     * XPBSY each read so both wait loops terminate. */
+    case VB_VIP_XPSTTS: {
+        static unsigned xp_poll;
+        uint16_t busy = (++xp_poll & 1u) ? 0x000C : 0x0000;
+        return (reg_xpstts & ~0x000Cu) | 0x0072u | busy;
+    }
     case VB_VIP_XPCTRL:  return reg_xpctrl;
     case VB_VIP_SPT0:    return reg_spt[0];
     case VB_VIP_SPT1:    return reg_spt[1];
