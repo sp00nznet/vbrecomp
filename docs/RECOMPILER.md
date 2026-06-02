@@ -17,6 +17,7 @@
 - **JMP [reg]** resolved to a known function → tail call.
 - **JMP [reg]** resolved to an intra-function label → `goto`.
 - **Jump tables** → `switch` over the register, one `case` per entry.
+- **Unresolved `jmp [reg]`** → dispatched at run time through a generated function table (`vb_recomp_call(addr)`): a sorted `addr -> vb_func_*` array at the bottom of `recomp_funcs.c`, looked up by the register's value. This makes indirect jumps/dispatch work for any target that was emitted as a function, without needing static resolution (the N64Recomp model). Targets not in the table are a no-op (the routine to emit them is the coverage frontier).
 
 ### Resolved-jump targets become functions
 
