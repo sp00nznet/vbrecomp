@@ -30,12 +30,12 @@ void vb_gamepad_init(void) {
 
 uint8_t vb_gamepad_read8(vb_addr_t addr) {
     switch (addr) {
+    case 0x10: /* SDLR - low byte of button data */
+        return (uint8_t)(latched & 0xFF);
+    case 0x14: /* SDHR - high byte of button data */
+        return (uint8_t)(latched >> 8);
     case 0x28: /* SCR */
         return scr & ~SCR_STAT; /* STAT=0 means ready (instant read) */
-    case 0x2C: /* SDR - low byte of button data */
-        return (uint8_t)(latched & 0xFF);
-    case 0x30: /* SDHR - high byte of button data */
-        return (uint8_t)(latched >> 8);
     default:
         return 0;
     }

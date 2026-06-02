@@ -34,16 +34,22 @@ void vb_timer_init(void) {
 
 uint8_t vb_timer_read8(vb_addr_t addr) {
     switch (addr) {
-    case 0x10: return tcr;
-    case 0x14: return (uint8_t)(counter & 0xFF);
-    case 0x18: return (uint8_t)(counter >> 8);
+    case 0x18: return (uint8_t)(counter & 0xFF);   /* TLR */
+    case 0x1C: return (uint8_t)(counter >> 8);      /* THR */
+    case 0x20: return tcr;                           /* TCR */
     default:   return 0;
     }
 }
 
 void vb_timer_write8(vb_addr_t addr, uint8_t val) {
     switch (addr) {
-    case 0x10: /* TCR */
+    case 0x18: /* TLR (low byte of reload) */
+        reload = (reload & 0xFF00) | val;
+        break;
+    case 0x1C: /* THR (high byte of reload) */
+        reload = (reload & 0x00FF) | ((uint16_t)val << 8);
+        break;
+    case 0x20: /* TCR */
         {
             static int dbg = -1;
             if (dbg < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); dbg = (e && e[0] && e[0] != '0'); }
@@ -58,12 +64,6 @@ void vb_timer_write8(vb_addr_t addr, uint8_t val) {
             counter = reload;
             prescaler = 0;
         }
-        break;
-    case 0x14: /* TLR (low byte of reload) */
-        reload = (reload & 0xFF00) | val;
-        break;
-    case 0x18: /* THR (high byte of reload) */
-        reload = (reload & 0x00FF) | ((uint16_t)val << 8);
         break;
     default:
         break;
