@@ -71,8 +71,8 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
 
     /* Normalize mirrored ROM addresses to canonical range.
      * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF.
-     * High addresses (0xFFF00000+) also map into ROM. */
-    if (addr >= 0xFFF00000) {
+     * High addresses (>=0x08000000) are mirrors of the 27-bit physical map. */
+    if (addr >= 0x08000000) {
         addr = addr & 0x07FFFFFF;
     }
     if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
@@ -107,9 +107,9 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
 }
 
 /* Normalize a ROM address by resolving mirrors to the canonical range.
- * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF and at 0xFFF00000+. */
+ * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF; the whole 32-bit space mirrors the 27-bit physical map every 0x08000000. */
 static uint32_t normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
-    if (addr >= 0xFFF00000) {
+    if (addr >= 0x08000000) {
         addr = addr & 0x07FFFFFF;
     }
     if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
@@ -245,7 +245,7 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                 /* Try to resolve via constant propagation */
                 if (reg_known[insn.reg1]) {
                     uint32_t target = reg_val[insn.reg1] & 0xFFFFFFFE;
-                    if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                    if (target >= 0x08000000) target &= 0x07FFFFFF;
                     if (is_rom_addr(ctx, target)) {
                         uint32_t target_off = addr_to_offset(ctx, target);
                         printf("  Resolved JMP [r%d] at 0x%08X -> 0x%08X\n",
@@ -397,7 +397,7 @@ static void scan_all_jal_targets(v810_ctx_t *ctx) {
             uint32_t addr = ctx->rom_base + off;
             uint32_t target = addr + disp;
 
-            if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+            if (target >= 0x08000000) target &= 0x07FFFFFF;
 
             if (target >= ctx->rom_base && target < ROM_REGION_END && (target & 1) == 0) {
                 if (find_func(ctx, target) < 0) {
@@ -486,7 +486,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                              * The table base has the SHL'd index baked in at runtime,
                              * but for table_base we use the base without index (index=0). */
                             uint32_t tbl_cpu = table_base;
-                            if (tbl_cpu >= 0xFFF00000) tbl_cpu &= 0x07FFFFFF;
+                            if (tbl_cpu >= 0x08000000) tbl_cpu &= 0x07FFFFFF;
 
                             if (tbl_cpu >= ctx->rom_base && tbl_cpu < ROM_REGION_END) {
                                 uint32_t tbl_off = tbl_cpu - ctx->rom_base;
@@ -503,7 +503,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                                     uint32_t entry = ((uint16_t)ep[0] | ((uint16_t)ep[1] << 8))
                                                    | (((uint32_t)ep[2] | ((uint32_t)ep[3] << 8)) << 16);
                                     uint32_t mapped = entry;
-                                    if (mapped >= 0xFFF00000) mapped &= 0x07FFFFFF;
+                                    if (mapped >= 0x08000000) mapped &= 0x07FFFFFF;
                                     if (mapped < ctx->rom_base || mapped >= ROM_REGION_END) break;
                                     if (mapped & 1) break; /* Unaligned = end of table */
                                     raw_targets[n] = entry;
@@ -581,7 +581,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                     insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
                     if (insn.opcode == 0x2B) { /* JAL */
                         uint32_t target = insn.addr + insn.imm;
-                        if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                        if (target >= 0x08000000) target &= 0x07FFFFFF;
                         int idx = find_func(ctx, target);
                         if (idx >= 0 && !ctx->funcs[idx].confirmed) {
                             ctx->funcs[idx].confirmed = true;
