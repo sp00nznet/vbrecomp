@@ -14,6 +14,28 @@
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];
 static int bgmap_writes_per_frame = 0;
+
+/* Cumulative non-zero VRAM writes by region (any write size), for diagnosing
+ * whether a game loads graphics at all. Dumped by vb_vip_dump_write_stats(). */
+static unsigned long long g_chr_writes, g_chr_any, g_bgmap_writes, g_oam_writes, g_other_writes;
+static uint32_t g_other_lo = 0xFFFFFFFF, g_other_hi;
+static inline int is_chr_off(uint32_t o) {
+    /* CHR lives in four 0x2000 segments interleaved with the framebuffers. */
+    return (o >= 0x06000 && o < 0x08000) || (o >= 0x0E000 && o < 0x10000) ||
+           (o >= 0x16000 && o < 0x18000) || (o >= 0x1E000 && o < 0x20000);
+}
+static inline void track_vram_write(uint32_t mapped, uint32_t val) {
+    if (is_chr_off(mapped)) { g_chr_any++; if (val) g_chr_writes++; return; }
+    if (val == 0) return;
+    if (mapped >= 0x20000 && mapped < 0x3D800) g_bgmap_writes++;
+    else if (mapped >= 0x3E000 && mapped < 0x40000) g_oam_writes++;
+    else { g_other_writes++; if (mapped < g_other_lo) g_other_lo = mapped; if (mapped > g_other_hi) g_other_hi = mapped; }
+}
+void vb_vip_dump_write_stats(void) {
+    fprintf(stderr, "  VRAM writes: CHR=%llu/%llu(nonzero/any) BGMap=%llu OAM=%llu other=%llu [0x%05X-0x%05X]\n",
+            g_chr_writes, g_chr_any, g_bgmap_writes, g_oam_writes, g_other_writes,
+            g_other_writes ? g_other_lo : 0, g_other_hi);
+}
 static int bgmap_write_frame_log = 0;
 
 uint8_t *vb_vip_get_vram(void) { return vram; }
@@ -300,6 +322,7 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
     if (is_vram_addr(addr)) {
         uint32_t off = vip_map_addr(addr);
+        track_vram_write(off, val);
         if (off < VB_VRAM_SIZE) vram[off] = val;
     }
 }
@@ -321,6 +344,7 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
     }
     if (is_vram_addr(addr)) {
         uint32_t off = vip_map_addr(addr);
+        track_vram_write(off, val);
         if (off + 1 < VB_VRAM_SIZE) {
             vram[off]     = (uint8_t)(val);
             vram[off + 1] = (uint8_t)(val >> 8);
@@ -331,6 +355,7 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
 void vb_vip_write32(vb_addr_t addr, uint32_t val) {
     if (is_vram_addr(addr)) {
         uint32_t off = vip_map_addr(addr);
+        track_vram_write(off, val);
         if (off + 3 < VB_VRAM_SIZE) {
             vram[off]     = (uint8_t)(val);
             vram[off + 1] = (uint8_t)(val >> 8);
