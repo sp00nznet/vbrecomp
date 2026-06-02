@@ -67,4 +67,125 @@ static inline void vb_cpu_set_flags_zs(uint32_t result) {
     vb_cpu.sr[VB_SREG_PSW] = psw;
 }
 
+/* ============================================================
+ * Recompiler ALU / flag helpers
+ *
+ * The recompiled code calls these instead of inlining PSW flag
+ * arithmetic for every instruction, so the generated functions stay
+ * readable (e.g. `vb_cmp(a, b);` instead of an 8-line flag block).
+ * Each updates the PSW exactly as the V810 hardware does.
+ * ============================================================ */
+
+/* ADD: a + b, sets Z/S/OV/CY. */
+static inline uint32_t vb_add(uint32_t a, uint32_t b) {
+    uint64_t r64 = (uint64_t)a + (uint64_t)b;
+    uint32_t r = (uint32_t)r64;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);
+    if (r == 0) psw |= VB_PSW_Z;
+    if (r & 0x80000000) psw |= VB_PSW_S;
+    if (r64 > 0xFFFFFFFFu) psw |= VB_PSW_CY;
+    if (((a ^ r) & (b ^ r)) & 0x80000000) psw |= VB_PSW_OV;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return r;
+}
+
+/* SUB: a - b, sets Z/S/OV/CY (borrow). */
+static inline uint32_t vb_sub(uint32_t a, uint32_t b) {
+    uint32_t r = a - b;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);
+    if (r == 0) psw |= VB_PSW_Z;
+    if (r & 0x80000000) psw |= VB_PSW_S;
+    if (b > a) psw |= VB_PSW_CY;
+    if (((a ^ b) & (a ^ r)) & 0x80000000) psw |= VB_PSW_OV;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return r;
+}
+
+/* CMP: SUB that discards the result, keeping only the flags. */
+static inline void vb_cmp(uint32_t a, uint32_t b) { (void)vb_sub(a, b); }
+
+/* Logical ops (AND/OR/XOR/NOT): set Z/S from result, clear OV. */
+static inline uint32_t vb_setf_logic(uint32_t v) {
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
+    if (v == 0) psw |= VB_PSW_Z;
+    if (v & 0x80000000) psw |= VB_PSW_S;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return v;
+}
+
+/* SHL: logical left shift by (sh & 31), CY = last bit shifted out. */
+static inline uint32_t vb_shl(uint32_t v, uint32_t sh) {
+    sh &= 0x1F;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);
+    if (sh > 0) { if ((v >> (32 - sh)) & 1) psw |= VB_PSW_CY; v <<= sh; }
+    if (v == 0) psw |= VB_PSW_Z;
+    if (v & 0x80000000) psw |= VB_PSW_S;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return v;
+}
+
+/* SHR: logical right shift by (sh & 31), CY = last bit shifted out. */
+static inline uint32_t vb_shr(uint32_t v, uint32_t sh) {
+    sh &= 0x1F;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);
+    if (sh > 0) { if ((v >> (sh - 1)) & 1) psw |= VB_PSW_CY; v >>= sh; }
+    if (v == 0) psw |= VB_PSW_Z;
+    if (v & 0x80000000) psw |= VB_PSW_S;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return v;
+}
+
+/* SAR: arithmetic right shift by (sh & 31), CY = last bit shifted out. */
+static inline uint32_t vb_sar(uint32_t v, uint32_t sh) {
+    sh &= 0x1F;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);
+    if (sh > 0) { if ((v >> (sh - 1)) & 1) psw |= VB_PSW_CY; v = (uint32_t)((int32_t)v >> sh); }
+    if (v == 0) psw |= VB_PSW_Z;
+    if (v & 0x80000000) psw |= VB_PSW_S;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return v;
+}
+
+/* MUL: signed 32x32 -> 64; low word returned, high word into r30. */
+static inline uint32_t vb_mul(uint32_t a, uint32_t b) {
+    int64_t r64 = (int64_t)(int32_t)a * (int64_t)(int32_t)b;
+    vb_cpu.r[30] = (uint32_t)((uint64_t)r64 >> 32);
+    uint32_t lo = (uint32_t)r64;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
+    if (lo == 0) psw |= VB_PSW_Z;
+    if (r64 & 0x80000000) psw |= VB_PSW_S;
+    if (r64 > 0x7FFFFFFF || r64 < -(int64_t)0x80000000) psw |= VB_PSW_OV;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return lo;
+}
+
+/* MULU: unsigned 32x32 -> 64; low word returned, high word into r30. */
+static inline uint32_t vb_mulu(uint32_t a, uint32_t b) {
+    uint64_t r64 = (uint64_t)a * (uint64_t)b;
+    vb_cpu.r[30] = (uint32_t)(r64 >> 32);
+    uint32_t lo = (uint32_t)r64;
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
+    if (lo == 0) psw |= VB_PSW_Z;
+    if (r64 & 0x80000000) psw |= VB_PSW_S;
+    if (r64 > 0xFFFFFFFFu) psw |= VB_PSW_OV;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
+    return lo;
+}
+
+/* DIV: signed quotient returned, remainder into r30. Caller guards b != 0. */
+static inline uint32_t vb_div(uint32_t a, uint32_t b) {
+    int32_t q = (int32_t)a / (int32_t)b;
+    vb_cpu.r[30] = (uint32_t)((int32_t)a % (int32_t)b);
+    vb_cpu_set_flags_zs((uint32_t)q);
+    return (uint32_t)q;
+}
+
+/* DIVU: unsigned quotient returned, remainder into r30. Caller guards b != 0. */
+static inline uint32_t vb_divu(uint32_t a, uint32_t b) {
+    vb_cpu.r[30] = a % b;
+    uint32_t q = a / b;
+    vb_cpu_set_flags_zs(q);
+    return q;
+}
+
 #endif /* VBRECOMP_CPU_H */

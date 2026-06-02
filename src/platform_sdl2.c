@@ -26,6 +26,7 @@ void vb_platform_shutdown(void) {}
 #else
 
 #include <SDL2/SDL.h>
+#include <stdlib.h>
 #include "screenshot.h"
 #include "menu.h"
 
@@ -36,6 +37,14 @@ static uint16_t button_state;
 static vb_audio_callback_t audio_cb;
 static SDL_AudioDeviceID audio_dev;
 
+/* Headless mode (VBRECOMP_HEADLESS=1): no window/renderer/audio device, so
+ * the recompiled game loop can run on a machine with no display (CI, batch
+ * screenshot capture, automated regression). The game still renders into its
+ * own framebuffer via vb_vip_render; present is a no-op. VBRECOMP_HEADLESS_FRAMES
+ * bounds the run so the loop terminates on its own (default: unlimited). */
+static bool headless;
+static int headless_frames_left = -1;
+
 static void screenshot_toast(const char *filename, void *userdata) {
     (void)userdata;
     char msg[512];
@@ -44,6 +53,18 @@ static void screenshot_toast(const char *filename, void *userdata) {
 }
 
 bool vb_platform_init(const char *title, int scale) {
+    const char *hl = getenv("VBRECOMP_HEADLESS");
+    headless = (hl && hl[0] && hl[0] != '0');
+    if (headless) {
+        const char *nf = getenv("VBRECOMP_HEADLESS_FRAMES");
+        headless_frames_left = (nf && nf[0]) ? atoi(nf) : -1;
+        SDL_Init(SDL_INIT_TIMER);
+        button_state = 0;
+        audio_cb = NULL;
+        audio_dev = 0;
+        return true;
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
         return false;
     }
@@ -82,6 +103,7 @@ bool vb_platform_init(const char *title, int scale) {
 }
 
 void vb_platform_present(const uint32_t *framebuffer) {
+    if (headless) return;
     SDL_UpdateTexture(texture, NULL, framebuffer, VB_SCREEN_WIDTH * sizeof(uint32_t));
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
@@ -116,6 +138,12 @@ static void update_key(SDL_Keycode key, bool pressed) {
 }
 
 bool vb_platform_poll(void) {
+    if (headless) {
+        if (headless_frames_left < 0) return true;     /* unlimited */
+        if (headless_frames_left == 0) return false;   /* budget spent */
+        headless_frames_left--;
+        return true;
+    }
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         menu_process_event(&e);
@@ -186,6 +214,7 @@ void vb_platform_audio_stop(void) {
 }
 
 void vb_platform_shutdown(void) {
+    if (headless) { SDL_Quit(); return; }
     menu_shutdown();
     vb_platform_audio_stop();
     if (texture) { SDL_DestroyTexture(texture); texture = NULL; }

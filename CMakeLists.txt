@@ -60,6 +60,13 @@ add_executable(v810recomp
 )
 target_include_directories(v810recomp PRIVATE tools/v810recomp)
 
+# --- Games ---
+
+option(VBRECOMP_BUILD_GAMES "Build recompiled game executables" ON)
+if(VBRECOMP_BUILD_GAMES)
+    add_subdirectory(games)
+endif()
+
 # --- Tests ---
 
 option(VBRECOMP_BUILD_TESTS "Build tests" ON)
