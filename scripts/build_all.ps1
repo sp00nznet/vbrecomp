@@ -106,16 +106,16 @@ foreach ($slug in $slugs) {
 
 # --- report ---
 $results | ConvertTo-Json -Depth 3 | Out-File -Encoding utf8 (Join-Path $Corpus "bootstatus.json")
-$built = ($results | Where-Object { $_.build -eq "ok" }).Count
-$ran   = ($results | Where-Object { $_.ran -eq "yes" }).Count
-$drew  = ($results | Where-Object { $_.rendered -eq "yes" }).Count
+$built = @($results | Where-Object { $_.build -eq "ok" }).Count
+$ran   = @($results | Where-Object { $_.ran -eq "yes" }).Count
+$drew  = @($results | Where-Object { $_.rendered -eq "yes" }).Count
 $md = @("# Boot status (generic driver)", "",
     "Every recompiled ROM built with the shared generic driver (no game-specific code) and booted headless for $Frames frames. Screenshots in ``corpus/_shots/``.", "",
     "- Builds: **$built / $($results.Count)**",
     "- Runs without crashing: **$ran / $($results.Count)**",
     "- Drew visible output: **$drew / $($results.Count)** (non-blank screenshot)",
     "",
-    "Most games run but don't render under the naive driver yet — they need per-game boot/timing tuning (as the lead games got). 'Drew visible output' marks the ones that already show something.",
+    "Most games run but don't render under the naive driver yet -- they need per-game boot/timing tuning (as the lead games got). 'Drew visible output' marks the ones that already show something.",
     "",
     "| # | Game | Builds | Runs | Drew | Notes |",
     "|---|------|--------|------|------|-------|")
