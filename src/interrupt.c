@@ -13,8 +13,14 @@
 #include "vbrecomp/vip.h"
 #include "vbrecomp/mem.h"
 #include "vbrecomp/cpu.h"
+#include "vbrecomp/timer.h"
 #include <string.h>
 #include <stdio.h>
+
+/* Approximate CPU cycles per interrupt_check call. The VB runs ~400K cycles
+ * per ~50Hz frame; with the default ~20K checks per frame that's ~20 cycles
+ * each. Used to advance the hardware timer at roughly the right rate. */
+#define VB_CYCLES_PER_CHECK 20
 
 #define MAX_INT_LEVELS 5
 
@@ -55,6 +61,14 @@ void vb_interrupt_clear(int level) {
 }
 
 void vb_interrupt_check(void) {
+    /* Advance the hardware timer every check (independent of frame timing).
+     * Counts down whenever enabled, sets ZSTAT on underflow, and requests the
+     * timer interrupt if the game enabled it. Games commonly poll or wait on
+     * this during boot, so it must always run. */
+    if (vb_timer_tick(VB_CYCLES_PER_CHECK)) {
+        vb_interrupt_request(VB_INT_TIMER);
+    }
+
     /* Advance frame tick counter */
     if (frame_ticks > 0) {
         tick_counter++;
