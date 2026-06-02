@@ -47,6 +47,7 @@ vb_add_game(galacticpinball galacticpinball)
 
 # Generic driver (no game-specific glue):
 vb_add_game_generic(marioclash marioclash)
+vb_add_game_generic(golf       golf)
 
 # Build EVERY recompiled ROM in a corpus dir via the generic driver. Used by
 # scripts/build_all.ps1: configure with -DVBRECOMP_CORPUS_DIR=<abs corpus path>.
