@@ -24,6 +24,7 @@ static uint32_t framebuffer[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
 static int frame_count;
 static int max_frames;          /* 0 = unlimited (VBRECOMP_HEADLESS_FRAMES) */
 static const char *shot_path;   /* VBRECOMP_SHOT_PATH: dump a PNG before exit */
+static int shot_every;          /* VBRECOMP_SHOT_EVERY: also dump every N frames */
 
 extern int stbi_write_png(const char *, int, int, int, const void *, int);
 
@@ -52,6 +53,11 @@ static bool on_frame(void) {
     vb_gamepad_set_buttons(vb_platform_get_buttons());
     vb_vip_render(framebuffer, 0);
     vb_platform_present(framebuffer);
+    if (shot_every > 0 && shot_path && frame_count % shot_every == 0) {
+        char p[512];
+        snprintf(p, sizeof(p), "%s.%04d.png", shot_path, frame_count);
+        dump_png(p);
+    }
     if (max_frames && frame_count >= max_frames) finish();
     return true;
 }
@@ -84,6 +90,8 @@ int main(int argc, char **argv) {
     max_frames = mf ? atoi(mf) : 0;
     shot_path = getenv("VBRECOMP_SHOT_PATH");
     if (shot_path && !shot_path[0]) shot_path = NULL;
+    const char *se = getenv("VBRECOMP_SHOT_EVERY");
+    shot_every = se ? atoi(se) : 0;
 
     vb_init(rom, rom_size);
     vb_cpu.sr[VB_SREG_PSW] = 0;
