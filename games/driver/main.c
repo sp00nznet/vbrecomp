@@ -22,16 +22,37 @@
 
 static uint32_t framebuffer[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
 static int frame_count;
-static int max_frames;   /* 0 = unlimited (VBRECOMP_HEADLESS_FRAMES) */
+static int max_frames;          /* 0 = unlimited (VBRECOMP_HEADLESS_FRAMES) */
+static const char *shot_path;   /* VBRECOMP_SHOT_PATH: dump a PNG before exit */
+
+extern int stbi_write_png(const char *, int, int, int, const void *, int);
+
+/* Dump the current framebuffer (RGBA8888) to a PNG. */
+static void dump_png(const char *path) {
+    static uint8_t px[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT * 4];
+    for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
+        uint32_t c = framebuffer[i];
+        px[i*4+0] = (c >> 24) & 0xFF;  /* R */
+        px[i*4+1] = (c >> 16) & 0xFF;  /* G */
+        px[i*4+2] = (c >> 8) & 0xFF;   /* B */
+        px[i*4+3] = 0xFF;              /* A */
+    }
+    stbi_write_png(path, VB_SCREEN_WIDTH, VB_SCREEN_HEIGHT, 4, px, VB_SCREEN_WIDTH * 4);
+}
+
+static void finish(void) {
+    if (shot_path) dump_png(shot_path);
+    exit(0);
+}
 
 /* Per-frame: poll input, render, present. Driven by vb_interrupt_check(). */
 static bool on_frame(void) {
     frame_count++;
-    if (!vb_platform_poll()) exit(0);
+    if (!vb_platform_poll()) finish();
     vb_gamepad_set_buttons(vb_platform_get_buttons());
     vb_vip_render(framebuffer, 0);
     vb_platform_present(framebuffer);
-    if (max_frames && frame_count >= max_frames) exit(0);
+    if (max_frames && frame_count >= max_frames) finish();
     return true;
 }
 
@@ -61,6 +82,8 @@ int main(int argc, char **argv) {
 
     const char *mf = getenv("VBRECOMP_HEADLESS_FRAMES");
     max_frames = mf ? atoi(mf) : 0;
+    shot_path = getenv("VBRECOMP_SHOT_PATH");
+    if (shot_path && !shot_path[0]) shot_path = NULL;
 
     vb_init(rom, rom_size);
     vb_cpu.sr[VB_SREG_PSW] = 0;
@@ -84,6 +107,7 @@ int main(int argc, char **argv) {
         vb_platform_present(framebuffer);
         if (max_frames && ++frame_count >= max_frames) break;
     }
+    if (shot_path) dump_png(shot_path);
 
     vb_platform_shutdown();
     vb_shutdown();

@@ -47,3 +47,26 @@ vb_add_game(galacticpinball galacticpinball)
 
 # Generic driver (no game-specific glue):
 vb_add_game_generic(marioclash marioclash)
+
+# Build EVERY recompiled ROM in a corpus dir via the generic driver. Used by
+# scripts/build_all.ps1: configure with -DVBRECOMP_CORPUS_DIR=<abs corpus path>.
+# Each subdir with a recomp_funcs.c becomes a `corpus_<slug>` executable.
+if(DEFINED VBRECOMP_CORPUS_DIR)
+    file(GLOB corpus_entries RELATIVE ${VBRECOMP_CORPUS_DIR} ${VBRECOMP_CORPUS_DIR}/*)
+    foreach(slug ${corpus_entries})
+        set(gen ${VBRECOMP_CORPUS_DIR}/${slug}/recomp_funcs.c)
+        if(EXISTS ${gen})
+            add_executable(corpus_${slug}
+                ${CMAKE_CURRENT_SOURCE_DIR}/driver/main.c ${gen})
+            target_include_directories(corpus_${slug} PRIVATE ${VBRECOMP_CORPUS_DIR}/${slug})
+            target_link_libraries(corpus_${slug} PRIVATE vbrecomp)
+            if(MSVC)
+                # /Od: these generated files are huge and only boot-tested,
+                # so skip optimization to keep the 76-target build tractable.
+                target_compile_options(corpus_${slug} PRIVATE /W0 /Od /wd4244 /wd4146)
+            else()
+                target_compile_options(corpus_${slug} PRIVATE -O0 -w)
+            endif()
+        endif()
+    endforeach()
+endif()
