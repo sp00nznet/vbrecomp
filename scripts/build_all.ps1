@@ -64,7 +64,7 @@ $dllCopied = $false
 $i = 0
 foreach ($slug in $slugs) {
     $i++
-    $rec = [ordered]@{ slug=$slug; name=($meta[$slug]); build="fail"; ran="no"; shot="no"; shotKB=0; note="" }
+    $rec = [ordered]@{ slug=$slug; name=($meta[$slug]); build="fail"; ran="no"; shot="no"; shotBytes=0; rendered="no"; note="" }
 
     # --- build (one target at a time, single MSBuild process) ---
     $exe = Join-Path $BuildDir "games\Release\corpus_$slug.exe"
@@ -90,32 +90,39 @@ foreach ($slug in $slugs) {
             if ($r.TimedOut -or $r.Code -eq 0) { $rec.ran = "yes" }
             else { $rec.ran = "crash"; $rec.note = "exit 0x{0:X}" -f $r.Code }
             if (Test-Path $shot) {
-                $rec.shot = "yes"; $rec.shotKB = [int]((Get-Item $shot).Length / 1024)
+                $rec.shot = "yes"
+                $rec.shotBytes = (Get-Item $shot).Length
+                # A blank 384x224 frame (all black) is exactly 3619 bytes; anything
+                # meaningfully larger means the game drew something.
+                if ($rec.shotBytes -gt 3800) { $rec.rendered = "yes" }
             }
         } else { $rec.note = "ROM not found" }
     }
 
     $results += [pscustomobject]$rec
-    Write-Host ("{0,-3} {1,-44} build:{2,-8} ran:{3,-6} shot:{4,-4} {5}KB {6}" -f `
-        $i, $slug.Substring(0,[Math]::Min(44,$slug.Length)), $rec.build, $rec.ran, $rec.shot, $rec.shotKB, $rec.note)
+    Write-Host ("{0,-3} {1,-44} build:{2,-8} ran:{3,-6} rendered:{4,-4} {5}b {6}" -f `
+        $i, $slug.Substring(0,[Math]::Min(44,$slug.Length)), $rec.build, $rec.ran, $rec.rendered, $rec.shotBytes, $rec.note)
 }
 
 # --- report ---
 $results | ConvertTo-Json -Depth 3 | Out-File -Encoding utf8 (Join-Path $Corpus "bootstatus.json")
 $built = ($results | Where-Object { $_.build -eq "ok" }).Count
 $ran   = ($results | Where-Object { $_.ran -eq "yes" }).Count
-$drew  = ($results | Where-Object { [int]$_.shotKB -gt 3 }).Count   # >3KB png ~ non-blank
+$drew  = ($results | Where-Object { $_.rendered -eq "yes" }).Count
 $md = @("# Boot status (generic driver)", "",
-    "Built and booted headless via the generic driver, $Frames frames each.", "",
+    "Every recompiled ROM built with the shared generic driver (no game-specific code) and booted headless for $Frames frames. Screenshots in ``corpus/_shots/``.", "",
     "- Builds: **$built / $($results.Count)**",
-    "- Run without crashing: **$ran / $($results.Count)**",
-    "- Rendered non-blank output: **~$drew / $($results.Count)** (screenshot >3KB)", "",
-    "| # | Game | Builds | Runs | Screenshot KB | Notes |",
-    "|---|------|--------|------|---------------|-------|")
+    "- Runs without crashing: **$ran / $($results.Count)**",
+    "- Drew visible output: **$drew / $($results.Count)** (non-blank screenshot)",
+    "",
+    "Most games run but don't render under the naive driver yet — they need per-game boot/timing tuning (as the lead games got). 'Drew visible output' marks the ones that already show something.",
+    "",
+    "| # | Game | Builds | Runs | Drew | Notes |",
+    "|---|------|--------|------|------|-------|")
 $n = 0
-foreach ($r in $results) {
+foreach ($r in ($results | Sort-Object @{e={$_.rendered -ne 'yes'}}, @{e={$_.build -eq 'ok'}}, name)) {
     $n++
-    $md += "| $n | $($r.name) | $($r.build) | $($r.ran) | $($r.shotKB) | $($r.note) |"
+    $md += "| $n | $($r.name) | $($r.build) | $($r.ran) | $($r.rendered) | $($r.note) |"
 }
 ($md -join "`n") | Out-File -Encoding utf8 (Join-Path $Root "BOOTSTATUS.md")
 Write-Host ""

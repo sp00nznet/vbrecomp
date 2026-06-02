@@ -404,7 +404,17 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         uint32_t target = insn->addr + insn->imm;
         uint32_t skip = v810_get_skip_bytes(ctx, target);
         fprintf(out, "    vb_cpu.r[31] = 0x%08X;\n", insn->addr + 4 + skip);
-        fprintf(out, "    vb_func_%08X();\n", target);
+        /* Normalize the target the same way declarations/stubs do. An
+         * in-ROM target is a direct call; an out-of-ROM one (a mirror or a
+         * garbage target from data decoded as JAL) has no emitted function,
+         * so dispatch it at run time (no-op on miss) to stay linkable. */
+        uint32_t nt = target;
+        if (nt >= 0x08000000) nt &= 0x07FFFFFF;
+        if (nt >= ctx->rom_base && nt < ROM_REGION_END) {
+            fprintf(out, "    vb_func_%08X();\n", nt);
+        } else {
+            fprintf(out, "    vb_recomp_call(0x%08Xu);\n", target);
+        }
         if (skip > 0) {
             fprintf(out, "    /* skip %u bytes of inline data after JAL */\n", skip);
         }
