@@ -25,6 +25,7 @@ static int frame_count;
 static int max_frames;          /* 0 = unlimited (VBRECOMP_HEADLESS_FRAMES) */
 static const char *shot_path;   /* VBRECOMP_SHOT_PATH: dump a PNG before exit */
 static int shot_every;          /* VBRECOMP_SHOT_EVERY: also dump every N frames */
+static uint16_t inject_btn;      /* VBRECOMP_PRESS: button mask to auto-press (testing) */
 
 extern int stbi_write_png(const char *, int, int, int, const void *, int);
 
@@ -50,7 +51,13 @@ static void finish(void) {
 static bool on_frame(void) {
     frame_count++;
     if (!vb_platform_poll()) finish();
-    vb_gamepad_set_buttons(vb_platform_get_buttons());
+    {
+        uint16_t btn = vb_platform_get_buttons();
+        /* Test aid: auto-press a button in periodic bursts (press then release),
+         * so a headless run can get past "press start"-style gates. */
+        if (inject_btn && frame_count > 60 && (frame_count % 120) < 40) btn |= inject_btn;
+        vb_gamepad_set_buttons(btn);
+    }
     vb_vip_render(framebuffer, 0);
     vb_platform_present(framebuffer);
     if (shot_every > 0 && shot_path && frame_count % shot_every == 0) {
@@ -92,6 +99,8 @@ int main(int argc, char **argv) {
     if (shot_path && !shot_path[0]) shot_path = NULL;
     const char *se = getenv("VBRECOMP_SHOT_EVERY");
     shot_every = se ? atoi(se) : 0;
+    const char *pb = getenv("VBRECOMP_PRESS");
+    inject_btn = pb ? (uint16_t)strtoul(pb, NULL, 16) : 0;
 
     vb_init(rom, rom_size);
     vb_cpu.sr[VB_SREG_PSW] = 0;

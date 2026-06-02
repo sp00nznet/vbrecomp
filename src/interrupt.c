@@ -75,6 +75,8 @@ void vb_interrupt_check(void) {
                     vb_mem_read8(0x02000028), vb_mem_read8(0x02000010));
             extern void vb_mem_dump_hot_reads(void);
             vb_mem_dump_hot_reads();
+            extern void vb_vip_dump_write_stats(void);
+            vb_vip_dump_write_stats();
         }
     }
 
