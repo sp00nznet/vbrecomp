@@ -16,7 +16,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Insmouth no Yakata (Japan) | 1024 | 143 | yes | yes | - | - | - |  |
 | Jack Bros. (USA) | 1024 | 29 | yes | yes | - | - | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 29 | yes | yes | - | - | - |  |
-| Mario Clash (Japan, USA) (En) | 1024 | 791 | yes | yes | - | - | - |  |
+| Mario Clash (Japan, USA) (En) | 1024 | 791 | yes | yes | yes | wip | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
 | Mario's Tennis (Japan, USA) (En) | 512 | 205 | yes | yes | yes | wip | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
 | Nester's Funky Bowling (USA) | 2048 | 189 | yes | yes | - | - | - |  |
 | Panic Bomber (USA) | 512 | 188 | yes | yes | - | - | - |  |
