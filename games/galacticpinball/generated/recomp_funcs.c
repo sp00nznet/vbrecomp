@@ -15,6 +15,8 @@
 #include <string.h>
 #include <math.h>
 
+void vb_recomp_call(uint32_t addr);
+
 void vb_func_07F00000(void);
 void vb_func_07F00026(void);
 void vb_func_07F000B4(void);
@@ -2354,9 +2356,8 @@ label_07F00A10:
     /* 07F00A26: ld.w     0[r6], r11 */
     vb_cpu.r[11] = vb_mem_read32(vb_cpu.r[6] + (int32_t)(int16_t)0x0000);
     /* 07F00A2A: jmp      [r11] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[11]] */
     vb_cpu.pc = vb_cpu.r[11] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[11]] */
 label_07F00A2C:
     vb_interrupt_check();
     /* 07F00A2C: st.w     r8, 24[r21] */
@@ -3185,9 +3186,8 @@ label_07F00A10:
     /* 07F00A26: ld.w     0[r6], r11 */
     vb_cpu.r[11] = vb_mem_read32(vb_cpu.r[6] + (int32_t)(int16_t)0x0000);
     /* 07F00A2A: jmp      [r11] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[11]] */
     vb_cpu.pc = vb_cpu.r[11] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[11]] */
 label_07F00A2C:
     vb_interrupt_check();
     /* 07F00A2C: st.w     r8, 24[r21] */
@@ -3389,9 +3389,8 @@ label_07F00B38:
     /* 07F00B4C: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B50: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B52:
     vb_interrupt_check();
     /* 07F00B52: sub      r1, r17 */
@@ -3416,9 +3415,8 @@ label_07F00B52:
     /* 07F00B6A: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B6E: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B70:
     vb_interrupt_check();
     /* 07F00B70: sub      r1, r17 */
@@ -3443,9 +3441,8 @@ label_07F00B70:
     /* 07F00B88: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B8C: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B8E:
     vb_interrupt_check();
     /* 07F00B8E: movea    0x0050, r0, r7 */
@@ -3671,9 +3668,8 @@ label_07F00C86:
     /* 07F00CA6: add      -1, r8 */
     vb_cpu.r[8] = vb_add(vb_cpu.r[8], 0xFFFFFFFF);
     /* 07F00CA8: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
     /* 07F00CAA: movhi    0xFFF0, r0, r9 */
     vb_cpu.r[9] = vb_cpu.r[0] + 0xFFF00000;
     /* 07F00CAE: movea    0x1664, r9, r9 */
@@ -4183,9 +4179,8 @@ label_07F00A10:
     /* 07F00A26: ld.w     0[r6], r11 */
     vb_cpu.r[11] = vb_mem_read32(vb_cpu.r[6] + (int32_t)(int16_t)0x0000);
     /* 07F00A2A: jmp      [r11] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[11]] */
     vb_cpu.pc = vb_cpu.r[11] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[11]] */
 label_07F00A2C:
     vb_interrupt_check();
     /* 07F00A2C: st.w     r8, 24[r21] */
@@ -4387,9 +4382,8 @@ label_07F00B38:
     /* 07F00B4C: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B50: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B52:
     vb_interrupt_check();
     /* 07F00B52: sub      r1, r17 */
@@ -4414,9 +4408,8 @@ label_07F00B52:
     /* 07F00B6A: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B6E: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B70:
     vb_interrupt_check();
     /* 07F00B70: sub      r1, r17 */
@@ -4441,9 +4434,8 @@ label_07F00B70:
     /* 07F00B88: ld.w     0[r8], r10 */
     vb_cpu.r[10] = vb_mem_read32(vb_cpu.r[8] + (int32_t)(int16_t)0x0000);
     /* 07F00B8C: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
 label_07F00B8E:
     vb_interrupt_check();
     /* 07F00B8E: movea    0x0050, r0, r7 */
@@ -4669,9 +4661,8 @@ label_07F00C86:
     /* 07F00CA6: add      -1, r8 */
     vb_cpu.r[8] = vb_add(vb_cpu.r[8], 0xFFFFFFFF);
     /* 07F00CA8: jmp      [r10] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[10]] */
     vb_cpu.pc = vb_cpu.r[10] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[10]] */
     /* 07F00CAA: movhi    0xFFF0, r0, r9 */
     vb_cpu.r[9] = vb_cpu.r[0] + 0xFFF00000;
     /* 07F00CAE: movea    0x1664, r9, r9 */
@@ -6461,9 +6452,8 @@ label_07F412E0:
 void vb_func_07F412EE(void) {
     vb_interrupt_check();
     /* 07F412EE: jmp      [r1] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[1]] */
     vb_cpu.pc = vb_cpu.r[1] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[1]] */
 }
 
 /* sub_07F41790: 0x07F41790-0x07F417B8 (40 bytes) */
@@ -7463,9 +7453,8 @@ void vb_func_07F42E78(void) {
     /* 07F42E78: ld.w     -12736[r4], r17 */
     vb_cpu.r[17] = vb_mem_read32(vb_cpu.r[4] + (int32_t)(int16_t)0xCE40);
     /* 07F42E7C: jmp      [r17] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[17]] */
     vb_cpu.pc = vb_cpu.r[17] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[17]] */
 }
 
 /* sub_07F42F70: 0x07F42F70-0x07F42F76 (6 bytes) */
@@ -7549,9 +7538,8 @@ void vb_func_07F468A0(void) {
     /* 07F468A6: ld.w     -12720[r4], r1 */
     vb_cpu.r[1] = vb_mem_read32(vb_cpu.r[4] + (int32_t)(int16_t)0xCE50);
     /* 07F468AA: jmp      [r1] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[1]] */
     vb_cpu.pc = vb_cpu.r[1] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[1]] */
 }
 
 /* sub_07F46BB0: 0x07F46BB0-0x07F46C18 (104 bytes) */
@@ -7671,9 +7659,8 @@ label_07F46D8E:
     /* 07F46DB0: ld.w     0[r22], r15 */
     vb_cpu.r[15] = vb_mem_read32(vb_cpu.r[22] + (int32_t)(int16_t)0x0000);
     /* 07F46DB4: jmp      [r15] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[15]] */
     vb_cpu.pc = vb_cpu.r[15] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[15]] */
 }
 
 /* sub_07F46E0A: 0x07F46E0A-0x07F46E5C (82 bytes) */
@@ -7749,9 +7736,8 @@ label_07F46E44:
 void vb_func_07F46E5C(void) {
     vb_interrupt_check();
     /* 07F46E5C: jmp      [r15] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[15]] */
     vb_cpu.pc = vb_cpu.r[15] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[15]] */
 }
 
 /* sub_07F46E5E: 0x07F46E5E-0x07F46EE6 (136 bytes) */
@@ -7864,9 +7850,8 @@ void vb_func_07F46EE6(void) {
     /* 07F46EE6: ld.w     20[r23], r1 */
     vb_cpu.r[1] = vb_mem_read32(vb_cpu.r[23] + (int32_t)(int16_t)0x0014);
     /* 07F46EEA: jmp      [r1] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[1]] */
     vb_cpu.pc = vb_cpu.r[1] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[1]] */
 }
 
 /* sub_07F46EEC: 0x07F46EEC-0x07F46F64 (120 bytes) */
@@ -7971,9 +7956,8 @@ void vb_func_07F46F64(void) {
     /* 07F46F64: ld.w     40[r23], r1 */
     vb_cpu.r[1] = vb_mem_read32(vb_cpu.r[23] + (int32_t)(int16_t)0x0028);
     /* 07F46F68: jmp      [r1] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[1]] */
     vb_cpu.pc = vb_cpu.r[1] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[1]] */
 }
 
 /* sub_07F46F6A: 0x07F46F6A-0x07F46FE0 (118 bytes) */
@@ -8076,9 +8060,8 @@ void vb_func_07F46FFE(void) {
     /* 07F46FFE: ld.w     40[r23], r1 */
     vb_cpu.r[1] = vb_mem_read32(vb_cpu.r[23] + (int32_t)(int16_t)0x0028);
     /* 07F47002: jmp      [r1] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[1]] */
     vb_cpu.pc = vb_cpu.r[1] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[1]] */
 }
 
 /* sub_07F47004: 0x07F47004-0x07F47086 (130 bytes) */
@@ -8186,9 +8169,8 @@ label_07F47072:
 void vb_func_07F47086(void) {
     vb_interrupt_check();
     /* 07F47086: jmp      [r15] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[15]] */
     vb_cpu.pc = vb_cpu.r[15] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[15]] */
 }
 
 /* sub_07F4722A: 0x07F4722A-0x07F47250 (38 bytes) */
@@ -9409,9 +9391,8 @@ void vb_func_07F5453A(void) {
 void vb_func_07F545B2(void) {
     vb_interrupt_check();
     /* 07F545B2: jmp      [r15] */
-    /* WARNING: unresolved indirect jump [vb_cpu.r[15]] */
     vb_cpu.pc = vb_cpu.r[15] & 0xFFFFFFFE;
-    return; /* indirect jump - FIXME */
+    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [vb_cpu.r[15]] */
 }
 
 /* sub_07FFFFF0: 0x07FFFFF0-0x07FFFFFA (10 bytes) */
@@ -9452,3 +9433,110 @@ void vb_func_07F459A2(void) { /* STUB: jump table target */ }
 void vb_func_07F459B4(void) { /* STUB: jump table target */ }
 
 void vb_func_07F459BE(void) { /* STUB: jump table target */ }
+
+/* Runtime dispatch table: ROM address -> recompiled function. */
+typedef void (*vb_func_ptr_t)(void);
+static const struct { uint32_t addr; vb_func_ptr_t fn; } vb_func_table[] = {
+    { 0x07F00000u, vb_func_07F00000 },
+    { 0x07F00026u, vb_func_07F00026 },
+    { 0x07F000B4u, vb_func_07F000B4 },
+    { 0x07F00214u, vb_func_07F00214 },
+    { 0x07F00238u, vb_func_07F00238 },
+    { 0x07F0025Cu, vb_func_07F0025C },
+    { 0x07F00280u, vb_func_07F00280 },
+    { 0x07F00298u, vb_func_07F00298 },
+    { 0x07F003CCu, vb_func_07F003CC },
+    { 0x07F0068Cu, vb_func_07F0068C },
+    { 0x07F0074Eu, vb_func_07F0074E },
+    { 0x07F007C0u, vb_func_07F007C0 },
+    { 0x07F00976u, vb_func_07F00976 },
+    { 0x07F009B6u, vb_func_07F009B6 },
+    { 0x07F3FF2Cu, vb_func_07F3FF2C },
+    { 0x07F3FF48u, vb_func_07F3FF48 },
+    { 0x07F3FFDEu, vb_func_07F3FFDE },
+    { 0x07F400F2u, vb_func_07F400F2 },
+    { 0x07F40180u, vb_func_07F40180 },
+    { 0x07F4022Eu, vb_func_07F4022E },
+    { 0x07F403BEu, vb_func_07F403BE },
+    { 0x07F40420u, vb_func_07F40420 },
+    { 0x07F40446u, vb_func_07F40446 },
+    { 0x07F4047Cu, vb_func_07F4047C },
+    { 0x07F404B0u, vb_func_07F404B0 },
+    { 0x07F404F6u, vb_func_07F404F6 },
+    { 0x07F4054Cu, vb_func_07F4054C },
+    { 0x07F40C9Cu, vb_func_07F40C9C },
+    { 0x07F41158u, vb_func_07F41158 },
+    { 0x07F41176u, vb_func_07F41176 },
+    { 0x07F411A2u, vb_func_07F411A2 },
+    { 0x07F41242u, vb_func_07F41242 },
+    { 0x07F41250u, vb_func_07F41250 },
+    { 0x07F412BAu, vb_func_07F412BA },
+    { 0x07F412EEu, vb_func_07F412EE },
+    { 0x07F41790u, vb_func_07F41790 },
+    { 0x07F417B8u, vb_func_07F417B8 },
+    { 0x07F417D6u, vb_func_07F417D6 },
+    { 0x07F417E0u, vb_func_07F417E0 },
+    { 0x07F42CD8u, vb_func_07F42CD8 },
+    { 0x07F42D44u, vb_func_07F42D44 },
+    { 0x07F42E78u, vb_func_07F42E78 },
+    { 0x07F42F70u, vb_func_07F42F70 },
+    { 0x07F434D0u, vb_func_07F434D0 },
+    { 0x07F4366Cu, vb_func_07F4366C },
+    { 0x07F45980u, vb_func_07F45980 },
+    { 0x07F4598Cu, vb_func_07F4598C },
+    { 0x07F45996u, vb_func_07F45996 },
+    { 0x07F459A2u, vb_func_07F459A2 },
+    { 0x07F459A8u, vb_func_07F459A8 },
+    { 0x07F459B4u, vb_func_07F459B4 },
+    { 0x07F459BEu, vb_func_07F459BE },
+    { 0x07F459CAu, vb_func_07F459CA },
+    { 0x07F468A0u, vb_func_07F468A0 },
+    { 0x07F46BB0u, vb_func_07F46BB0 },
+    { 0x07F46D74u, vb_func_07F46D74 },
+    { 0x07F46E0Au, vb_func_07F46E0A },
+    { 0x07F46E5Cu, vb_func_07F46E5C },
+    { 0x07F46E5Eu, vb_func_07F46E5E },
+    { 0x07F46EE6u, vb_func_07F46EE6 },
+    { 0x07F46EECu, vb_func_07F46EEC },
+    { 0x07F46F64u, vb_func_07F46F64 },
+    { 0x07F46F6Au, vb_func_07F46F6A },
+    { 0x07F46FFEu, vb_func_07F46FFE },
+    { 0x07F47004u, vb_func_07F47004 },
+    { 0x07F47086u, vb_func_07F47086 },
+    { 0x07F4722Au, vb_func_07F4722A },
+    { 0x07F47250u, vb_func_07F47250 },
+    { 0x07F47276u, vb_func_07F47276 },
+    { 0x07F47B54u, vb_func_07F47B54 },
+    { 0x07F47C28u, vb_func_07F47C28 },
+    { 0x07F47CD8u, vb_func_07F47CD8 },
+    { 0x07F47D28u, vb_func_07F47D28 },
+    { 0x07F4963Cu, vb_func_07F4963C },
+    { 0x07F4999Cu, vb_func_07F4999C },
+    { 0x07F5168Cu, vb_func_07F5168C },
+    { 0x07F519B8u, vb_func_07F519B8 },
+    { 0x07F519D8u, vb_func_07F519D8 },
+    { 0x07F51A08u, vb_func_07F51A08 },
+    { 0x07F5453Au, vb_func_07F5453A },
+    { 0x07F545B2u, vb_func_07F545B2 },
+    { 0x07F63558u, vb_func_07F63558 },
+    { 0x07F6EE30u, vb_func_07F6EE30 },
+    { 0x07F7E67Cu, vb_func_07F7E67C },
+    { 0x07F90A4Cu, vb_func_07F90A4C },
+    { 0x07FB39D0u, vb_func_07FB39D0 },
+    { 0x07FFFFF0u, vb_func_07FFFFF0 },
+};
+static const int vb_func_table_count = 87;
+
+void vb_recomp_call(uint32_t addr) {
+    if (addr >= 0x08000000u) addr &= 0x07FFFFFFu;
+    if (addr >= 0x07000000u && addr < 0x07F00000u)
+        addr = 0x07F00000u + (addr - 0x07000000u) % 0x100000u;
+    int lo = 0, hi = vb_func_table_count - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) >> 1;
+        uint32_t a = vb_func_table[mid].addr;
+        if (a == addr) { vb_func_table[mid].fn(); return; }
+        if (a < addr) lo = mid + 1; else hi = mid - 1;
+    }
+    /* No function at this address: unresolved target, no-op. */
+}

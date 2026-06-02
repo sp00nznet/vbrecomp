@@ -40,6 +40,12 @@ static const char *cond_expr[16] = {
 };
 
 /* Emit flag-setting code for arithmetic operations */
+/* qsort comparator for the runtime dispatch table (ascending by address). */
+static int cmp_u32(const void *a, const void *b) {
+    uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
+    return (x > y) - (x < y);
+}
+
 static void emit_flags_add(FILE *out, const char *a, const char *b, const char *result) {
     fprintf(out, "    %s = vb_add(%s, %s);\n", result, a, b);
 }
@@ -186,9 +192,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                     fprintf(out, "    return; /* resolved jmp to 0x%08X (no local label) */\n", resolved);
                 }
             } else {
-                fprintf(out, "    /* WARNING: unresolved indirect jump [%s] */\n", r1);
+                /* Unresolved at compile time: dispatch through the runtime
+                 * function table by the register's value (tail call). */
                 fprintf(out, "    vb_cpu.pc = %s & 0xFFFFFFFE;\n", r1);
-                fprintf(out, "    return; /* indirect jump - FIXME */\n");
+                fprintf(out, "    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [%s] */\n", r1);
             }
         }
         break;
@@ -790,6 +797,10 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "#include <string.h>\n");
     fprintf(out, "#include <math.h>\n\n");
 
+    /* Runtime dispatch for indirect jumps the static analysis can't resolve;
+     * defined at the bottom of this file. */
+    fprintf(out, "void vb_recomp_call(uint32_t addr);\n\n");
+
     /* Forward declarations (confirmed functions only) */
     for (int i = 0; i < ctx->num_funcs; i++) {
         if (!ctx->funcs[i].confirmed) continue;
@@ -947,6 +958,42 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                 off += insn.size;
             }
         }
+        /* --- Runtime dispatch table -------------------------------------
+         * Every defined function, sorted by address, so unresolved indirect
+         * jumps/calls can be dispatched by address at run time. */
+        qsort(emitted_addrs, n_emitted, sizeof(uint32_t), cmp_u32);
+
+        fprintf(out, "\n/* Runtime dispatch table: ROM address -> recompiled function. */\n");
+        fprintf(out, "typedef void (*vb_func_ptr_t)(void);\n");
+        fprintf(out, "static const struct { uint32_t addr; vb_func_ptr_t fn; } vb_func_table[] = {\n");
+        int table_count = 0;
+        for (int i = 0; i < n_emitted; i++) {
+            if (i > 0 && emitted_addrs[i] == emitted_addrs[i - 1]) continue; /* dedup */
+            fprintf(out, "    { 0x%08Xu, vb_func_%08X },\n", emitted_addrs[i], emitted_addrs[i]);
+            table_count++;
+        }
+        fprintf(out, "};\n");
+        fprintf(out, "static const int vb_func_table_count = %d;\n\n", table_count);
+
+        fprintf(out, "void vb_recomp_call(uint32_t addr) {\n");
+        fprintf(out, "    if (addr >= 0x08000000u) addr &= 0x07FFFFFFu;\n");
+        if (ctx->rom_base > ROM_REGION_BASE) {
+            /* Collapse ROM-internal mirrors below rom_base to canonical range. */
+            fprintf(out, "    if (addr >= 0x%08Xu && addr < 0x%08Xu)\n",
+                    ROM_REGION_BASE, ctx->rom_base);
+            fprintf(out, "        addr = 0x%08Xu + (addr - 0x%08Xu) %% 0x%Xu;\n",
+                    ctx->rom_base, ROM_REGION_BASE, ctx->rom_size);
+        }
+        fprintf(out, "    int lo = 0, hi = vb_func_table_count - 1;\n");
+        fprintf(out, "    while (lo <= hi) {\n");
+        fprintf(out, "        int mid = (lo + hi) >> 1;\n");
+        fprintf(out, "        uint32_t a = vb_func_table[mid].addr;\n");
+        fprintf(out, "        if (a == addr) { vb_func_table[mid].fn(); return; }\n");
+        fprintf(out, "        if (a < addr) lo = mid + 1; else hi = mid - 1;\n");
+        fprintf(out, "    }\n");
+        fprintf(out, "    /* No function at this address: unresolved target, no-op. */\n");
+        fprintf(out, "}\n");
+
         free(emitted_addrs);
     }
     free(was_emitted);
