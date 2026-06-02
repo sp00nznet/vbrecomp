@@ -108,7 +108,7 @@ static uint32_t find_entry_point(const uint8_t *rom, uint32_t rom_size, uint32_t
         uint32_t entry = hi + lo;
 
         /* Resolve mirrored address to canonical ROM range */
-        if (entry >= 0xFFF00000) {
+        if (entry >= 0x08000000) {
             entry = entry & 0x07FFFFFF;
         }
         if (entry >= ROM_REGION_BASE && entry < rom_base) {
@@ -123,7 +123,7 @@ static uint32_t find_entry_point(const uint8_t *rom, uint32_t rom_size, uint32_t
     /* Fallback: check for JR instruction */
     if (count >= 1 && insns[0].opcode == 0x2A) {
         uint32_t entry = insns[0].addr + insns[0].imm;
-        if (entry >= 0xFFF00000) entry &= 0x07FFFFFF;
+        if (entry >= 0x08000000) entry &= 0x07FFFFFF;
         if (entry >= ROM_REGION_BASE && entry < rom_base) {
             entry = rom_base + (entry - ROM_REGION_BASE) % rom_size;
         }
@@ -200,7 +200,7 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
                 uint32_t hi = (uint32_t)((uint16_t)insns[i].imm) << 16;
                 uint32_t lo = (uint32_t)(int32_t)(int16_t)insns[i+1].imm;
                 target = hi + lo;
-                if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                if (target >= 0x08000000) target &= 0x07FFFFFF;
                 found = true;
                 break;
             }
@@ -211,7 +211,7 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
             for (int i = 0; i < count; i++) {
                 if (insns[i].opcode == 0x2A) {
                     target = insns[i].addr + insns[i].imm;
-                    if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                    if (target >= 0x08000000) target &= 0x07FFFFFF;
                     found = true;
                     break;
                 }

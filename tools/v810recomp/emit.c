@@ -642,7 +642,7 @@ static bool label_set_has(label_set_t *ls, uint32_t addr) {
 
 /* Convert address to ROM offset, handling high addresses */
 static uint32_t resolve_addr(v810_ctx_t *ctx, uint32_t addr) {
-    if (addr >= 0xFFF00000) {
+    if (addr >= 0x08000000) {
         addr = addr & 0x07FFFFFF;
     }
     return addr - ctx->rom_base;
@@ -827,7 +827,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
         if (ctx->funcs[i].addr < ctx->rom_base) continue;
         uint32_t foff = ctx->funcs[i].addr;
-        if (foff >= 0xFFF00000) foff &= 0x07FFFFFF;
+        if (foff >= 0x08000000) foff &= 0x07FFFFFF;
         foff -= ctx->rom_base;
         uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
         if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
@@ -838,7 +838,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
             insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
             if (insn.opcode == 0x2B) {
                 uint32_t target = insn.addr + insn.imm;
-                if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                if (target >= 0x08000000) target &= 0x07FFFFFF;
                 if (target >= ctx->rom_base && target < ROM_REGION_END) {
                     fprintf(out, "void vb_func_%08X(void);\n", target);
                 }
@@ -860,7 +860,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         if (ctx->funcs[i].addr >= ctx->rom_base && ctx->funcs[i].addr < ROM_REGION_END &&
             ctx->funcs[i].end_addr > ctx->funcs[i].addr) {
             start_off = ctx->funcs[i].addr - ctx->rom_base;
-            if (ctx->funcs[i].addr >= 0xFFF00000)
+            if (ctx->funcs[i].addr >= 0x08000000)
                 start_off = (ctx->funcs[i].addr & 0x07FFFFFF) - ctx->rom_base;
             end_off = start_off + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
             if (start_off < ctx->rom_size && end_off <= ctx->rom_size && start_off < end_off)
@@ -921,7 +921,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
             if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
             if (ctx->funcs[i].addr < ctx->rom_base) continue;
             uint32_t foff = ctx->funcs[i].addr;
-            if (foff >= 0xFFF00000) foff &= 0x07FFFFFF;
+            if (foff >= 0x08000000) foff &= 0x07FFFFFF;
             foff -= ctx->rom_base;
             uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
             if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
@@ -934,7 +934,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
 
                 if (insn.opcode == 0x2B) { /* JAL */
                     uint32_t target = insn.addr + insn.imm;
-                    if (target >= 0xFFF00000) target &= 0x07FFFFFF;
+                    if (target >= 0x08000000) target &= 0x07FFFFFF;
                     bool already = false;
                     for (int k = 0; k < n_emitted; k++) {
                         if (emitted_addrs[k] == target) { already = true; break; }
