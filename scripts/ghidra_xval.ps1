@@ -26,11 +26,16 @@ $slug = ([System.IO.Path]::GetFileNameWithoutExtension($Rom) -replace '[^A-Za-z0
 $funcsOut = Join-Path $WorkDir "$slug.ghidra.tsv"
 $headless = Join-Path $GhidraHome "support\analyzeHeadless.bat"
 
+# analyzeHeadless.bat (a batch file) mis-parses paths with parens/commas, which
+# every No-Intro ROM name has. Copy to a sanitized temp name first.
+$romTmp = Join-Path $WorkDir "$slug.vb"
+Copy-Item -LiteralPath $Rom -Destination $romTmp -Force
+
 Write-Host "ROM: $Rom ($romSize bytes), base $baseHex"
 Write-Host "Running Ghidra headless analysis (V810)..."
 
 & $headless $WorkDir "xval_$slug" `
-    -import $Rom `
+    -import $romTmp `
     -processor "V810:LE:32:default" `
     -loader BinaryLoader -loader-baseAddr $baseHex `
     -scriptPath (Join-Path $PSScriptRoot "ghidra") `
