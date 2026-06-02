@@ -16,6 +16,7 @@
 #include "vbrecomp/timer.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Approximate CPU cycles per interrupt_check call. The VB runs ~400K cycles
  * per ~50Hz frame; with the default ~20K checks per frame that's ~20 cycles
@@ -61,6 +62,20 @@ void vb_interrupt_clear(int level) {
 }
 
 void vb_interrupt_check(void) {
+    /* Optional boot-diagnosis heartbeat (VBRECOMP_HEARTBEAT=1): periodically
+     * dump the key hardware registers so a stalled boot reveals its state. */
+    {
+        static int hb_on = -1;
+        static uint64_t hb = 0;
+        if (hb_on < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); hb_on = (e && e[0] && e[0] != '0'); }
+        if (hb_on && (++hb % 4000000ull == 0)) {
+            fprintf(stderr, "HB: INTPND=%04X INTENB=%04X DPSTTS=%04X XPSTTS=%04X SCR=%02X TCR=%02X\n",
+                    vb_mem_read16(0x0005F800), vb_mem_read16(0x0005F802),
+                    vb_mem_read16(0x0005F820), vb_mem_read16(0x0005F840),
+                    vb_mem_read8(0x02000028), vb_mem_read8(0x02000010));
+        }
+    }
+
     /* Advance the hardware timer every check (independent of frame timing).
      * Counts down whenever enabled, sets ZSTAT on underflow, and requests the
      * timer interrupt if the game enabled it. Games commonly poll or wait on
