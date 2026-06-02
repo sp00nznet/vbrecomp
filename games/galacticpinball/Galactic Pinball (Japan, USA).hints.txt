@@ -1,0 +1,26 @@
+# v810recomp hints for Galactic Pinball
+#
+# The game uses two function-pointer dispatch slots in WRAM, both set up
+# during init (07F40398-07F403AC) and read at jmp [reg] sites later.
+# The static analyzer can't propagate constants through memory, so hint:
+#
+#   [GP-0xCE34]: state-init dispatcher
+#     stored 0x07F42D44 at 07F40398; read+jumped at 07F42CDC
+#
+#   [GP-0xCE3C]: per-frame dispatcher
+#     stored 0x07F5168C at 07F403A4; read+jumped at 07F42F74
+jmp 0x07F42CDC 0x07F42D44
+jmp 0x07F42F74 0x07F5168C
+
+# Additional per-frame state-machine handlers stored to [GP-0xCE3C]
+# during the boot/logo sequence. Each handler runs every frame until
+# it transitions to the next by writing a new pointer to that slot.
+entry 0x07F519D8
+entry 0x07F519B8
+entry 0x07F51A08
+
+# vb_func_07F417B8 is a "skip-after-JAL" helper: it reads two pointers
+# from the 8 bytes immediately after the JAL (src=*+0, dst=*+4), calls
+# decompressor 07F417D6, then `add 8, r31; jmp [r31]` to resume past
+# the inline data. v810recomp must not analyze those 8 bytes as code.
+skip 0x07F417B8 0x8

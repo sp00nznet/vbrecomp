@@ -41,59 +41,26 @@ static const char *cond_expr[16] = {
 
 /* Emit flag-setting code for arithmetic operations */
 static void emit_flags_add(FILE *out, const char *a, const char *b, const char *result) {
-    fprintf(out, "    { uint64_t _r64 = (uint64_t)(uint32_t)(%s) + (uint64_t)(uint32_t)(%s);\n", a, b);
-    fprintf(out, "      uint32_t _r = (uint32_t)_r64;\n");
-    fprintf(out, "      uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);\n");
-    fprintf(out, "      if (_r == 0) _psw |= VB_PSW_Z;\n");
-    fprintf(out, "      if (_r & 0x80000000) _psw |= VB_PSW_S;\n");
-    fprintf(out, "      if (_r64 > 0xFFFFFFFF) _psw |= VB_PSW_CY;\n");
-    fprintf(out, "      if ((((uint32_t)(%s) ^ _r) & ((uint32_t)(%s) ^ _r)) & 0x80000000) _psw |= VB_PSW_OV;\n", a, b);
-    fprintf(out, "      vb_cpu.sr[5] = _psw;\n");
-    fprintf(out, "      %s = _r; }\n", result);
+    fprintf(out, "    %s = vb_add(%s, %s);\n", result, a, b);
 }
 
 static void emit_flags_sub(FILE *out, const char *a, const char *b, const char *result) {
     /* a - b, result goes into 'result' (or NULL for CMP) */
-    fprintf(out, "    { uint32_t _a = (uint32_t)(%s), _b = (uint32_t)(%s);\n", a, b);
-    fprintf(out, "      uint32_t _r = _a - _b;\n");
-    fprintf(out, "      uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);\n");
-    fprintf(out, "      if (_r == 0) _psw |= VB_PSW_Z;\n");
-    fprintf(out, "      if (_r & 0x80000000) _psw |= VB_PSW_S;\n");
-    fprintf(out, "      if (_b > _a) _psw |= VB_PSW_CY;\n");
-    fprintf(out, "      if (((_a ^ _b) & (_a ^ _r)) & 0x80000000) _psw |= VB_PSW_OV;\n");
-    fprintf(out, "      vb_cpu.sr[5] = _psw;\n");
     if (result) {
-        fprintf(out, "      %s = _r; }\n", result);
+        fprintf(out, "    %s = vb_sub(%s, %s);\n", result, a, b);
     } else {
-        fprintf(out, "    }\n");
+        fprintf(out, "    vb_cmp(%s, %s);\n", a, b);
     }
 }
 
 static void emit_flags_zs(FILE *out, const char *result) {
-    fprintf(out, "    { uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);\n");
-    fprintf(out, "      if ((%s) == 0) _psw |= VB_PSW_Z;\n", result);
-    fprintf(out, "      if ((%s) & 0x80000000) _psw |= VB_PSW_S;\n", result);
-    fprintf(out, "      vb_cpu.sr[5] = _psw; }\n");
+    /* Logical-op flags: Z/S from result, OV cleared. */
+    fprintf(out, "    vb_setf_logic(%s);\n", result);
 }
 
 static void emit_flags_shift(FILE *out, const char *reg, const char *shift_expr, const char *op, bool arithmetic) {
-    fprintf(out, "    { uint32_t _sh = %s & 0x1F;\n", shift_expr);
-    fprintf(out, "      uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV|VB_PSW_CY);\n");
-    fprintf(out, "      if (_sh > 0) {\n");
-    if (strcmp(op, "<<") == 0) {
-        fprintf(out, "        if ((%s >> (32 - _sh)) & 1) _psw |= VB_PSW_CY;\n", reg);
-        fprintf(out, "        %s = %s << _sh;\n", reg, reg);
-    } else if (arithmetic) {
-        fprintf(out, "        if ((%s >> (_sh - 1)) & 1) _psw |= VB_PSW_CY;\n", reg);
-        fprintf(out, "        %s = (uint32_t)((int32_t)%s >> _sh);\n", reg, reg);
-    } else {
-        fprintf(out, "        if ((%s >> (_sh - 1)) & 1) _psw |= VB_PSW_CY;\n", reg);
-        fprintf(out, "        %s = %s >> _sh;\n", reg, reg);
-    }
-    fprintf(out, "      }\n");
-    fprintf(out, "      if (%s == 0) _psw |= VB_PSW_Z;\n", reg);
-    fprintf(out, "      if (%s & 0x80000000) _psw |= VB_PSW_S;\n", reg);
-    fprintf(out, "      vb_cpu.sr[5] = _psw; }\n");
+    const char *fn = (strcmp(op, "<<") == 0) ? "vb_shl" : (arithmetic ? "vb_sar" : "vb_shr");
+    fprintf(out, "    %s = %s(%s, %s);\n", reg, fn, reg, shift_expr);
 }
 
 /* reg accessor macros to keep output readable */
@@ -205,28 +172,18 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
             uint32_t resolved = lookup_resolved_jump(ctx, insn->addr);
             if (resolved) {
                 /* Check if target is another function (tail call) or intraprocedural */
-                if (find_func_by_addr(ctx, resolved) >= 0) {
+                if (label_set_has(emit_labels, resolved)) {
+                    /* Target is a guaranteed-defined label in THIS function
+                     * (intraprocedural computed jump). */
+                    fprintf(out, "    goto label_%08X; /* resolved jmp [r%d] */\n",
+                            resolved, insn->reg1);
+                } else if (find_func_by_addr(ctx, resolved) >= 0) {
+                    /* Target is a known function head: tail call. */
                     fprintf(out, "    vb_func_%08X(); return; /* resolved tail call */\n", resolved);
                 } else {
-                    /* Check if target is within the current function's emitted range */
-                    uint32_t func_start = ctx->funcs[0].addr; /* placeholder */
-                    /* Find our function to check range */
-                    for (int fi = 0; fi < ctx->num_funcs; fi++) {
-                        if (insn->addr >= ctx->funcs[fi].addr &&
-                            insn->addr < ctx->funcs[fi].end_addr) {
-                            func_start = ctx->funcs[fi].addr;
-                            if (resolved >= ctx->funcs[fi].addr &&
-                                resolved < ctx->funcs[fi].end_addr) {
-                                fprintf(out, "    goto label_%08X; /* resolved jmp [r%d] */\n",
-                                        resolved, insn->reg1);
-                                goto jmp_done;
-                            }
-                            break;
-                        }
-                    }
-                    /* Target outside function: treat as return/reset */
-                    fprintf(out, "    return; /* resolved jmp to 0x%08X (outside function) */\n", resolved);
-                jmp_done:;
+                    /* Unknown cross-function target with no local label: a
+                     * goto here would reference an undefined label, so bail. */
+                    fprintf(out, "    return; /* resolved jmp to 0x%08X (no local label) */\n", resolved);
                 }
             } else {
                 fprintf(out, "    /* WARNING: unresolved indirect jump [%s] */\n", r1);
@@ -243,43 +200,19 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         break;
 
     case 0x08: /* MUL reg1, reg2 */
-        fprintf(out, "    { int64_t _r64 = (int64_t)(int32_t)%s * (int64_t)(int32_t)%s;\n", r2, r1);
-        fprintf(out, "      %s = (uint32_t)_r64;\n", r2);
-        fprintf(out, "      vb_cpu.r[30] = (uint32_t)(_r64 >> 32);\n");
-        fprintf(out, "      uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);\n");
-        fprintf(out, "      if ((uint32_t)_r64 == 0) _psw |= VB_PSW_Z;\n");
-        fprintf(out, "      if (_r64 & 0x80000000) _psw |= VB_PSW_S;\n");
-        fprintf(out, "      if (_r64 > 0x7FFFFFFF || _r64 < -(int64_t)0x80000000) _psw |= VB_PSW_OV;\n");
-        fprintf(out, "      vb_cpu.sr[5] = _psw; }\n");
+        fprintf(out, "    %s = vb_mul(%s, %s);\n", r2, r2, r1);
         break;
 
     case 0x09: /* DIV reg1, reg2 */
-        fprintf(out, "    if (%s != 0) {\n", r1);
-        fprintf(out, "      int32_t _q = (int32_t)%s / (int32_t)%s;\n", r2, r1);
-        fprintf(out, "      int32_t _rem = (int32_t)%s %% (int32_t)%s;\n", r2, r1);
-        fprintf(out, "      %s = (uint32_t)_q; vb_cpu.r[30] = (uint32_t)_rem;\n", r2);
-        fprintf(out, "      vb_cpu_set_flags_zs((uint32_t)_q);\n");
-        fprintf(out, "    }\n");
+        fprintf(out, "    if (%s != 0) %s = vb_div(%s, %s);\n", r1, r2, r2, r1);
         break;
 
     case 0x0A: /* MULU reg1, reg2 */
-        fprintf(out, "    { uint64_t _r64 = (uint64_t)%s * (uint64_t)%s;\n", r2, r1);
-        fprintf(out, "      %s = (uint32_t)_r64;\n", r2);
-        fprintf(out, "      vb_cpu.r[30] = (uint32_t)(_r64 >> 32);\n");
-        fprintf(out, "      uint32_t _psw = vb_cpu.sr[5] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);\n");
-        fprintf(out, "      if ((uint32_t)_r64 == 0) _psw |= VB_PSW_Z;\n");
-        fprintf(out, "      if (_r64 & 0x80000000) _psw |= VB_PSW_S;\n");
-        fprintf(out, "      if (_r64 > 0xFFFFFFFF) _psw |= VB_PSW_OV;\n");
-        fprintf(out, "      vb_cpu.sr[5] = _psw; }\n");
+        fprintf(out, "    %s = vb_mulu(%s, %s);\n", r2, r2, r1);
         break;
 
     case 0x0B: /* DIVU reg1, reg2 */
-        fprintf(out, "    if (%s != 0) {\n", r1);
-        fprintf(out, "      uint32_t _q = %s / %s;\n", r2, r1);
-        fprintf(out, "      uint32_t _rem = %s %% %s;\n", r2, r1);
-        fprintf(out, "      %s = _q; vb_cpu.r[30] = _rem;\n", r2);
-        fprintf(out, "      vb_cpu_set_flags_zs(_q);\n");
-        fprintf(out, "    }\n");
+        fprintf(out, "    if (%s != 0) %s = vb_divu(%s, %s);\n", r1, r2, r2, r1);
         break;
 
     case 0x0C: /* OR */
@@ -776,12 +709,14 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         off += insn.size;
     }
 
-    /* Emit function definition */
-    fprintf(out, "\nvoid vb_func_%08X(void) {\n", func->addr);
-
+    /* Emit function definition with a short header comment. */
+    fprintf(out, "\n/* sub_%08X: 0x%08X-0x%08X (%u bytes)",
+            func->addr, func->addr, func->end_addr, func->end_addr - func->addr);
     if (func->is_interrupt) {
-        fprintf(out, "    /* Interrupt handler (level %d) */\n", func->int_level);
+        fprintf(out, ", IRQ level %d handler", func->int_level);
     }
+    fprintf(out, " */\n");
+    fprintf(out, "void vb_func_%08X(void) {\n", func->addr);
 
     /* Interrupt check at function entry */
     fprintf(out, "    vb_interrupt_check();\n");
@@ -841,6 +776,15 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     /* File header */
     fprintf(out, "/*\n");
     fprintf(out, " * Auto-generated by v810recomp - DO NOT EDIT\n");
+    fprintf(out, " *\n");
+    fprintf(out, " * Each vb_func_<addr> is one recompiled V810 routine. Every line is\n");
+    fprintf(out, " * preceded by its original address and disassembly. CPU state lives in\n");
+    fprintf(out, " * the global `vb_cpu`:\n");
+    fprintf(out, " *   vb_cpu.r[0]  = zero (hardwired)   vb_cpu.r[3]  = sp (stack pointer)\n");
+    fprintf(out, " *   vb_cpu.r[4]  = gp (global ptr)    vb_cpu.r[5]  = tp (text ptr)\n");
+    fprintf(out, " *   vb_cpu.r[31] = lp (link/return)   vb_cpu.sr[5] = psw (flags)\n");
+    fprintf(out, " * Flag-setting ops call helpers in <vbrecomp/cpu.h> (vb_add, vb_sub,\n");
+    fprintf(out, " * vb_cmp, vb_shl, ...) which update the PSW exactly as hardware does.\n");
     fprintf(out, " */\n\n");
     fprintf(out, "#include <vbrecomp/vbrecomp.h>\n");
     fprintf(out, "#include <string.h>\n");

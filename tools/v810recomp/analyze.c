@@ -259,11 +259,21 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                         ctx->resolved_jumps[ctx->num_resolved].from_addr = insn.addr;
                         ctx->resolved_jumps[ctx->num_resolved].to_addr = target;
                         ctx->num_resolved++;
-                        /* Treat as intraprocedural jump or tail call */
-                        if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
-                            if (num_targets < 1024) {
-                                branch_targets[num_targets++] = target_off;
-                            }
+                        /* A jmp [reg] never returns to this flow, so the
+                         * target is the head of its own routine. Promote it
+                         * to a function and let the emitter tail-call it
+                         * (same handling as JAL callees and `jmp` hints).
+                         * Folding it into the current function instead would
+                         * create overlapping function ranges, which produce
+                         * gotos to labels defined only in the other function
+                         * (undefined-label compile errors). */
+                        (void)target_off;
+                        bool here_confirmed = func->confirmed;
+                        int jtgt = v810_ctx_add_func(ctx, target, false, -1);
+                        /* add_func may realloc ctx->funcs; refresh func. */
+                        func = &ctx->funcs[func_idx];
+                        if (jtgt >= 0 && here_confirmed) {
+                            ctx->funcs[jtgt].confirmed = true;
                         }
                     }
                 }

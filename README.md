@@ -1,96 +1,123 @@
 # vbrecomp
 
-**Static recompilation libraries for Virtual Boy games.**
+**Static recompilation toolkit for Virtual Boy games — recompile the entire library.**
 
-Remember the Virtual Boy? Nintendo's glorious red-and-black fever dream from 1995? Yeah, we're bringing those games back from the dead — and this time, you don't need to destroy your neck or your retinas to play them.
+Remember the Virtual Boy? Nintendo's red-and-black fever dream from 1995? We're bringing those games back as native executables — no neck strain, no retina damage required.
 
 ![Mario's Tennis title screen running via vbrecomp](screenshots/mariotennis_title.png)
 
-![Tennis court with 3D perspective rendering](screenshots/mariotennis_court.png)
-
 ## What is this?
 
-vbrecomp is a set of libraries for statically recompiling Virtual Boy ROMs into native executables. Think [N64Recomp](https://github.com/N64Recomp/N64Recomp), but for Nintendo's most misunderstood console.
+vbrecomp statically recompiles Virtual Boy ROMs into native C, then links that C against a small hardware runtime (CPU state, VIP video, VSU audio, timers, input). Think [N64Recomp](https://github.com/N64Recomp/N64Recomp), but for Nintendo's most misunderstood console.
 
-The Virtual Boy only had 22 games. That's a small enough library that we could realistically recompile *all of them*. That's the goal.
+The retail Virtual Boy library is only 22 games. That's small enough to recompile *all of them* — and that goal drives the whole project. Rather than a separate repo per game, **everything lives here**: the recompiler, the runtime, and every game, so improvements to the tool immediately benefit the whole set.
 
-### The Pipeline
+## How it works
 
-1. **V810 Static Recompiler** (`tools/v810recomp`) — Translates V810 binary code into C functions
-2. **VIP (Video Image Processor)** — Renders those beautiful red parallax graphics
-3. **VSU (Virtual Sound Unit)** — Recreates the surprisingly decent 6-channel sound hardware
-4. **Hardware Runtime** — Timers, interrupts, game pad, link port — all the glue
+```
+  ROM (.vb)
+     │
+     ▼
+  ┌──────────────────┐   discovers functions via control-flow analysis,
+  │  v810recomp      │   translates each V810 routine to a C function
+  │  (tools/)        │   (vb_func_<addr>), resolves jumps, jump tables
+  └──────────────────┘
+     │  generated/recomp_funcs.c  (human-readable C, see below)
+     ▼
+  ┌──────────────────┐   per-game src/main.c wires up entry point,
+  │  vbrecomp runtime│   interrupt handlers, and the frame loop, then
+  │  (src/, include/)│   links the generated C against the runtime:
+  └──────────────────┘     CPU · VIP · VSU · timers · input · SDL2
+     │
+     ▼
+  native game executable
+```
 
-## Current Status
+The recompiled output is meant to be **read**, not just run. Flag math is factored into named helpers, every line carries its original address and disassembly, and functions get header comments:
 
-### VIP Renderer
+```c
+/* sub_07F80026: 0x07F80026-0x07F8004A (36 bytes), IRQ level 2 handler */
+void vb_func_07F80026(void) {
+    /* 07F80026: add  -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);   /* r3 = sp */
+    /* 07F80028: st.w r31, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[31]);
+    ...
+```
 
-The VIP renderer is the core of the project and is actively under development:
+## The plan: corpus-driven hardening
 
-| Feature | Status |
-|---------|--------|
-| Normal mode (BGM=0) | Working — tiled backgrounds with multi-segment BGMap support |
-| H-Bias mode (BGM=1) | Stubbed — treated as Normal |
-| Affine mode (BGM=2) | Working — per-scanline transforms, area sampling for zoom-out |
-| OBJ mode (BGM=3) | Working — hardware sprites via OAM with SPT group support |
-| Eye filtering | Working — proper LON/RON handling for left/right eye |
-| CHR RAM mirrors | Working — 0x78000-0x7FFFF validated against rustual-boy |
-| Separate CHR segments | Working — CHR 0-3 independent for block-based tile swapping |
-| World attribute mirror | Working — 0x3DC00 for dynamic world updates |
-| Direct frame buffer | Working — column-major 2bpp planar format for wireframe games |
+Every ROM in the library is a test case. The recompiler is only as good as the worst ROM it chokes on, so we run it against **all of them** and treat each failure as a concrete bug:
 
-### Key Technical Fixes
+1. **Recompile everything** — `scripts/sweep.ps1` runs `v810recomp` on every ROM and syntax-checks the generated C with MSVC. Output: [`STATUS.md`](STATUS.md) (auto-generated compile matrix) + `corpus/results.json`.
+2. **Fix what breaks** — each ROM that fails to recompile or compile is a decoder/analysis/codegen gap to fix in `tools/v810recomp`.
+3. **Boot & render** — bring games up one at a time, factoring common patterns (frame sync, decompressors) into shared helpers so each new game is less manual.
+4. **Cross-validate** — an independent Ghidra V810 disassembly is diffed against our function table to catch missed functions, data-misparsed-as-code, and boundary disagreements, and to source real function names. See [`docs/RECOMPILER.md`](docs/RECOMPILER.md#cross-validation).
 
-All validated against the [rustual-boy](https://github.com/emu-rs/rustual-boy) reference emulator:
+Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 
-- VIP register offsets corrected (DPSTTS=0x20, GPLT0=0x60, SPT0=0x48, etc.)
-- CHR RAM mirrors at 0x78000-0x7FFFF (was incorrectly mapping to BGMap)
-- BGMap base derived from HEAD bits 3:0 (was incorrectly from PARAM)
-- `is_vram_addr` accepts addresses >0x60000 (was silently dropping writes)
-- GX is 10-bit signed (sign-extend from bit 9)
-- OBJ word format: word0=X, word1=L/R/parallax, word2=Y, word3=pal/flip/char
-- Param table offset uses `param_base * 2` (was masking with 0xFFF0)
-- v810recomp emitter: only add JMP-table label targets when they fall inside the current function (cross-function targets handled by tail call instead) — fixes undefined-label C compile errors on Galactic Pinball
-- v810recomp emitter: emit orphan-label stubs at end of function for branch targets that fall mid-instruction (off the decoder's 4-byte walk) — keeps generated C compilable when the analyzer extends a function into data
-- v810recomp: `--hints <file>` flag to manually resolve indirect jumps and add function entry points the static analyzer can't reach (e.g. function pointers stored in WRAM and dispatched later) — needed for Galactic Pinball's main dispatch
-- v810recomp: `skip <target> <bytes>` hint for "inline-data-after-JAL" helpers (functions that read N bytes of data immediately following the JAL and bump r31 past them before returning) — without this, the data bytes get analyzed as instructions, producing garbage code. Galactic Pinball uses this pattern for graphics decompression — `vb_func_07F417B8` consumes 8 bytes (src + dst pointers) after every JAL, hit at 31 sites in the ROM
+## Status
 
-### Open Problems
+- **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
+- Three games are in active bring-up: **Mario's Tennis** (demo mode runs), **Red Alarm** (boots to title, framebuffer WIP), **Galactic Pinball** (first pixels on screen).
 
-- **Block-based VIP rendering** — The VB renders 8 rows at a time, but our renderer draws all 224 rows at once. Games that swap CHR tiles mid-frame (like Mario's Tennis during gameplay) get garbled upper backgrounds. VRAM data is confirmed correct; the issue is render timing.
+Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md).
 
-## Target Games
+## Building & running
 
-| Game | Repo | Status |
-|------|------|--------|
-| Mario's Tennis | [vb-mariotennis](https://github.com/sp00nznet/vb-mariotennis) | Demo mode runs, rendering WIP |
-| Red Alarm | [vb-redalarm](https://github.com/sp00nznet/vb-redalarm) | Boots to title, frame buffer rendering WIP |
-| Galactic Pinball | vb-galacticpinball (private) | First pixels on screen — boots through 4-state dispatch machine, BGMap populated |
+Requires CMake, a C/C++ compiler (MSVC on Windows), and SDL2 (via vcpkg).
 
-The Virtual Boy library is only 22 games. Once the core libraries are solid, porting additional titles should be straightforward.
+```powershell
+# Configure (point at your vcpkg SDL2)
+cmake -S . -B build -DSDL2_DIR="C:/vcpkg/installed/x64-windows/share/sdl2"
 
-## Architecture
+# Build the recompiler + runtime + all games
+cmake --build build --config Release
 
-The Virtual Boy is a surprisingly clean little system:
+# Run a game (ROMs are not shipped — supply your own .vb)
+./build/games/Release/galacticpinball.exe "path/to/Galactic Pinball.vb"
+```
 
-- **NEC V810** — 32-bit RISC CPU @ 20MHz
-- **VIP** — Custom video processor, 384x224 per eye, 4 shades of red
-- **VSU** — 6 sound channels (5 wave + 1 noise)
-- Simple memory map, no MMU shenanigans
+Recompile a ROM yourself:
 
-This makes it a great candidate for static recompilation.
+```powershell
+./build/Release/v810recomp.exe "game.vb" out_dir [--hints game.hints.txt]
+```
 
-## Stretch Goals
+**Headless mode** (CI / display-less boxes): set `VBRECOMP_HEADLESS=1` (and optionally `VBRECOMP_HEADLESS_FRAMES=N`) to run the game loop without a window; it still renders into its framebuffer and can write PNG screenshots.
 
-- VR headset support — the Virtual Boy was *meant* for this, it just arrived 25 years too early
-- Stereoscopic 3D rendering on modern hardware
-- Block-based VIP rendering for accurate mid-frame tile timing
+The full corpus sweep:
 
-## Dependencies
+```powershell
+./scripts/extract_roms.ps1     # extract ROMs -> roms/  (gitignored)
+./scripts/sweep.ps1            # recompile + syntax-check all -> STATUS.md
+```
 
-- SDL2 — windowing, input, audio
-- Dear ImGui — menu bar and toast notifications (from [sp00nznet/tools](https://github.com/sp00nznet/tools))
-- stb_image_write — screenshot capture
+## Repository layout
+
+```
+include/vbrecomp/   public runtime API (cpu, mem, vip, vsu, timer, gamepad, ...)
+src/                runtime implementation + SDL2 platform + ImGui menu
+tools/v810recomp/   the static recompiler (decode, analyze, emit)
+games/<name>/       per-game: generated/ C, src/main.c glue, hints, screenshots
+scripts/            extract_roms.ps1, sweep.ps1
+docs/               architecture & recompiler internals
+COMPATIBILITY.md    living per-game status
+STATUS.md           auto-generated compile matrix (from sweep.ps1)
+```
+
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Virtual Boy hardware, memory map, the VIP renderer, validated technical fixes.
+- [`docs/RECOMPILER.md`](docs/RECOMPILER.md) — how `v810recomp` works, the hints format, the readability design, the corpus workflow, and Ghidra cross-validation.
+
+## Credits & dependencies
+
+- [SDL2](https://www.libsdl.org/) — windowing, input, audio.
+- [Dear ImGui](https://github.com/ocornut/imgui) — menu bar and toasts (via [sp00nznet/tools](https://github.com/sp00nznet/tools)).
+- [stb_image_write](https://github.com/nothings/stb) — screenshots.
+- [rustual-boy](https://github.com/emu-rs/rustual-boy) — reference for VIP/VSU behavior (architecture reference only; all vbrecomp code is original).
+- [Ghidra_v810_v830](https://github.com/20Enderdude20/Ghidra_v810_v830) by 20Enderdude20 — V810 processor module used for independent cross-validation.
 
 ## License
 

@@ -333,6 +333,15 @@ int main(int argc, char **argv) {
         if (idx >= 0) ctx.funcs[idx].confirmed = true;
     }
 
+    /* Always emit the reset vector itself (0xFFFFFFF0) as a function. It is
+     * the canonical entry point the runtime calls to boot the game; it runs
+     * the MOVHI/MOVEA/JMP stub that tail-calls the real entry. Without this
+     * it is only emitted if some jump table happens to reference it. */
+    {
+        int idx = v810_ctx_add_func(&ctx, 0xFFFFFFF0, false, -1);
+        if (idx >= 0) ctx.funcs[idx].confirmed = true;
+    }
+
     /* Find interrupt handlers */
     printf("Interrupt handlers:\n");
     find_interrupt_handlers(&ctx);

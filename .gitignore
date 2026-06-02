@@ -1,4 +1,9 @@
 build/
+roms/
+corpus/
+*.vb
+*.zip
+*.7z
 *.o
 *.obj
 *.exe
