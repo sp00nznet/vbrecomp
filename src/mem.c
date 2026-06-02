@@ -82,18 +82,18 @@ static const uint8_t *rom_ptr;
 static uint32_t rom_sz;
 static uint32_t rom_mask;
 
-/* Hardware control registers at 0x02000000 */
-#define HW_REG_CCR     0x00  /* Communication control */
-#define HW_REG_CCSR    0x04  /* Comm. control shadow */
-#define HW_REG_CDTR    0x08  /* Comm. data */
-#define HW_REG_CDRR    0x0C  /* Comm. data receive */
-#define HW_REG_TCR     0x10  /* Timer control */
-#define HW_REG_TLR     0x14  /* Timer counter low */
-#define HW_REG_THR     0x18  /* Timer counter high */
-#define HW_REG_WCR     0x20  /* Wait control */
-#define HW_REG_SCR     0x28  /* Serial (gamepad) control */
-#define HW_REG_SDR     0x2C  /* Serial data low */
-#define HW_REG_SDHR    0x30  /* Serial data high */
+/* Hardware control registers at 0x02000000 (canonical Virtual Boy layout). */
+#define HW_REG_CCR     0x00  /* Link control */
+#define HW_REG_CCSR    0x04  /* Link control status */
+#define HW_REG_CDTR    0x08  /* Link transmit data */
+#define HW_REG_CDRR    0x0C  /* Link receive data */
+#define HW_REG_SDLR    0x10  /* Gamepad serial data, low byte */
+#define HW_REG_SDHR    0x14  /* Gamepad serial data, high byte */
+#define HW_REG_TLR     0x18  /* Timer counter/reload, low byte */
+#define HW_REG_THR     0x1C  /* Timer counter/reload, high byte */
+#define HW_REG_TCR     0x20  /* Timer control */
+#define HW_REG_WCR     0x24  /* Wait control */
+#define HW_REG_SCR     0x28  /* Gamepad serial control */
 
 /* Round rom_size up to the nearest power of two for masking */
 static uint32_t next_pow2(uint32_t v) {
@@ -128,13 +128,13 @@ static uint8_t hw_read8(vb_addr_t offset) {
     offset &= 0x3F;  /* Registers repeat within small range */
 
     switch (offset) {
-    case HW_REG_TCR:
     case HW_REG_TLR:
     case HW_REG_THR:
+    case HW_REG_TCR:
         return vb_timer_read8(offset);
 
     case HW_REG_SCR:
-    case HW_REG_SDR:
+    case HW_REG_SDLR:
     case HW_REG_SDHR:
         return vb_gamepad_read8(offset);
 
@@ -148,16 +148,22 @@ static uint8_t hw_read8(vb_addr_t offset) {
 
 static void hw_write8(vb_addr_t offset, uint8_t val) {
     offset &= 0x3F;
+    if (hot_enabled > 0) {
+        static const char *nm[] = {"CCR","?","?","?","CCSR","?","?","?","CDTR","?","?","?","CDRR","?","?","?",
+                                   "TCR","?","?","?","TLR","?","?","?","THR","?","?","?","?","?","?","?",
+                                   "WCR","?","?","?","?","?","?","?","SCR","?","?","?","SDR","?","?","?","SDHR"};
+        fprintf(stderr, "HWwrite [0x%02X %s] = 0x%02X\n", offset, (offset<49?nm[offset]:"?"), val);
+    }
 
     switch (offset) {
-    case HW_REG_TCR:
     case HW_REG_TLR:
     case HW_REG_THR:
+    case HW_REG_TCR:
         vb_timer_write8(offset, val);
         break;
 
     case HW_REG_SCR:
-    case HW_REG_SDR:
+    case HW_REG_SDLR:
     case HW_REG_SDHR:
         vb_gamepad_write8(offset, val);
         break;
