@@ -136,7 +136,16 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_INTPND:  return reg_intpnd;
     case VB_VIP_INTENB:  return reg_intenb;
     case VB_VIP_INTCLR:  return 0; /* Write-only */
-    case VB_VIP_DPSTTS:  return reg_dpstts | 0x007E; /* Report display ready + scan ready */
+    /* Display status. Like XPSTTS, the frame-phase bits must transition: games
+     * detect frame boundaries by waiting on DPBSY0/1 (0x000C, which FB is being
+     * scanned out) and FCLK (0x0040, the frame clock). Forcing them constant
+     * (the old | 0x007E) deadlocks any "wait for the other phase" loop. Keep
+     * DISP + scan-ready stable (0x0032), alternate the phase bits each read. */
+    case VB_VIP_DPSTTS: {
+        static unsigned dp_poll;
+        uint16_t phase = (++dp_poll & 1u) ? 0x004Cu : 0x0000u;
+        return (reg_dpstts & ~0x004Cu) | 0x0032u | phase;
+    }
     case VB_VIP_DPCTRL:  return reg_dpctrl;
     case VB_VIP_BRTA:    return reg_brta;
     case VB_VIP_BRTB:    return reg_brtb;
