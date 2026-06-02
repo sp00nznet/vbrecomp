@@ -994,6 +994,23 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "    /* No function at this address: unresolved target, no-op. */\n");
         fprintf(out, "}\n");
 
+        /* --- Generic boot helpers ---------------------------------------
+         * Let a generic driver boot any game: register the interrupt
+         * handlers the analyzer discovered, and run the reset vector. */
+        fprintf(out, "\n/* Register the interrupt handlers discovered by v810recomp. */\n");
+        fprintf(out, "void vb_recomp_init_handlers(void) {\n");
+        for (int i = 0; i < ctx->num_funcs; i++) {
+            if (!ctx->funcs[i].is_interrupt) continue;
+            static const char *lvl_name[] = { "KEY", "TIMER", "EXPANSION", "LINK", "VIP" };
+            int lv = ctx->funcs[i].int_level;
+            const char *nm = (lv >= 0 && lv <= 4) ? lvl_name[lv] : "?";
+            fprintf(out, "    vb_interrupt_set_handler(%d, vb_func_%08X); /* %s */\n",
+                    lv, ctx->funcs[i].addr, nm);
+        }
+        fprintf(out, "}\n");
+        fprintf(out, "\n/* Run the reset vector (boots the game). */\n");
+        fprintf(out, "void vb_recomp_boot(void) { vb_func_07FFFFF0(); }\n");
+
         free(emitted_addrs);
     }
     free(was_emitted);
@@ -1011,6 +1028,11 @@ void v810_emit_header(v810_ctx_t *ctx, FILE *out) {
         if (!ctx->funcs[i].confirmed) continue;
         fprintf(out, "void vb_func_%08X(void);\n", ctx->funcs[i].addr);
     }
+
+    fprintf(out, "\n/* Generic boot helpers (see games/driver/main.c). */\n");
+    fprintf(out, "void vb_recomp_call(uint32_t addr);   /* dispatch by ROM address */\n");
+    fprintf(out, "void vb_recomp_init_handlers(void);   /* register discovered IRQ handlers */\n");
+    fprintf(out, "void vb_recomp_boot(void);            /* run the reset vector */\n");
 
     fprintf(out, "\n#endif\n");
 }

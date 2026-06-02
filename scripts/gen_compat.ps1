@@ -15,6 +15,7 @@ $curated = @{
     "Mario's Tennis (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="wip"; note="Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering)" }
     "Red Alarm (USA)"                  = @{ boots="yes"; renders="wip"; playable="no";  note="Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate" }
     "Galactic Pinball (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="no"; note="First pixels on screen; boots through 4-state dispatch, settles ~frame 527" }
+    "Mario Clash (Japan, USA) (En)"      = @{ boots="yes"; renders="wip"; playable="no"; note="Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames" }
 }
 
 $rows = Get-Content $Results -Raw | ConvertFrom-Json

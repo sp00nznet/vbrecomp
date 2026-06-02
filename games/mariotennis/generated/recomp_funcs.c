@@ -83716,3 +83716,15 @@ void vb_recomp_call(uint32_t addr) {
     }
     /* No function at this address: unresolved target, no-op. */
 }
+
+/* Register the interrupt handlers discovered by v810recomp. */
+void vb_recomp_init_handlers(void) {
+    vb_interrupt_set_handler(0, vb_func_07F80000); /* KEY */
+    vb_interrupt_set_handler(1, vb_func_07F80024); /* TIMER */
+    vb_interrupt_set_handler(2, vb_func_07F80026); /* EXPANSION */
+    vb_interrupt_set_handler(3, vb_func_07F8004A); /* LINK */
+    vb_interrupt_set_handler(4, vb_func_07F800AA); /* VIP */
+}
+
+/* Run the reset vector (boots the game). */
+void vb_recomp_boot(void) { vb_func_07FFFFF0(); }

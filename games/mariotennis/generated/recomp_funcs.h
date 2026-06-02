@@ -211,4 +211,9 @@ void vb_func_07F95C32(void);
 void vb_func_07F95F52(void);
 void vb_func_07FFFFF0(void);
 
+/* Generic boot helpers (see games/driver/main.c). */
+void vb_recomp_call(uint32_t addr);   /* dispatch by ROM address */
+void vb_recomp_init_handlers(void);   /* register discovered IRQ handlers */
+void vb_recomp_boot(void);            /* run the reset vector */
+
 #endif

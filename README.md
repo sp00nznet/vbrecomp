@@ -59,7 +59,8 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 ## Status
 
 - **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
-- Three games are in active bring-up: **Mario's Tennis** (demo mode runs), **Red Alarm** (boots to title, framebuffer WIP), **Galactic Pinball** (first pixels on screen).
+- A **generic driver** (`games/driver/main.c`) boots any game with no game-specific code: the recompiler emits the discovered interrupt handlers + reset, and the driver wires them up. Mario Clash boots through it (programs the VIP, advances frames) with zero hand-written glue.
+- Games needing custom boot/dispatch get a hand-written `src/main.c`: **Mario's Tennis** (demo mode runs), **Red Alarm** (boots to title, framebuffer WIP), **Galactic Pinball** (first pixels on screen).
 
 Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md).
 
