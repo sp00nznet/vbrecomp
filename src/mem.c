@@ -8,6 +8,7 @@
 #include "vbrecomp/vsu.h"
 #include "vbrecomp/timer.h"
 #include "vbrecomp/gamepad.h"
+#include "vbrecomp/cpu.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,12 +25,30 @@ static uint32_t hot_addr[HOT_N];
 static uint32_t hot_cnt[HOT_N];
 static int hot_enabled = -1;
 
+/* Optional: when a watched address (VBRECOMP_WATCH=hex) is read, tally the link
+ * register (r31) so the polling loop's caller can be identified. */
+static uint32_t watch_addr;
+static int watch_on = -1;
+static uint32_t watch_lr[256], watch_lr_cnt[256];
+
 static inline void hot_track(uint32_t addr) {
     if (hot_enabled < 0) {
         const char *e = getenv("VBRECOMP_HEARTBEAT");
         hot_enabled = (e && e[0] && e[0] != '0');
+        const char *w = getenv("VBRECOMP_WATCH");
+        watch_on = (w && w[0]);
+        if (watch_on) watch_addr = (uint32_t)strtoul(w, NULL, 16);
     }
     if (!hot_enabled) return;
+    if (watch_on && addr == watch_addr) {
+        uint32_t lr = vb_cpu.r[31];
+        uint32_t h = (lr * 2654435761u) & 255u;
+        for (uint32_t i = 0; i < 256; i++) {
+            uint32_t j = (h + i) & 255u;
+            if (watch_lr_cnt[j] == 0) { watch_lr[j] = lr; watch_lr_cnt[j] = 1; break; }
+            if (watch_lr[j] == lr) { watch_lr_cnt[j]++; break; }
+        }
+    }
     uint32_t h = (addr * 2654435761u) & (HOT_N - 1);
     for (uint32_t i = 0; i < HOT_N; i++) {
         uint32_t j = (h + i) & (HOT_N - 1);
@@ -47,6 +66,16 @@ void vb_mem_dump_hot_reads(void) {
         hot_cnt[best] = 0;
     }
     memset(hot_cnt, 0, sizeof(hot_cnt));
+    if (watch_on) {
+        for (int k = 0; k < 4; k++) {
+            int best = -1; uint32_t bc = 0;
+            for (uint32_t i = 0; i < 256; i++) if (watch_lr_cnt[i] > bc) { bc = watch_lr_cnt[i]; best = (int)i; }
+            if (best < 0) break;
+            fprintf(stderr, "  watch 0x%08X read from LR=0x%08X x%u\n", watch_addr, watch_lr[best], watch_lr_cnt[best]);
+            watch_lr_cnt[best] = 0;
+        }
+        memset(watch_lr_cnt, 0, sizeof(watch_lr_cnt));
+    }
 }
 
 static const uint8_t *rom_ptr;
