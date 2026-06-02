@@ -117,14 +117,14 @@ int main(int argc, char **argv) {
      * rendering until the user quits / the frame budget is hit (via exit()).
      * If the reset path returns, fall through to a manual render loop. */
     vb_recomp_boot();
-    fprintf(stderr, "Reset returned after %d frames; entering fallback loop.\n", frame_count);
-    while (vb_platform_poll()) {
-        vb_gamepad_set_buttons(vb_platform_get_buttons());
-        vb_vip_render(framebuffer, 0);
-        vb_platform_present(framebuffer);
-        if (max_frames && ++frame_count >= max_frames) break;
-    }
-    if (shot_path) dump_png(shot_path);
+
+    /* If the reset path returned, the game is interrupt-driven (its per-frame
+     * work runs in the VIP/timer interrupt handlers, not an explicit loop).
+     * Keep driving vb_interrupt_check() so those handlers fire; the per-frame
+     * callback (on_frame) does render/present/poll and exits at the frame
+     * budget or on quit. Games whose reset loops forever never reach here. */
+    fprintf(stderr, "Reset returned after %d frames; driving interrupts.\n", frame_count);
+    for (;;) vb_interrupt_check();
 
     vb_platform_shutdown();
     vb_shutdown();
