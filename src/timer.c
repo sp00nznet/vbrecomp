@@ -6,6 +6,8 @@
  */
 
 #include "vbrecomp/timer.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /* Timer control register bits */
 #define TCR_ENABLE  (1 << 0)   /* Timer enable */
@@ -42,6 +44,11 @@ uint8_t vb_timer_read8(vb_addr_t addr) {
 void vb_timer_write8(vb_addr_t addr, uint8_t val) {
     switch (addr) {
     case 0x10: /* TCR */
+        {
+            static int dbg = -1;
+            if (dbg < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); dbg = (e && e[0] && e[0] != '0'); }
+            if (dbg) fprintf(stderr, "TCR write 0x%02X (reload=%u)\n", val, reload);
+        }
         if (val & TCR_ZCLR) {
             tcr &= ~TCR_ZSTAT;
         }
