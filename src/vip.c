@@ -36,6 +36,35 @@ void vb_vip_dump_write_stats(void) {
             g_chr_writes, g_chr_any, g_bgmap_writes, g_oam_writes, g_other_writes,
             g_other_writes ? g_other_lo : 0, g_other_hi);
 }
+
+/* Dump the render chain for enabled (non-OBJ) worlds: does each world's BGMap
+ * actually contain tile references, and do those tiles have CHR pixels? */
+void vb_vip_dump_render_chain(void) {
+    for (int w = 31; w >= 0; w--) {
+        uint32_t wa = 0x3D800 + w * 32;
+        uint16_t head = vram[wa] | ((uint16_t)vram[wa + 1] << 8);
+        if (head == 0) continue;
+        int lon = (head >> 15) & 1, ron = (head >> 14) & 1;
+        int bgm = (head >> 12) & 3, end = (head >> 6) & 1;
+        uint32_t bgmap = 0x20000 + (head & 0x000F) * 0x2000;
+        int nz = 0, fidx = -1; uint16_t first = 0;
+        if (bgm != 3) for (int i = 0; i < 0x1000; i++) {
+            uint16_t e = vram[bgmap + i*2] | ((uint16_t)vram[bgmap + i*2 + 1] << 8);
+            if (e) { nz++; if (fidx < 0) { fidx = i; first = e; } }
+        }
+        int16_t mx = (int16_t)(vram[wa+8] | (vram[wa+9]<<8)), my = (int16_t)(vram[wa+12] | (vram[wa+13]<<8));
+        int tile = first & 0x07FF;
+        uint32_t chrb = (tile < 0x200) ? 0x06000 + tile*16
+                      : (tile < 0x400) ? 0x0E000 + (tile-0x200)*16
+                      : (tile < 0x600) ? 0x16000 + (tile-0x400)*16
+                                       : 0x1E000 + (tile-0x600)*16;
+        int chrnz = 0;
+        for (int i = 0; i < 16; i++) if (vram[(chrb + i) & (VB_VRAM_SIZE-1)]) chrnz++;
+        fprintf(stderr, "  W%d HEAD=%04X L%d R%d BGM=%d END=%d bgmap=0x%05X NZ=%d firstCell[r%d,c%d]=%04X tile%d CHRnz=%d MX=%d MY=%d\n",
+                w, head, lon, ron, bgm, end, bgmap, nz, fidx>=0?fidx/64:-1, fidx>=0?fidx%64:-1, first, tile, chrnz, mx, my);
+        if (end) break;   /* world processing stops at the first END world */
+    }
+}
 static int bgmap_write_frame_log = 0;
 
 uint8_t *vb_vip_get_vram(void) { return vram; }
@@ -497,7 +526,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
     }
 
     uint8_t bkcol = reg_bkcol & 0x03;
-    uint8_t bg_intensity = bkcol ? (64 + bkcol * 64) : 0;
+    uint8_t bg_intensity = (uint8_t)(bkcol * 255 / 3);
     uint32_t bg_color = ((uint32_t)bg_intensity << 24) | 0xFF; /* R=intensity, A=FF */
     for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
         out_rgba[i] = bg_color;
@@ -756,7 +785,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                         uint8_t color = apply_palette(pixel, pal);
                         if (color == 0) continue;
 
-                        uint8_t intensity = 64 + color * 64;
+                        uint8_t intensity = (uint8_t)(color * 255 / 3);
                         out_rgba[sy * VB_SCREEN_WIDTH + sx] =
                             ((uint32_t)intensity << 24) | 0xFF;
                         tiles_drawn++; world_pixels[w]++;
@@ -864,7 +893,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                         if (c > best_color) { best_color = c; best_pal = p; }
                     }
                     if (best_color != 0) {
-                        uint8_t intensity = 64 + best_color * 64;
+                        uint8_t intensity = (uint8_t)(best_color * 255 / 3);
                         out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
                             ((uint32_t)intensity << 24) | 0xFF;
                         tiles_drawn++; world_pixels[w]++;
@@ -923,7 +952,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                     uint8_t color = apply_palette(pixel, pal);
                     if (color == 0) continue;
 
-                    uint8_t intensity = 64 + color * 64;
+                    uint8_t intensity = (uint8_t)(color * 255 / 3);
                     out_rgba[screen_y * VB_SCREEN_WIDTH + screen_x] =
                         ((uint32_t)intensity << 24) | 0xFF;
                     tiles_drawn++; world_pixels[w]++;

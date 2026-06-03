@@ -78,6 +78,11 @@ void vb_interrupt_check(void) {
             vb_mem_dump_hot_reads();
             extern void vb_vip_dump_write_stats(void);
             vb_vip_dump_write_stats();
+            fprintf(stderr, "  BRT A/B/C=%02X/%02X/%02X GPLT0=%04X DPCTRL=%04X XPCTRL=%04X\n",
+                    vb_mem_read8(0x0005F824), vb_mem_read8(0x0005F826), vb_mem_read8(0x0005F828),
+                    vb_mem_read16(0x0005F860), vb_mem_read16(0x0005F822), vb_mem_read16(0x0005F842));
+            extern void vb_vip_dump_render_chain(void);
+            vb_vip_dump_render_chain();
         }
     }
 
