@@ -37,7 +37,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Virtual League Baseball (USA) | 1024 | 80 | yes | yes | yes | yes | - |  |
 | Virtual Pro Yakyuu '95 (Japan) | 1024 | 75 | yes | yes | yes | yes | - |  |
 | V-Tetris (Japan) | 512 | 160 | yes | yes | yes | yes | - |  |
-| Waterworld (USA) | 2048 | 87 | yes | yes | yes | wip | - |  |
+| Waterworld (USA) | 2048 | 87 | yes | yes | yes | yes | - |  |
 
 ## Proto / Demo (3)
 
