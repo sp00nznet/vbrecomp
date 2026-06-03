@@ -113,6 +113,10 @@ void v810_ctx_free(v810_ctx_t *ctx);
 /* Add a function entry point */
 int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int_level);
 
+/* Resolve VB ROM mirrors to the canonical (top-mirror) address used as the key
+ * for function heads. Use on any jump/call target before matching it to a func. */
+uint32_t v810_normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr);
+
 /* Look up how many bytes of inline data a JAL target consumes after the call.
  * Returns 0 if the target is not a registered skip-after-JAL helper. */
 uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target);

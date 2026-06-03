@@ -108,7 +108,7 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
 
 /* Normalize a ROM address by resolving mirrors to the canonical range.
  * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF; the whole 32-bit space mirrors the 27-bit physical map every 0x08000000. */
-static uint32_t normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
+uint32_t v810_normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
     if (addr >= 0x08000000) {
         addr = addr & 0x07FFFFFF;
     }
@@ -121,13 +121,13 @@ static uint32_t normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
 
 /* Check if an address is a valid ROM code address */
 static bool is_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
-    addr = normalize_rom_addr(ctx, addr);
+    addr = v810_normalize_rom_addr(ctx, addr);
     return addr >= ctx->rom_base && addr < ROM_REGION_END;
 }
 
 /* Convert any valid code address to ROM offset */
 static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
-    addr = normalize_rom_addr(ctx, addr);
+    addr = v810_normalize_rom_addr(ctx, addr);
     return addr - ctx->rom_base;
 }
 
@@ -257,7 +257,15 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                                 ctx->max_resolved * sizeof(ctx->resolved_jumps[0]));
                         }
                         ctx->resolved_jumps[ctx->num_resolved].from_addr = insn.addr;
-                        ctx->resolved_jumps[ctx->num_resolved].to_addr = target;
+                        /* Store the canonical (mirror-normalized) target so the
+                         * emitter's find_func_by_addr matches the function head,
+                         * which add_func also keys at the normalized address.
+                         * A reset vector built with `movhi 0x0700` yields a low
+                         * mirror (e.g. 0x07001688) for an entry keyed at the top
+                         * mirror (0x07F01688); without this the emitter saw "no
+                         * local label" and emitted a bare return -> entry never ran. */
+                        ctx->resolved_jumps[ctx->num_resolved].to_addr =
+                            v810_normalize_rom_addr(ctx, target);
                         ctx->num_resolved++;
                         /* A jmp [reg] never returns to this flow, so the
                          * target is the head of its own routine. Promote it
