@@ -221,6 +221,11 @@ void vb_func_07F95A22(void);
 void vb_func_07F95B0C(void);
 void vb_func_07F95C32(void);
 void vb_func_07F95F52(void);
+void vb_func_07FFFE00(void);
+void vb_func_07FFFE10(void);
+void vb_func_07FFFE20(void);
+void vb_func_07FFFE30(void);
+void vb_func_07FFFE40(void);
 void vb_func_07FFFFF0(void);
 void vb_func_07F8DBD8(void);
 void vb_func_07F8DBFE(void);
@@ -1107,7 +1112,7 @@ void vb_func_07F80EC4(void);
 void vb_func_07F81556(void);
 
 
-/* sub_07F80000: 0x07F80000-0x07F80024 (36 bytes), IRQ level 0 handler */
+/* sub_07F80000: 0x07F80000-0x07F80024 (36 bytes) */
 void vb_func_07F80000(void) {
     vb_interrupt_check();
     /* 07F80000: add      -4, r3 */
@@ -1142,7 +1147,7 @@ void vb_func_07F80000(void) {
     return;
 }
 
-/* sub_07F80024: 0x07F80024-0x07F80026 (2 bytes), IRQ level 1 handler */
+/* sub_07F80024: 0x07F80024-0x07F80026 (2 bytes) */
 void vb_func_07F80024(void) {
     vb_interrupt_check();
     /* 07F80024: reti */
@@ -1154,7 +1159,7 @@ void vb_func_07F80024(void) {
     return;
 }
 
-/* sub_07F80026: 0x07F80026-0x07F8004A (36 bytes), IRQ level 2 handler */
+/* sub_07F80026: 0x07F80026-0x07F8004A (36 bytes) */
 void vb_func_07F80026(void) {
     vb_interrupt_check();
     /* 07F80026: add      -4, r3 */
@@ -1189,7 +1194,7 @@ void vb_func_07F80026(void) {
     return;
 }
 
-/* sub_07F8004A: 0x07F8004A-0x07F800AA (96 bytes), IRQ level 3 handler */
+/* sub_07F8004A: 0x07F8004A-0x07F800AA (96 bytes) */
 void vb_func_07F8004A(void) {
     vb_interrupt_check();
     /* 07F8004A: add      -4, r3 */
@@ -1264,7 +1269,7 @@ void vb_func_07F8004A(void) {
     return;
 }
 
-/* sub_07F800AA: 0x07F800AA-0x07F80116 (108 bytes), IRQ level 4 handler */
+/* sub_07F800AA: 0x07F800AA-0x07F80116 (108 bytes) */
 void vb_func_07F800AA(void) {
     vb_interrupt_check();
     /* 07F800AA: add      -4, r3 */
@@ -83448,6 +83453,81 @@ label_07F95FC4:
     return; /* jmp [r31] */
 }
 
+/* sub_07FFFE00: 0x07FFFE00-0x07FFFE10 (16 bytes), IRQ level 0 handler */
+void vb_func_07FFFE00(void) {
+    vb_interrupt_check();
+    /* 07FFFE00: add      -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
+    /* 07FFFE02: st.w     r11, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[11]);
+    /* 07FFFE06: movhi    0xFFF8, r0, r11 */
+    vb_cpu.r[11] = vb_cpu.r[0] + 0xFFF80000;
+    /* 07FFFE0A: movea    0x0000, r11, r11 */
+    vb_cpu.r[11] = vb_cpu.r[11] + (int32_t)(int16_t)0x0000;
+    /* 07FFFE0E: jmp      [r11] */
+    vb_func_07F80000(); return; /* resolved tail call */
+}
+
+/* sub_07FFFE10: 0x07FFFE10-0x07FFFE20 (16 bytes), IRQ level 1 handler */
+void vb_func_07FFFE10(void) {
+    vb_interrupt_check();
+    /* 07FFFE10: add      -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
+    /* 07FFFE12: st.w     r11, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[11]);
+    /* 07FFFE16: movhi    0xFFF8, r0, r11 */
+    vb_cpu.r[11] = vb_cpu.r[0] + 0xFFF80000;
+    /* 07FFFE1A: movea    0x0024, r11, r11 */
+    vb_cpu.r[11] = vb_cpu.r[11] + (int32_t)(int16_t)0x0024;
+    /* 07FFFE1E: jmp      [r11] */
+    vb_func_07F80024(); return; /* resolved tail call */
+}
+
+/* sub_07FFFE20: 0x07FFFE20-0x07FFFE30 (16 bytes), IRQ level 2 handler */
+void vb_func_07FFFE20(void) {
+    vb_interrupt_check();
+    /* 07FFFE20: add      -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
+    /* 07FFFE22: st.w     r11, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[11]);
+    /* 07FFFE26: movhi    0xFFF8, r0, r11 */
+    vb_cpu.r[11] = vb_cpu.r[0] + 0xFFF80000;
+    /* 07FFFE2A: movea    0x0026, r11, r11 */
+    vb_cpu.r[11] = vb_cpu.r[11] + (int32_t)(int16_t)0x0026;
+    /* 07FFFE2E: jmp      [r11] */
+    vb_func_07F80026(); return; /* resolved tail call */
+}
+
+/* sub_07FFFE30: 0x07FFFE30-0x07FFFE40 (16 bytes), IRQ level 3 handler */
+void vb_func_07FFFE30(void) {
+    vb_interrupt_check();
+    /* 07FFFE30: add      -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
+    /* 07FFFE32: st.w     r11, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[11]);
+    /* 07FFFE36: movhi    0xFFF8, r0, r11 */
+    vb_cpu.r[11] = vb_cpu.r[0] + 0xFFF80000;
+    /* 07FFFE3A: movea    0x004A, r11, r11 */
+    vb_cpu.r[11] = vb_cpu.r[11] + (int32_t)(int16_t)0x004A;
+    /* 07FFFE3E: jmp      [r11] */
+    vb_func_07F8004A(); return; /* resolved tail call */
+}
+
+/* sub_07FFFE40: 0x07FFFE40-0x07FFFE50 (16 bytes), IRQ level 4 handler */
+void vb_func_07FFFE40(void) {
+    vb_interrupt_check();
+    /* 07FFFE40: add      -4, r3 */
+    vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
+    /* 07FFFE42: st.w     r11, 0[r3] */
+    vb_mem_write32(vb_cpu.r[3] + (int32_t)(int16_t)0x0000, vb_cpu.r[11]);
+    /* 07FFFE46: movhi    0xFFF8, r0, r11 */
+    vb_cpu.r[11] = vb_cpu.r[0] + 0xFFF80000;
+    /* 07FFFE4A: movea    0x00AA, r11, r11 */
+    vb_cpu.r[11] = vb_cpu.r[11] + (int32_t)(int16_t)0x00AA;
+    /* 07FFFE4E: jmp      [r11] */
+    vb_func_07F800AA(); return; /* resolved tail call */
+}
+
 /* sub_07FFFFF0: 0x07FFFFF0-0x07FFFFFA (10 bytes) */
 void vb_func_07FFFFF0(void) {
     vb_interrupt_check();
@@ -83699,9 +83779,14 @@ static const struct { uint32_t addr; vb_func_ptr_t fn; } vb_func_table[] = {
     { 0x07F95B0Cu, vb_func_07F95B0C },
     { 0x07F95C32u, vb_func_07F95C32 },
     { 0x07F95F52u, vb_func_07F95F52 },
+    { 0x07FFFE00u, vb_func_07FFFE00 },
+    { 0x07FFFE10u, vb_func_07FFFE10 },
+    { 0x07FFFE20u, vb_func_07FFFE20 },
+    { 0x07FFFE30u, vb_func_07FFFE30 },
+    { 0x07FFFE40u, vb_func_07FFFE40 },
     { 0x07FFFFF0u, vb_func_07FFFFF0 },
 };
-static const int vb_func_table_count = 216;
+static const int vb_func_table_count = 221;
 
 void vb_recomp_call(uint32_t addr) {
     if (addr >= 0x08000000u) addr &= 0x07FFFFFFu;
@@ -83719,11 +83804,11 @@ void vb_recomp_call(uint32_t addr) {
 
 /* Register the interrupt handlers discovered by v810recomp. */
 void vb_recomp_init_handlers(void) {
-    vb_interrupt_set_handler(0, vb_func_07F80000); /* KEY */
-    vb_interrupt_set_handler(1, vb_func_07F80024); /* TIMER */
-    vb_interrupt_set_handler(2, vb_func_07F80026); /* EXPANSION */
-    vb_interrupt_set_handler(3, vb_func_07F8004A); /* LINK */
-    vb_interrupt_set_handler(4, vb_func_07F800AA); /* VIP */
+    vb_interrupt_set_handler(0, vb_func_07FFFE00); /* KEY */
+    vb_interrupt_set_handler(1, vb_func_07FFFE10); /* TIMER */
+    vb_interrupt_set_handler(2, vb_func_07FFFE20); /* EXPANSION */
+    vb_interrupt_set_handler(3, vb_func_07FFFE30); /* LINK */
+    vb_interrupt_set_handler(4, vb_func_07FFFE40); /* VIP */
 }
 
 /* Run the reset vector (boots the game). */

@@ -225,6 +225,9 @@ void vb_func_07F4128C(void);
 void vb_func_07F41610(void);
 void vb_func_07F452A2(void);
 void vb_func_07F45646(void);
+void vb_func_07FFFE10(void);
+void vb_func_07FFFE30(void);
+void vb_func_07FFFE40(void);
 void vb_func_07FFFFF0(void);
 
 /* Generic boot helpers (see games/driver/main.c). */

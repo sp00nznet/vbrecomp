@@ -77,6 +77,8 @@ void vb_func_07F519D8(void);
 void vb_func_07F51A08(void);
 void vb_func_07F5453A(void);
 void vb_func_07F545B2(void);
+void vb_func_07FFFE10(void);
+void vb_func_07FFFE40(void);
 void vb_func_07FFFFF0(void);
 
 /* Generic boot helpers (see games/driver/main.c). */
