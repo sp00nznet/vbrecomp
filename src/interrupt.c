@@ -69,10 +69,11 @@ void vb_interrupt_check(void) {
         static uint64_t hb = 0;
         if (hb_on < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); hb_on = (e && e[0] && e[0] != '0'); }
         if (hb_on && (++hb % 4000000ull == 0)) {
-            fprintf(stderr, "HB: INTPND=%04X INTENB=%04X DPSTTS=%04X XPSTTS=%04X SCR=%02X TCR=%02X\n",
+            fprintf(stderr, "HB: INTPND=%04X INTENB=%04X DPSTTS=%04X XPSTTS=%04X SCR=%02X TCR=%02X SP=%08X GP=%08X\n",
                     vb_mem_read16(0x0005F800), vb_mem_read16(0x0005F802),
                     vb_mem_read16(0x0005F820), vb_mem_read16(0x0005F840),
-                    vb_mem_read8(0x02000028), vb_mem_read8(0x02000010));
+                    vb_mem_read8(0x02000028), vb_mem_read8(0x02000020),
+                    vb_cpu.r[3], vb_cpu.r[4]);
             extern void vb_mem_dump_hot_reads(void);
             vb_mem_dump_hot_reads();
             extern void vb_vip_dump_write_stats(void);
@@ -173,7 +174,14 @@ void vb_interrupt_check(void) {
                 fprintf(stderr, "INT: level %d fired (count=%d, PSW was 0x%08X)\n",
                         i, int_count[i], psw);
             }
+            uint32_t sp_before = vb_cpu.r[3];
             handlers[i]();
+            if (vb_cpu.r[3] != sp_before) {
+                static int leak_log[MAX_INT_LEVELS] = {0};
+                if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)
+                    fprintf(stderr, "IRQ %d LEAKED SP: %08X -> %08X (delta %d)\n",
+                            i, sp_before, vb_cpu.r[3], (int)(vb_cpu.r[3] - sp_before));
+            }
         }
         return; /* Handle one interrupt at a time */
     }
