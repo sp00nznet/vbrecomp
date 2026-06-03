@@ -251,8 +251,12 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             /* Analyze control flow */
             switch (insn.opcode) {
             case 0x06: /* JMP [reg1] - indirect jump */
-                if (insn.reg1 == 31) {
-                    /* JMP [r31] = return from subroutine */
+                if (insn.reg1 == 31 && !reg_known[31]) {
+                    /* jmp [r31] with an unknown r31 is a subroutine return.
+                     * But if r31 holds a constant we propagated, it's a
+                     * computed jump -- a common reset-vector idiom loads r31
+                     * (movhi+movea) and jmps to the entry, which would
+                     * otherwise be mistaken for a return (dead boot, SP=0). */
                     goto next_path;
                 }
                 /* Try to resolve via constant propagation */
