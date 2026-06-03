@@ -219,8 +219,19 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
         }
 
         if (found) {
-            printf("  IRQ %d (%s): handler at 0x%08X\n", vectors[v].level, vectors[v].name, target);
-            v810_ctx_add_func(ctx, target, true, vectors[v].level);
+            /* Register the vector STUB itself as the interrupt handler, not the
+             * jump target. The stub pushes a register (add -4,r3; st.w rX,0[r3])
+             * before jumping to the real handler, and the handler's epilogue
+             * pops it. Calling the target directly skips that push, so the
+             * handler's pop leaks 4 bytes of stack per interrupt. The stub's
+             * resolved jmp tail-calls the target, which we also confirm so it
+             * gets emitted. */
+            printf("  IRQ %d (%s): stub 0x%08X -> handler 0x%08X\n",
+                   vectors[v].level, vectors[v].name, vectors[v].cpu_addr, target);
+            int sidx = v810_ctx_add_func(ctx, vectors[v].cpu_addr, true, vectors[v].level);
+            if (sidx >= 0) ctx->funcs[sidx].confirmed = true;
+            int tidx = v810_ctx_add_func(ctx, target, false, -1);
+            if (tidx >= 0) ctx->funcs[tidx].confirmed = true;
         } else {
             printf("  IRQ %d (%s): could not decode stub\n", vectors[v].level, vectors[v].name);
         }
