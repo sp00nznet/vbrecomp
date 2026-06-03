@@ -32,6 +32,11 @@ extern int stbi_write_png(const char *, int, int, int, const void *, int);
 /* Dump the current framebuffer (RGBA8888) to a PNG. */
 static void dump_png(const char *path) {
     static uint8_t px[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT * 4];
+    if (getenv("VBRECOMP_HEARTBEAT")) {
+        int nzfb = 0;
+        for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) if (framebuffer[i] >> 24) nzfb++;
+        fprintf(stderr, "dump_png %s: %d non-zero framebuffer pixels\n", path, nzfb);
+    }
     for (int i = 0; i < VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT; i++) {
         uint32_t c = framebuffer[i];
         px[i*4+0] = (c >> 24) & 0xFF;  /* R */
