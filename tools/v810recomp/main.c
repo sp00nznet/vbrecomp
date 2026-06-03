@@ -276,7 +276,8 @@ static void load_hints(v810_ctx_t *ctx, const char *path) {
                     ctx->max_resolved * sizeof(ctx->resolved_jumps[0]));
             }
             ctx->resolved_jumps[ctx->num_resolved].from_addr = from;
-            ctx->resolved_jumps[ctx->num_resolved].to_addr = to;
+            ctx->resolved_jumps[ctx->num_resolved].to_addr =
+                v810_normalize_rom_addr(ctx, to);
             ctx->num_resolved++;
             int idx = v810_ctx_add_func(ctx, to, false, -1);
             if (idx >= 0) ctx->funcs[idx].confirmed = true;
