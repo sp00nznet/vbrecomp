@@ -19,23 +19,23 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Mario Clash (Japan, USA) (En) | 1024 | 792 | yes | yes | yes | wip | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
 | Mario's Tennis (Japan, USA) (En) | 512 | 210 | yes | yes | yes | wip | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
 | Nester's Funky Bowling (USA) | 2048 | 191 | yes | yes | yes | yes | - |  |
-| Panic Bomber (USA) | 512 | 193 | yes | yes | - | no | - |  |
+| Panic Bomber (USA) | 512 | 193 | yes | yes | yes | yes | - |  |
 | Red Alarm (Japan) | 1024 | 224 | yes | yes | yes | yes | - |  |
 | Red Alarm (USA) | 1024 | 224 | yes | yes | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 232 | yes | yes | yes | yes | - |  |
 | Space Invaders - Virtual Collection (Japan) | 512 | 47 | yes | yes | - | no | - |  |
 | Space Squash (Japan) | 512 | 3 | yes | yes | - | no | - |  |
 | T&E Virtual Golf (Japan) | 2048 | 68 | yes | yes | - | no | - |  |
-| Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | yes | - | no | - |  |
-| Tobidase! Panibon (Japan) | 512 | 193 | yes | yes | - | no | - |  |
+| Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | yes | yes | wip | - |  |
+| Tobidase! Panibon (Japan) | 512 | 193 | yes | yes | yes | yes | - |  |
 | Vertical Force (Japan) | 1024 | 106 | yes | yes | - | no | - |  |
 | Vertical Force (USA) | 1024 | 106 | yes | yes | - | no | - |  |
 | Virtual Bowling (Japan) | 1024 | 255 | yes | yes | - | no | - |  |
 | Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3026 | yes | yes | - | no | - |  |
-| Virtual Fishing (Japan) | 1024 | 23 | yes | yes | - | - | - |  |
-| Virtual Lab (Japan) | 1024 | 208 | yes | yes | - | - | - |  |
-| Virtual League Baseball (USA) | 1024 | 80 | yes | yes | - | - | - |  |
-| Virtual Pro Yakyuu '95 (Japan) | 1024 | 75 | yes | yes | - | - | - |  |
+| Virtual Fishing (Japan) | 1024 | 23 | yes | yes | - | no | - |  |
+| Virtual Lab (Japan) | 1024 | 208 | yes | yes | - | no | - |  |
+| Virtual League Baseball (USA) | 1024 | 80 | yes | yes | yes | yes | - |  |
+| Virtual Pro Yakyuu '95 (Japan) | 1024 | 75 | yes | yes | yes | yes | - |  |
 | V-Tetris (Japan) | 512 | 160 | yes | yes | yes | yes | - |  |
 | Waterworld (USA) | 2048 | 87 | yes | yes | yes | wip | - |  |
 
@@ -79,8 +79,8 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Mario Combat (World) (Aftermarket) (Homebrew) | 2048 | 17 | yes | yes | - | no | - |  |
 | Mario Kart - Virtual Cup (World) (Aftermarket) (Homebrew) | 1024 | 30 | yes | yes | - | no | - |  |
 | Mario VB (World) (Aftermarket) (Homebrew) | 512 | 528 | yes | yes | - | no | - |  |
-| Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew) | 512 | 1140 | yes | yes | - | - | - |  |
-| Red Square (World) (Aftermarket) (Homebrew) | 512 | 32 | yes | yes | - | - | - |  |
+| Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew) | 512 | 1140 | yes | yes | - | no | - |  |
+| Red Square (World) (Aftermarket) (Homebrew) | 512 | 32 | yes | yes | yes | yes | - |  |
 | Snatcher (World) (Demo) (Aftermarket) (Homebrew) | 2048 | 17 | yes | yes | - | no | - |  |
 | Snowball Wars (World) (Demo 1) (Aftermarket) (Homebrew) | 256 | 400 | yes | yes | yes | yes | - |  |
 | Snowball Wars (World) (Demo 2) (Aftermarket) (Homebrew) | 1024 | 437 | yes | yes | yes | yes | - |  |
