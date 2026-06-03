@@ -147,14 +147,21 @@ void vb_interrupt_check(void) {
     /* Current interrupt level from PSW */
     int current_level = (psw & VB_PSW_I_MASK) >> VB_PSW_I_SHIFT;
 
-    /* Check each level, highest priority (0) first */
-    for (int i = 0; i < MAX_INT_LEVELS; i++) {
+    /* Check each level, highest priority first. On the VB a HIGHER level
+     * number is HIGHER priority (key=0, timer=1, expansion=2, link=3, VIP=4),
+     * so scan 4 -> 0 and service the highest pending level. */
+    for (int i = MAX_INT_LEVELS - 1; i >= 0; i--) {
         if (!(pending & (1u << i))) continue;
 
-        /* V810: IL in PSW is the masking threshold. Interrupts with
-         * level >= IL are blocked. Level 0 = highest priority.
-         * IL=0 means accept all interrupts. */
-        if (current_level > 0 && i >= current_level) continue;
+        /* V810: PSW.I is the masking threshold. An interrupt is acknowledged
+         * only when its level is >= PSW.I; lower-level (lower-priority)
+         * requests are held pending. (Accepting level i sets PSW.I = i+1
+         * below, so same-level requests don't re-enter and only strictly
+         * higher levels preempt.) The old code inverted this and blocked
+         * level >= PSW.I, which masked the high-priority VIP interrupt
+         * whenever a game raised PSW.I above 0 -- deadlocking any game that
+         * waits on VIP from a raised interrupt level (e.g. Waterworld). */
+        if (i < current_level) continue;
 
         /* Accept the interrupt */
         pending &= ~(1u << i);
