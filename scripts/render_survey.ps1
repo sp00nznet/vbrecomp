@@ -11,9 +11,13 @@ param(
     [string]$BuildDir = (Join-Path $PSScriptRoot "..\build_all"),
     [string]$RomDir   = (Join-Path $PSScriptRoot "..\roms"),
     [string]$Corpus   = (Join-Path $PSScriptRoot "..\corpus"),
-    [int]$Frames      = 1200,
+    [int]$Frames      = 900,
     [int]$ShotEvery   = 300,
-    [int]$TimeoutSec  = 22,
+    # Slow games (heavy status-register polling) need wall-clock to reach a
+    # shot frame; a tight timeout kills them first and undercounts renders
+    # (e.g. Mario Clash/Teleroboxer draw 1762px by frame 300 but were killed
+    # at 22s and logged as fb=0). Give every game time to reach >=1 shot.
+    [int]$TimeoutSec  = 45,
     [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll"
 )
 $ErrorActionPreference = "Stop"
