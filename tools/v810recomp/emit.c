@@ -147,7 +147,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         break;
 
     case 0x06: /* JMP [reg1] */
-        if (insn->reg1 == 31) {
+        /* jmp [r31] is a return UNLESS we resolved r31 to a constant target
+         * (reset-vector idiom: load r31, jmp to entry). A resolved jump takes
+         * precedence so the computed-jump path below emits the real dispatch. */
+        if (insn->reg1 == 31 && !lookup_resolved_jump(ctx, insn->addr)) {
             fprintf(out, "    return; /* jmp [r31] */\n");
         } else {
             /* Check for jump table first */
