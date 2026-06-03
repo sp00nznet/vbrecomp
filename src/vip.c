@@ -53,6 +53,9 @@ void vb_vip_dump_render_chain(void) {
             if (e) { nz++; if (fidx < 0) { fidx = i; first = e; } }
         }
         int16_t mx = (int16_t)(vram[wa+8] | (vram[wa+9]<<8)), my = (int16_t)(vram[wa+12] | (vram[wa+13]<<8));
+        int16_t gx = (int16_t)((((uint16_t)(vram[wa+2]|(vram[wa+3]<<8))) << 6)) >> 6;
+        int16_t gy = (int16_t)(vram[wa+6] | (vram[wa+7]<<8));
+        uint16_t ww = vram[wa+14] | (vram[wa+15]<<8), wh = vram[wa+16] | (vram[wa+17]<<8);
         int tile = first & 0x07FF;
         uint32_t chrb = (tile < 0x200) ? 0x06000 + tile*16
                       : (tile < 0x400) ? 0x0E000 + (tile-0x200)*16
@@ -60,8 +63,8 @@ void vb_vip_dump_render_chain(void) {
                                        : 0x1E000 + (tile-0x600)*16;
         int chrnz = 0;
         for (int i = 0; i < 16; i++) if (vram[(chrb + i) & (VB_VRAM_SIZE-1)]) chrnz++;
-        fprintf(stderr, "  W%d HEAD=%04X L%d R%d BGM=%d END=%d bgmap=0x%05X NZ=%d firstCell[r%d,c%d]=%04X tile%d CHRnz=%d MX=%d MY=%d\n",
-                w, head, lon, ron, bgm, end, bgmap, nz, fidx>=0?fidx/64:-1, fidx>=0?fidx%64:-1, first, tile, chrnz, mx, my);
+        fprintf(stderr, "  W%d HEAD=%04X L%d R%d BGM=%d END=%d bgmap=0x%05X NZ=%d firstCell[r%d,c%d]=%04X tile%d CHRnz=%d GX=%d GY=%d W=%d H=%d MX=%d MY=%d\n",
+                w, head, lon, ron, bgm, end, bgmap, nz, fidx>=0?fidx/64:-1, fidx>=0?fidx%64:-1, first, tile, chrnz, gx, gy, ww, wh, mx, my);
         if (end) break;   /* world processing stops at the first END world */
     }
 }
@@ -982,6 +985,11 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         }
     }
 
+    if (getenv("VBRECOMP_RDBG") && (render_dbg % 200 == 0)) {
+        fprintf(stderr, "RDBG F%d: tiles_drawn=%d  per-world:", render_dbg, tiles_drawn);
+        for (int _w = 31; _w >= 0; _w--) if (world_pixels[_w]) fprintf(stderr, " W%d=%d", _w, world_pixels[_w]);
+        fprintf(stderr, "\n");
+    }
     if (render_dbg == 300) {
         fprintf(stderr, "RENDER F%d: %d pixels drawn\n", render_dbg, tiles_drawn);
         static int pw_log = 0;
