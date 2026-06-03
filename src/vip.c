@@ -193,9 +193,22 @@ static uint16_t reg_read(vb_addr_t offset) {
      * (the old | 0x007E) deadlocks any "wait for the other phase" loop. Keep
      * DISP + scan-ready stable (0x0032), alternate the phase bits each read. */
     case VB_VIP_DPSTTS: {
+        /* Cycle through each individual display phase rather than toggling two
+         * lumped states. The DPBSY bits mark which framebuffer column-row pair
+         * is being scanned out: L:FB0 (0x04), R:FB0 (0x08), L:FB1 (0x10),
+         * R:FB1 (0x20); FCLK (0x40) pulses at the frame boundary; plus an
+         * all-clear "between phases" step. A 2-state toggle only ever showed
+         * L0+R0+FCLK together, so a loop waiting for, say, DPBSY:R1 alone (or
+         * for FCLK with the DPBSY bits clear) spun forever (Panic Bomber read
+         * DPSTTS ~3.8M times). Stepping through every phase lets any
+         * single-phase wait terminate while still exposing all combinations.
+         * DISP (0x02) stays on the whole time. */
+        static const uint16_t dp_phases[] = {
+            0x0004u, 0x0008u, 0x0010u, 0x0020u, 0x0040u, 0x0000u
+        };
         static unsigned dp_poll;
-        uint16_t phase = (++dp_poll & 1u) ? 0x004Cu : 0x0000u;
-        return (reg_dpstts & ~0x004Cu) | 0x0032u | phase;
+        uint16_t phase = dp_phases[dp_poll++ % (sizeof dp_phases / sizeof dp_phases[0])];
+        return (reg_dpstts & ~0x007Cu) | 0x0002u | phase;
     }
     case VB_VIP_DPCTRL:  return reg_dpctrl;
     case VB_VIP_BRTA:    return reg_brta;
