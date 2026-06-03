@@ -223,8 +223,16 @@ static uint16_t reg_read(vb_addr_t offset) {
      * `while (!(XPSTTS & 0xC))`). We have no real drawing clock, so alternate
      * XPBSY each read so both wait loops terminate. */
     case VB_VIP_XPSTTS: {
+        /* Same reasoning as DPSTTS: step through each drawing phase instead of
+         * toggling the lumped 0x000C. Drawing ping-pongs between framebuffers,
+         * so F0BSY (0x04) and F1BSY (0x08) are each busy in turn, then idle.
+         * A 2-state toggle only ever showed them together (0x0C) or clear, so a
+         * loop waiting for one framebuffer specifically (F0BSY set, F1BSY clear)
+         * never saw it -- Mario Clash and Teleroboxer spin ~400K times on
+         * XPSTTS. Cycling F0, F1, both, idle lets every such wait terminate. */
+        static const uint16_t xp_busy[] = { 0x0004u, 0x0008u, 0x000Cu, 0x0000u };
         static unsigned xp_poll;
-        uint16_t busy = (++xp_poll & 1u) ? 0x000C : 0x0000;
+        uint16_t busy = xp_busy[xp_poll++ % (sizeof xp_busy / sizeof xp_busy[0])];
         return (reg_xpstts & ~0x000Cu) | 0x0072u | busy;
     }
     case VB_VIP_XPCTRL:  return reg_xpctrl;
