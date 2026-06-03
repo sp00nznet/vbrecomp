@@ -26,7 +26,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Space Invaders - Virtual Collection (Japan) | 512 | 47 | yes | yes | - | no | - |  |
 | Space Squash (Japan) | 512 | 3 | yes | yes | - | no | - |  |
 | T&E Virtual Golf (Japan) | 2048 | 68 | yes | yes | - | no | - |  |
-| Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | yes | yes | wip | - |  |
+| Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | yes | yes | yes | - |  |
 | Tobidase! Panibon (Japan) | 512 | 193 | yes | yes | yes | yes | - |  |
 | Vertical Force (Japan) | 1024 | 106 | yes | yes | - | no | - |  |
 | Vertical Force (USA) | 1024 | 106 | yes | yes | - | no | - |  |
