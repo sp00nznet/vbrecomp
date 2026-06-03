@@ -257,7 +257,7 @@ static void load_hints(v810_ctx_t *ctx, const char *path) {
     if (!f) return;
     printf("Loading hints from %s\n", path);
     char line[256];
-    int n_jmp = 0, n_entry = 0, n_skip = 0;
+    int n_jmp = 0, n_entry = 0, n_skip = 0, n_rename = 0;
     while (fgets(line, sizeof(line), f)) {
         char *p = line;
         while (*p == ' ' || *p == '\t') p++;
@@ -300,10 +300,26 @@ static void load_hints(v810_ctx_t *ctx, const char *path) {
             ctx->skip_funcs[ctx->num_skip_funcs].skip_bytes = bytes;
             ctx->num_skip_funcs++;
             n_skip++;
+        } else if (strcmp(tok, "rename") == 0 && n >= 2) {
+            /* Emit this function's definition as vb_func_<addr>_real so a
+             * hand-written driver can intercept vb_func_<addr>. Confirm it too,
+             * so it is actually emitted (and thus available as _real). */
+            uint32_t a;
+            if (!parse_hex_addr(a1, &a)) continue;
+            int idx = v810_ctx_add_func(ctx, a, false, -1);
+            if (idx >= 0) ctx->funcs[idx].confirmed = true;
+            if (ctx->num_rename_funcs >= ctx->max_rename_funcs) {
+                ctx->max_rename_funcs *= 2;
+                ctx->rename_funcs = realloc(ctx->rename_funcs,
+                    ctx->max_rename_funcs * sizeof(ctx->rename_funcs[0]));
+            }
+            ctx->rename_funcs[ctx->num_rename_funcs++] = v810_normalize_rom_addr(ctx, a);
+            n_rename++;
         }
     }
     fclose(f);
-    printf("  hints applied: %d jmp, %d entry, %d skip\n", n_jmp, n_entry, n_skip);
+    printf("  hints applied: %d jmp, %d entry, %d skip, %d rename\n",
+           n_jmp, n_entry, n_skip, n_rename);
 }
 
 int main(int argc, char **argv) {

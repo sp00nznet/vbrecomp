@@ -1139,7 +1139,7 @@ void vb_func_07F202AE(void);
 
 
 /* sub_07F0002C: 0x07F0002C-0x07F0004C (32 bytes) */
-void vb_func_07F0002C(void) {
+void vb_func_07F0002C_real(void) {
     vb_interrupt_check();
     /* 07F0002C: add      -8, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFF8);
@@ -6303,7 +6303,7 @@ label_07F04AB8:
     /* 07F04AD0: movea    0x4832, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x4832;
     /* 07F04AD4: jmp      [r1] */
-    return; /* resolved jmp to 0x07004832 (no local label) */
+    goto label_07F04832; /* resolved jmp [r1] */
     /* 07F04AD6: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
     /* 07F04AD8: st.w     r31, 0[r3] */
@@ -6640,7 +6640,7 @@ label_07F04C9C:
     /* 07F04CA8: movea    0x47E2, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x47E2;
     /* 07F04CAC: jmp      [r1] */
-    return; /* resolved jmp to 0x070047E2 (no local label) */
+    goto label_07F047E2; /* resolved jmp [r1] */
 }
 
 /* sub_07F0460E: 0x07F0460E-0x07F04CAE (1696 bytes) */
@@ -7479,7 +7479,7 @@ label_07F04AB8:
     /* 07F04AD0: movea    0x4832, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x4832;
     /* 07F04AD4: jmp      [r1] */
-    return; /* resolved jmp to 0x07004832 (no local label) */
+    goto label_07F04832; /* resolved jmp [r1] */
     /* 07F04AD6: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
     /* 07F04AD8: st.w     r31, 0[r3] */
@@ -7816,7 +7816,7 @@ label_07F04C9C:
     /* 07F04CA8: movea    0x47E2, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x47E2;
     /* 07F04CAC: jmp      [r1] */
-    return; /* resolved jmp to 0x070047E2 (no local label) */
+    goto label_07F047E2; /* resolved jmp [r1] */
 }
 
 /* sub_07F047E2: 0x07F047E2-0x07F04CAE (1228 bytes) */
@@ -8388,7 +8388,7 @@ label_07F04AB8:
     /* 07F04AD0: movea    0x4832, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x4832;
     /* 07F04AD4: jmp      [r1] */
-    return; /* resolved jmp to 0x07004832 (no local label) */
+    goto label_07F04832; /* resolved jmp [r1] */
     /* 07F04AD6: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
     /* 07F04AD8: st.w     r31, 0[r3] */
@@ -8725,7 +8725,7 @@ label_07F04C9C:
     /* 07F04CA8: movea    0x47E2, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x47E2;
     /* 07F04CAC: jmp      [r1] */
-    return; /* resolved jmp to 0x070047E2 (no local label) */
+    goto label_07F047E2; /* resolved jmp [r1] */
 }
 
 /* sub_07F04832: 0x07F04832-0x07F04CAE (1148 bytes) */
@@ -9243,7 +9243,7 @@ label_07F04AB8:
     /* 07F04AD0: movea    0x4832, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x4832;
     /* 07F04AD4: jmp      [r1] */
-    return; /* resolved jmp to 0x07004832 (no local label) */
+    goto label_07F04832; /* resolved jmp [r1] */
     /* 07F04AD6: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
     /* 07F04AD8: st.w     r31, 0[r3] */
@@ -9580,7 +9580,7 @@ label_07F04C9C:
     /* 07F04CA8: movea    0x47E2, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x47E2;
     /* 07F04CAC: jmp      [r1] */
-    return; /* resolved jmp to 0x070047E2 (no local label) */
+    vb_recomp_call(0x07F047E2u); return; /* resolved jmp -> dispatch */
 }
 
 /* sub_07F04AD6: 0x07F04AD6-0x07F04BE2 (268 bytes) */
@@ -9779,7 +9779,7 @@ label_07F04BC4:
 }
 
 /* sub_07F1A434: 0x07F1A434-0x07F1A460 (44 bytes) */
-void vb_func_07F1A434(void) {
+void vb_func_07F1A434_real(void) {
     vb_interrupt_check();
     /* 07F1A434: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -10072,7 +10072,7 @@ label_07F1D7DA:
 }
 
 /* sub_07F1DC54: 0x07F1DC54-0x07F1DCF2 (158 bytes) */
-void vb_func_07F1DC54(void) {
+void vb_func_07F1DC54_real(void) {
     vb_interrupt_check();
     /* 07F1DC54: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -10193,7 +10193,7 @@ label_07F1DCE4:
 }
 
 /* sub_07F1EB38: 0x07F1EB38-0x07F1EBB4 (124 bytes) */
-void vb_func_07F1EB38(void) {
+void vb_func_07F1EB38_real(void) {
     vb_interrupt_check();
     /* 07F1EB38: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -10326,7 +10326,7 @@ label_07F20280:
 }
 
 /* sub_07F20292: 0x07F20292-0x07F202AE (28 bytes) */
-void vb_func_07F20292(void) {
+void vb_func_07F20292_real(void) {
     vb_interrupt_check();
     /* 07F20292: st.h     r0, -32064[r4] */
     vb_mem_write16(vb_cpu.r[4] + (int32_t)(int16_t)0x82C0, (uint16_t)vb_cpu.r[0]);
@@ -10350,7 +10350,7 @@ void vb_func_07F20292(void) {
 }
 
 /* sub_07F202AE: 0x07F202AE-0x07F202F2 (68 bytes) */
-void vb_func_07F202AE(void) {
+void vb_func_07F202AE_real(void) {
     vb_interrupt_check();
 label_07F202AE:
     vb_interrupt_check();
@@ -10712,7 +10712,7 @@ label_07F20480:
 }
 
 /* sub_07F20488: 0x07F20488-0x07F204AA (34 bytes) */
-void vb_func_07F20488(void) {
+void vb_func_07F20488_real(void) {
     vb_interrupt_check();
     /* 07F20488: movhi    0x0004, r0, r1 */
     vb_cpu.r[1] = vb_cpu.r[0] + 0x00040000;
@@ -10741,7 +10741,7 @@ label_07F20494:
 }
 
 /* sub_07F204AA: 0x07F204AA-0x07F204D0 (38 bytes) */
-void vb_func_07F204AA(void) {
+void vb_func_07F204AA_real(void) {
     vb_interrupt_check();
     /* 07F204AA: st.h     r0, -32006[r4] */
     vb_mem_write16(vb_cpu.r[4] + (int32_t)(int16_t)0x82FA, (uint16_t)vb_cpu.r[0]);
@@ -10766,7 +10766,7 @@ void vb_func_07F204AA(void) {
 }
 
 /* sub_07F204D0: 0x07F204D0-0x07F204E6 (22 bytes) */
-void vb_func_07F204D0(void) {
+void vb_func_07F204D0_real(void) {
     vb_interrupt_check();
     /* 07F204D0: st.h     r0, -31992[r4] */
     vb_mem_write16(vb_cpu.r[4] + (int32_t)(int16_t)0x8308, (uint16_t)vb_cpu.r[0]);
@@ -11143,7 +11143,7 @@ label_07F20686:
 }
 
 /* sub_07F20716: 0x07F20716-0x07F2075E (72 bytes) */
-void vb_func_07F20716(void) {
+void vb_func_07F20716_real(void) {
     vb_interrupt_check();
     /* 07F20716: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -11468,7 +11468,7 @@ label_07F20880:
     /* 07F208AC: movea    0x460E, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x460E;
     /* 07F208B0: jmp      [r1] */
-    return; /* resolved jmp to 0x0700460E (no local label) */
+    vb_recomp_call(0x07F0460Eu); return; /* resolved jmp -> dispatch */
 }
 
 /* sub_07F208B2: 0x07F208B2-0x07F208C0 (14 bytes) */
@@ -15886,7 +15886,7 @@ label_07F22926:
 }
 
 /* sub_07F22AFE: 0x07F22AFE-0x07F22B5E (96 bytes) */
-void vb_func_07F22AFE(void) {
+void vb_func_07F22AFE_real(void) {
     vb_interrupt_check();
     /* 07F22AFE: mov      r0, r6 */
     vb_cpu.r[6] = vb_cpu.r[0];
@@ -33806,7 +33806,7 @@ label_07F3C4FE:
 }
 
 /* sub_07F3C580: 0x07F3C580-0x07F3C7D6 (598 bytes) */
-void vb_func_07F3C580(void) {
+void vb_func_07F3C580_real(void) {
     vb_interrupt_check();
     /* 07F3C580: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -34510,7 +34510,7 @@ label_07F3C8F0:
 }
 
 /* sub_07F3C9CE: 0x07F3C9CE-0x07F3CA7E (176 bytes) */
-void vb_func_07F3C9CE(void) {
+void vb_func_07F3C9CE_real(void) {
     vb_interrupt_check();
     /* 07F3C9CE: add      -4, r3 */
     vb_cpu.r[3] = vb_add(vb_cpu.r[3], 0xFFFFFFFC);
@@ -37677,7 +37677,7 @@ void vb_func_07FFFE10(void) {
     /* 07FFFE1A: movea    0x07CC, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x07CC;
     /* 07FFFE1E: jmp      [r1] */
-    return; /* resolved jmp to 0x070207CC (no local label) */
+    vb_recomp_call(0x07F207CCu); return; /* resolved jmp -> dispatch */
 }
 
 /* sub_07FFFE30: 0x07FFFE30-0x07FFFE40 (16 bytes), IRQ level 3 handler */
@@ -37692,7 +37692,7 @@ void vb_func_07FFFE30(void) {
     /* 07FFFE3A: movea    0x07C4, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x07C4;
     /* 07FFFE3E: jmp      [r1] */
-    return; /* resolved jmp to 0x070207C4 (no local label) */
+    vb_recomp_call(0x07F207C4u); return; /* resolved jmp -> dispatch */
 }
 
 /* sub_07FFFE40: 0x07FFFE40-0x07FFFE50 (16 bytes), IRQ level 4 handler */
@@ -37707,7 +37707,7 @@ void vb_func_07FFFE40(void) {
     /* 07FFFE4A: movea    0x07E8, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x07E8;
     /* 07FFFE4E: jmp      [r1] */
-    return; /* resolved jmp to 0x070207E8 (no local label) */
+    vb_recomp_call(0x07F207E8u); return; /* resolved jmp -> dispatch */
 }
 
 /* sub_07FFFFF0: 0x07FFFFF0-0x07FFFFFA (10 bytes) */
@@ -37718,7 +37718,7 @@ void vb_func_07FFFFF0(void) {
     /* 07FFFFF4: movea    0x45D4, r1, r1 */
     vb_cpu.r[1] = vb_cpu.r[1] + (int32_t)(int16_t)0x45D4;
     /* 07FFFFF8: jmp      [r1] */
-    return; /* resolved jmp to 0x070045D4 (no local label) */
+    vb_recomp_call(0x07F045D4u); return; /* resolved jmp -> dispatch */
 }
 
 /* Runtime dispatch table: ROM address -> recompiled function. */

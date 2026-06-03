@@ -1,0 +1,6 @@
+# Mario's Tennis recompiler hints.
+# `rename <addr>`: emit vb_func_<addr>_real so src/main.c can provide
+# vb_func_<addr> as an HLE replacement or a wrapper that calls _real.
+rename 07F8016C   # HLE replacement
+rename 07F80186   # HLE replacement
+rename 07F8135C   # wrapper (calls _real)

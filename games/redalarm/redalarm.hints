@@ -1,0 +1,18 @@
+# Red Alarm recompiler hints.
+# `rename <addr>`: emit the function's definition as vb_func_<addr>_real so the
+# hand-written driver (src/main.c) can provide vb_func_<addr> as an HLE
+# replacement or a wrapper that calls _real. All call sites keep vb_func_<addr>,
+# so interception is transparent to the rest of the recompiled code.
+rename 07F20716   # frame-sync / VBlank wait (HLE)
+rename 07F1EB38   # XPSTTS wait (HLE)
+rename 07F3C9CE   # per-frame render init (HLE)
+rename 07F202AE   # wait-N-frames + start drawing (HLE)
+rename 07F20292   # wait-one-frame + XPCTRL draw start (HLE)
+rename 07F3C580   # per-frame advance wrapper (calls _real)
+rename 07F20488   # decompression trace wrapper
+rename 07F22AFE   # trace wrapper
+rename 07F0002C   # trace wrapper
+rename 07F204D0   # trace wrapper
+rename 07F204AA   # trace wrapper
+rename 07F1A434   # trace wrapper
+rename 07F1DC54   # trace wrapper

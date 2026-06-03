@@ -35,6 +35,18 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->max_skip_funcs = 16;
     ctx->skip_funcs = calloc(ctx->max_skip_funcs, sizeof(ctx->skip_funcs[0]));
     ctx->num_skip_funcs = 0;
+
+    ctx->max_rename_funcs = 16;
+    ctx->rename_funcs = calloc(ctx->max_rename_funcs, sizeof(ctx->rename_funcs[0]));
+    ctx->num_rename_funcs = 0;
+}
+
+bool v810_is_renamed(v810_ctx_t *ctx, uint32_t addr) {
+    addr = v810_normalize_rom_addr(ctx, addr);
+    for (int i = 0; i < ctx->num_rename_funcs; i++) {
+        if (ctx->rename_funcs[i] == addr) return true;
+    }
+    return false;
 }
 
 uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target) {
@@ -54,6 +66,7 @@ void v810_ctx_free(v810_ctx_t *ctx) {
     }
     free(ctx->jump_tables);
     free(ctx->skip_funcs);
+    free(ctx->rename_funcs);
     memset(ctx, 0, sizeof(*ctx));
 }
 

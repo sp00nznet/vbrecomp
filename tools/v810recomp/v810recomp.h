@@ -95,7 +95,20 @@ typedef struct {
     struct { uint32_t target; uint32_t skip_bytes; } *skip_funcs;
     int num_skip_funcs;
     int max_skip_funcs;
+
+    /* "Rename" targets: functions whose DEFINITION is emitted as
+     * vb_func_<addr>_real instead of vb_func_<addr>. All call sites and the
+     * dispatch table keep vb_func_<addr>, so a hand-written driver can define
+     * vb_func_<addr> as an HLE replacement or a wrapper that calls _real --
+     * the interception hook used by games/<name>/src/main.c. Opt-in via the
+     * `rename <addr>` hint; empty for the corpus, so nothing changes there. */
+    uint32_t *rename_funcs;
+    int num_rename_funcs;
+    int max_rename_funcs;
 } v810_ctx_t;
+
+/* True if a function's definition should be emitted under the _real suffix. */
+bool v810_is_renamed(v810_ctx_t *ctx, uint32_t addr);
 
 /* Decode a single instruction */
 bool v810_decode(const uint8_t *rom, uint32_t offset, uint32_t rom_size, v810_insn_t *out);

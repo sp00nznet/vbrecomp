@@ -738,7 +738,12 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         fprintf(out, ", IRQ level %d handler", func->int_level);
     }
     fprintf(out, " */\n");
-    fprintf(out, "void vb_func_%08X(void) {\n", func->addr);
+    /* Renamed functions are emitted under the _real suffix so a hand-written
+     * driver can define vb_func_<addr> as a wrapper/HLE replacement. */
+    if (v810_is_renamed(ctx, func->addr))
+        fprintf(out, "void vb_func_%08X_real(void) {\n", func->addr);
+    else
+        fprintf(out, "void vb_func_%08X(void) {\n", func->addr);
 
     /* Interrupt check at function entry */
     fprintf(out, "    vb_interrupt_check();\n");
@@ -909,7 +914,12 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         if (was_emitted[i]) continue;
         /* Check if this function was forward-declared (confirmed) */
         if (!ctx->funcs[i].confirmed) continue;
-        fprintf(out, "\nvoid vb_func_%08X(void) {\n", ctx->funcs[i].addr);
+        /* Keep a renamed function's stub under _real too, so the driver's
+         * vb_func_<addr> wrapper stays the only plain-named definition. */
+        if (v810_is_renamed(ctx, ctx->funcs[i].addr))
+            fprintf(out, "\nvoid vb_func_%08X_real(void) {\n", ctx->funcs[i].addr);
+        else
+            fprintf(out, "\nvoid vb_func_%08X(void) {\n", ctx->funcs[i].addr);
         fprintf(out, "    /* STUB: function not yet analyzed */\n");
         fprintf(out, "}\n");
     }
