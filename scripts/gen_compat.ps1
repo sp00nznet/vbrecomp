@@ -5,9 +5,29 @@
 # the system codepage without a BOM, so non-ASCII literals break it).
 param(
     [string]$Results = (Join-Path $PSScriptRoot "..\corpus\results.json"),
+    [string]$Survey  = (Join-Path $PSScriptRoot "..\corpus\render_survey.json"),
     [string]$Out     = (Join-Path $PSScriptRoot "..\COMPATIBILITY.md")
 )
 $ErrorActionPreference = "Stop"
+
+# Render-survey results (scripts/render_survey.ps1), keyed by ROM name. Lets the
+# Boots/Renders columns auto-fill from the headless boot probe so the table
+# tracks reality across all ROMs without hand-editing each one. UTF-8 may carry
+# a BOM from PS5.1 Out-File, so strip it before parsing.
+# NB: PowerShell variable names are case-insensitive, so this map must NOT be
+# named $survey -- that would alias (and clobber) the $Survey path parameter.
+$surveyMap = @{}
+if (Test-Path $Survey) {
+    $raw = [IO.File]::ReadAllText($Survey)
+    $i = $raw.IndexOfAny([char[]]@('[','{'))   # skip any BOM/whitespace prefix
+    if ($i -ge 0) {
+        # Assign before foreach: PS5.1 ConvertFrom-Json emits a JSON array as a
+        # single pipeline object, so iterating the pipeline inline runs once with
+        # the whole array. Binding to a variable unrolls it into elements.
+        $parsed = $raw.Substring($i) | ConvertFrom-Json
+        foreach ($s in $parsed) { $surveyMap[$s.name] = $s }
+    }
+}
 
 # Curated runtime status, keyed by ROM base name. Update as games progress.
 # boots / renders / playable in {yes, wip, no, "-"(untested)}.
@@ -49,8 +69,20 @@ foreach ($cat in $order) {
     $md += "|------|----|-------|------------|----------|-------|---------|----------|-------|"
     foreach ($r in $catRows) {
         $c = $curated[$r.name]
-        $boots    = if ($c) { $c.boots }    else { "-" }
-        $renders  = if ($c) { $c.renders }  else { "-" }
+        # Auto-derive Boots/Renders from the headless render survey; curated
+        # entries override (they carry hand-verified nuance + notes).
+        $sv = $surveyMap[$r.name]
+        $autoBoots = "-"; $autoRenders = "-"
+        if ($sv) {
+            switch ($sv.cat) {
+                "RENDERS"            { $autoBoots = "yes"; $autoRenders = "yes" }
+                "LOADED-NOT-DRAWING" { $autoBoots = "yes"; $autoRenders = "wip" }
+                "CHR-NO-WORLD"       { $autoBoots = "yes"; $autoRenders = "wip" }
+                default              { $autoBoots = "-";   $autoRenders = "no"  }
+            }
+        }
+        $boots    = if ($c) { $c.boots }    else { $autoBoots }
+        $renders  = if ($c) { $c.renders }  else { $autoRenders }
         $playable = if ($c) { $c.playable } else { "-" }
         $note     = if ($c) { $c.note }     else { "" }
         $rec = if ($r.recomp -eq "ok")  { "yes" } else { "no" }
