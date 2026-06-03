@@ -183,13 +183,18 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                      * (intraprocedural computed jump). */
                     fprintf(out, "    goto label_%08X; /* resolved jmp [r%d] */\n",
                             resolved, insn->reg1);
-                } else if (find_func_by_addr(ctx, resolved) >= 0) {
-                    /* Target is a known function head: tail call. */
-                    fprintf(out, "    vb_func_%08X(); return; /* resolved tail call */\n", resolved);
                 } else {
-                    /* Unknown cross-function target with no local label: a
-                     * goto here would reference an undefined label, so bail. */
-                    fprintf(out, "    return; /* resolved jmp to 0x%08X (no local label) */\n", resolved);
+                    /* Cross-function computed target: dispatch through the
+                     * runtime table by address rather than emitting a direct
+                     * symbol reference. A direct `vb_func_X()` would fail to
+                     * link when X is a phantom entry that was never emitted --
+                     * e.g. a jump into the MIDDLE of another function (its head
+                     * is elsewhere, so no standalone body exists), or an
+                     * unconfirmed callee that got no stub. The table normalizes
+                     * ROM mirrors and no-ops on an unknown address, while still
+                     * reaching real heads (the reset-vector entry included). */
+                    fprintf(out, "    vb_recomp_call(0x%08Xu); return; /* resolved jmp -> dispatch */\n",
+                            resolved);
                 }
             } else {
                 /* Unresolved at compile time: dispatch through the runtime
