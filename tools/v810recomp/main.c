@@ -167,12 +167,15 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
         uint32_t rom_off = (vectors[v].cpu_addr & 0x07FFFFFF) - ctx->rom_base;
         if (rom_off >= ctx->rom_size) continue;
 
-        /* Check if the vector area is all 0xFF (unused) */
-        bool all_ff = true;
+        /* Skip unused vectors: all 0xFF (erased flash) or all 0x00. Registering
+         * a stub over filler would create a "handler" that never executes RETI,
+         * so the runtime would set EP and never clear it -> deadlock. */
+        bool all_ff = true, all_zero = true;
         for (int i = 0; i < 16 && rom_off + i < ctx->rom_size; i++) {
-            if (ctx->rom[rom_off + i] != 0xFF) { all_ff = false; break; }
+            if (ctx->rom[rom_off + i] != 0xFF) all_ff = false;
+            if (ctx->rom[rom_off + i] != 0x00) all_zero = false;
         }
-        if (all_ff) {
+        if (all_ff || all_zero) {
             printf("  IRQ %d (%s): unused\n", vectors[v].level, vectors[v].name);
             continue;
         }
@@ -218,22 +221,26 @@ static void find_interrupt_handlers(v810_ctx_t *ctx) {
             }
         }
 
+        /* Always register the vector STUB itself as the interrupt handler (not
+         * the jump target). The stub pushes registers (add -4,r3; st.w rX,0[r3])
+         * before jumping to the real handler, and the handler's epilogue pops
+         * them; calling the target directly would skip the push and leak stack.
+         * Crucially, we register the stub even when we could NOT pre-resolve the
+         * target above: a stub that pushes several registers puts its jmp past
+         * the 16-byte decode window, so the old code found nothing and left the
+         * IRQ with NO handler -- the runtime then accepted a phantom interrupt
+         * it could never RETI from and deadlocked. Function analysis traces the
+         * stub's pushes + computed jmp and discovers the real handler anyway. */
+        int sidx = v810_ctx_add_func(ctx, vectors[v].cpu_addr, true, vectors[v].level);
+        if (sidx >= 0) ctx->funcs[sidx].confirmed = true;
         if (found) {
-            /* Register the vector STUB itself as the interrupt handler, not the
-             * jump target. The stub pushes a register (add -4,r3; st.w rX,0[r3])
-             * before jumping to the real handler, and the handler's epilogue
-             * pops it. Calling the target directly skips that push, so the
-             * handler's pop leaks 4 bytes of stack per interrupt. The stub's
-             * resolved jmp tail-calls the target, which we also confirm so it
-             * gets emitted. */
             printf("  IRQ %d (%s): stub 0x%08X -> handler 0x%08X\n",
                    vectors[v].level, vectors[v].name, vectors[v].cpu_addr, target);
-            int sidx = v810_ctx_add_func(ctx, vectors[v].cpu_addr, true, vectors[v].level);
-            if (sidx >= 0) ctx->funcs[sidx].confirmed = true;
             int tidx = v810_ctx_add_func(ctx, target, false, -1);
             if (tidx >= 0) ctx->funcs[tidx].confirmed = true;
         } else {
-            printf("  IRQ %d (%s): could not decode stub\n", vectors[v].level, vectors[v].name);
+            printf("  IRQ %d (%s): stub 0x%08X (handler resolved by analysis)\n",
+                   vectors[v].level, vectors[v].name, vectors[v].cpu_addr);
         }
     }
 }
