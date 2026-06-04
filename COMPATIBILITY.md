@@ -13,18 +13,18 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | 3-D Tetris (USA) | 1024 | 743 | yes | no | - | no | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 33 | yes | no | yes | wip | no | First pixels on screen; boots through 4-state dispatch, settles ~frame 527 |
 | Golf (USA) | 2048 | 67 | yes | no | - | no | - |  |
-| Insmouth no Yakata (Japan) | 1024 | 144 | yes | no | - | no | - |  |
+| Insmouth no Yakata (Japan) | 1024 | 190 | yes | no | - | no | - |  |
 | Jack Bros. (USA) | 1024 | 30 | yes | no | - | no | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 30 | yes | no | - | no | - |  |
 | Mario Clash (Japan, USA) (En) | 1024 | 792 | yes | no | yes | wip | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
 | Mario's Tennis (Japan, USA) (En) | 512 | 210 | yes | no | yes | wip | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
 | Nester's Funky Bowling (USA) | 2048 | 191 | yes | no | yes | yes | - |  |
 | Panic Bomber (USA) | 512 | 193 | yes | no | yes | yes | - |  |
-| Red Alarm (Japan) | 1024 | 224 | yes | no | yes | yes | - |  |
-| Red Alarm (USA) | 1024 | 224 | yes | no | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
+| Red Alarm (Japan) | 1024 | 259 | yes | no | yes | yes | - |  |
+| Red Alarm (USA) | 1024 | 259 | yes | no | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 232 | yes | no | yes | yes | - |  |
 | Space Invaders - Virtual Collection (Japan) | 512 | 47 | yes | no | - | no | - |  |
-| Space Squash (Japan) | 512 | 3 | yes | no | - | no | - |  |
+| Space Squash (Japan) | 512 | 148 | yes | no | yes | wip | - |  |
 | T&E Virtual Golf (Japan) | 2048 | 68 | yes | no | - | no | - |  |
 | Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | no | yes | wip | - |  |
 | Tobidase! Panibon (Japan) | 512 | 193 | yes | no | yes | yes | - |  |
@@ -32,18 +32,18 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Vertical Force (USA) | 1024 | 106 | yes | no | - | no | - |  |
 | Virtual Bowling (Japan) | 1024 | 255 | yes | no | - | no | - |  |
 | Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3026 | yes | no | - | no | - |  |
-| Virtual Fishing (Japan) | 1024 | 23 | yes | no | - | no | - |  |
+| Virtual Fishing (Japan) | 1024 | 66 | yes | no | - | no | - |  |
 | Virtual Lab (Japan) | 1024 | 208 | yes | no | - | no | - |  |
 | Virtual League Baseball (USA) | 1024 | 80 | yes | no | yes | yes | - |  |
 | Virtual Pro Yakyuu '95 (Japan) | 1024 | 75 | yes | no | yes | yes | - |  |
 | V-Tetris (Japan) | 512 | 160 | yes | no | yes | yes | - |  |
-| Waterworld (USA) | 2048 | 87 | yes | no | yes | yes | - |  |
+| Waterworld (USA) | 2048 | 108 | yes | no | yes | yes | - |  |
 
 ## Proto / Demo (3)
 
 | Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Playable | Notes |
 |------|----|-------|------------|----------|-------|---------|----------|-------|
-| Bound High (Japan) (En) (Proto) | 2048 | 321 | yes | no | - | no | - |  |
+| Bound High (Japan) (En) (Proto) | 2048 | 437 | yes | no | yes | yes | - |  |
 | Niko-chan Battle (Japan) (Proto) | 1024 | 346 | yes | no | - | no | - |  |
 | Space Pinball (Japan) (En) (Proto) | 2048 | 35 | yes | no | - | no | - |  |
 
