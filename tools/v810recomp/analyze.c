@@ -468,20 +468,36 @@ void v810_analyze(v810_ctx_t *ctx) {
                 if (!v810_decode(ctx->rom, off, ctx->rom_size, &insns[0])) break;
                 insns[0].addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
 
-                /* Check for LD.W disp[r], rZ followed by JMP [rZ] */
+                /* Check for LD.W disp[r], rZ ... JMP [rZ]. The JMP need not be
+                 * the very next instruction: a state-machine dispatch commonly
+                 * loads the continuation into r31 (movhi/movea) between the
+                 * table load and the jmp. Scan a short window forward for the
+                 * JMP on the loaded register, stopping if that register is
+                 * overwritten or control flow leaves first. */
                 if (insns[0].opcode == 0x33 && /* LD.W */
                     off + insns[0].size + 2 <= ctx->rom_size) {
 
-                    uint32_t next_off = off + insns[0].size;
-                    if (!v810_decode(ctx->rom, next_off, ctx->rom_size, &insns[1])) {
-                        off += insns[0].size;
-                        continue;
+                    uint8_t tbl_reg = insns[0].reg2;
+                    uint32_t joff = off + insns[0].size;
+                    bool found_jmp = false;
+                    for (int step = 0; step < 5 && joff + 2 <= ctx->rom_size; step++) {
+                        v810_insn_t ji;
+                        if (!v810_decode(ctx->rom, joff, ctx->rom_size, &ji)) break;
+                        ji.addr = ROM_OFF_TO_ADDR(joff, ctx->rom_base);
+                        if (ji.opcode == 0x06 && ji.reg1 == tbl_reg && ji.reg1 != 31) {
+                            insns[1] = ji;
+                            found_jmp = true;
+                            break;
+                        }
+                        /* Stop at any control-flow change or a write that would
+                         * clobber the table-target register. */
+                        if (ji.opcode == 0x06 || ji.opcode == 0x2A ||
+                            ji.opcode == 0x2B || ji.opcode == 0x04) break;
+                        if (ji.reg2 == tbl_reg) break;
+                        joff += ji.size;
                     }
-                    insns[1].addr = ROM_OFF_TO_ADDR(next_off, ctx->rom_base);
 
-                    if (insns[1].opcode == 0x06 && /* JMP [reg] */
-                        insns[1].reg1 == insns[0].reg2 && /* Same register */
-                        insns[1].reg1 != 31) {
+                    if (found_jmp) {
 
                         /* We found a LD.W + JMP pattern!
                          * Now look backwards for MOVHI to compute table base.
@@ -510,8 +526,11 @@ void v810_analyze(v810_ctx_t *ctx) {
                             /* Convert table address to ROM offset.
                              * The table base has the SHL'd index baked in at runtime,
                              * but for table_base we use the base without index (index=0). */
-                            uint32_t tbl_cpu = table_base;
-                            if (tbl_cpu >= 0x08000000) tbl_cpu &= 0x07FFFFFF;
+                            /* Normalize ROM mirrors: the table base is often a
+                             * low mirror (e.g. 0x0703DEE4 for a 512K ROM keyed
+                             * at 0x07F80000). Without this it fails the range
+                             * check and the whole table is missed. */
+                            uint32_t tbl_cpu = v810_normalize_rom_addr(ctx, table_base);
 
                             if (tbl_cpu >= ctx->rom_base && tbl_cpu < ROM_REGION_END) {
                                 uint32_t tbl_off = tbl_cpu - ctx->rom_base;
@@ -527,10 +546,13 @@ void v810_analyze(v810_ctx_t *ctx) {
                                     const uint8_t *ep = ctx->rom + tbl_off + e * 4;
                                     uint32_t entry = ((uint16_t)ep[0] | ((uint16_t)ep[1] << 8))
                                                    | (((uint32_t)ep[2] | ((uint32_t)ep[3] << 8)) << 16);
-                                    uint32_t mapped = entry;
-                                    if (mapped >= 0x08000000) mapped &= 0x07FFFFFF;
+                                    if (entry & 1) break; /* Unaligned = end of table */
+                                    /* Normalize mirrors so low-mirror entries
+                                     * (e.g. 0x07024C64) map to the canonical
+                                     * function key (0x07FA4C64) instead of being
+                                     * rejected as out-of-range. */
+                                    uint32_t mapped = v810_normalize_rom_addr(ctx, entry);
                                     if (mapped < ctx->rom_base || mapped >= ROM_REGION_END) break;
-                                    if (mapped & 1) break; /* Unaligned = end of table */
                                     raw_targets[n] = entry;
                                     targets[n] = mapped;
                                     n++;
