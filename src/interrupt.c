@@ -163,6 +163,17 @@ void vb_interrupt_check(void) {
          * waits on VIP from a raised interrupt level (e.g. Waterworld). */
         if (i < current_level) continue;
 
+        /* No handler registered for this level: acknowledge and move on WITHOUT
+         * touching PSW. Setting EP/ID here with nothing to run+RETI wedges the
+         * CPU -- EP stays set forever, so every subsequent interrupt is blocked
+         * and the game deadlocks (it accepted a phantom interrupt it can never
+         * return from). This happens when the recompiler didn't discover the
+         * game's handlers (vb_recomp_init_handlers empty). */
+        if (!handlers[i]) {
+            pending &= ~(1u << i);
+            continue;
+        }
+
         /* Accept the interrupt */
         pending &= ~(1u << i);
 
