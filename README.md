@@ -59,10 +59,16 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 ## Status
 
 - **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
-- A **generic driver** (`games/driver/main.c`) boots any game with no game-specific code: the recompiler emits the discovered interrupt handlers + reset, and the driver wires them up. Mario Clash boots through it (programs the VIP, advances frames) with zero hand-written glue.
-- Games needing custom boot/dispatch get a hand-written `src/main.c`: **Mario's Tennis** (demo mode runs), **Red Alarm** (boots to title, framebuffer WIP), **Galactic Pinball** (first pixels on screen).
+- **27 / 76 games render on screen** through the **generic driver** (`games/driver/main.c`) — no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Among the renderers: Red Alarm (both regions), Mario Clash, Teleroboxer, Panic Bomber, V-Tetris, SD Gundam, Nester's Funky Bowling, Waterworld, Virtual League Baseball, Bound High, and a dozen homebrew titles (Ballface, Hamburgers, 3D Crosswords, BLOX, Fishbone, …).
+- That count came from a focused hardening pass that found **eight shared correctness bugs** in the recompiler/runtime — each fix unblocked a whole class of games at once. Highlights:
+  - **ROM-mirror jump normalization** — reset vectors built as low-mirror (`movhi 0x0700`) or `jmp [r31]` computed jumps were mistaken for returns, so the entry never ran (dead boot, SP=0). Fixing both took the most games from "boots dead" to "boots."
+  - **VIP status-register phase cycling** (DPSTTS/XPSTTS) — games poll these for a specific display/drawing phase; cycling through each phase (instead of a 2-state toggle) lets their frame-sync loops terminate.
+  - **V810 interrupt-priority masking** was inverted (it masked the high-priority VIP interrupt whenever a game raised `PSW.I`); fixed to accept `level ≥ PSW.I`.
+  - **State-machine jump-table detection** — the ubiquitous `ld.w table[idx]; … jmp [rN]` dispatch (with the continuation loaded into `r31` between) and low-mirror table entries are now resolved, so game main-loop state machines dispatch correctly.
+  - **Interrupt-handler discovery** for push-prologue vector stubs, plus a runtime guard so a missing handler can't wedge the CPU with `EP` stuck set.
+- A reusable **`rename` recompiler hint** lets a hand-written `src/main.c` intercept specific functions (HLE), used by the **Red Alarm** and **Mario's Tennis** custom drivers.
 
-Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md).
+Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md). Detailed fix notes: [`docs/RECOMPILER.md`](docs/RECOMPILER.md).
 
 ## Building & running
 
