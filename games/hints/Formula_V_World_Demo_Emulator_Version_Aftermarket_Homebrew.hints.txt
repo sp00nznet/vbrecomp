@@ -1,3 +1,16 @@
 # Profile-guided entry points for Formula V (World) (Demo) (Emulator Version) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07C2C064
+entry 07C4C56C
+entry 07C5DE04
+entry 07C3D8B4
+entry 07C34E18
+entry 0500010A
+entry 07C2C114
+entry 07C3902C
+entry 07C3908C
+entry 06000B1C
+entry 07C38DEC
+entry 07C519AE
+entry 06000B20

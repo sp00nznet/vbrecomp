@@ -1,3 +1,20 @@
 # Profile-guided entry points for Jack Bros. (USA).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F00688
+entry 07F00674
+entry 07F00678
+entry 07F001AE
+entry 07F0021A
+entry 07F20000
+entry 07F0213A
+entry 07F000AE
+entry 07F20046
+entry 07F00CB8
+entry 07F000AA
+entry 07F200E4
+entry 07F00CE0
+entry 07F03C34
+entry 07F03C3C
+entry 07F03CC4
+entry 00030002

@@ -1,3 +1,23 @@
 # Profile-guided entry points for SPONG (World) (En,Fr,De,Es) (Demo) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E07B24
+entry 07E1AEE0
+entry 07E07B36
+entry 07E07BD4
+entry 07E08054
+entry 07E3FBFC
+entry 07E3FCD8
+entry 07E0800C
+entry 07E00A5C
+entry 07E066D0
+entry 07E06AB4
+entry 07E0836C
+entry 07E00014
+entry 07E0B8A8
+entry 07E0C184
+entry 07E32E70
+entry 07E0D8EA
+entry 07E0832E
+entry 05003F20
+entry 01000000

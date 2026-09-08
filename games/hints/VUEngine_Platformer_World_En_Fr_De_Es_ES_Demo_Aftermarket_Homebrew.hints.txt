@@ -1,3 +1,16 @@
 # Profile-guided entry points for VUEngine Platformer (World) (En,Fr,De,Es-ES) (Demo) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E115DA
+entry 07E261B0
+entry 07F11680
+entry 07E115EC
+entry 07E000AC
+entry 07E11B04
+entry 07E49DAC
+entry 07E000A2
+entry 07E4CE34
+entry 07E11ABC
+entry 07E4D220
+entry 07E00040
+entry 07E3D30C

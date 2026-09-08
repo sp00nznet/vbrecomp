@@ -1,3 +1,20 @@
 # Profile-guided entry points for Jack Bros. no Meiro de Hiihoo! (Japan).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F00674
+entry 07F00660
+entry 07F00664
+entry 07F0019A
+entry 07F00206
+entry 07F20000
+entry 07F02122
+entry 07F20046
+entry 07F2081E
+entry 07F00CA4
+entry 07F000AA
+entry 07F200E4
+entry 07F00CCC
+entry 07F03C1C
+entry 07F03C24
+entry 07F03CAC
+entry 00030002

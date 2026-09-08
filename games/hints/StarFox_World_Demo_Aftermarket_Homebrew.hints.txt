@@ -36,3 +36,15 @@ entry 07FE46C2
 entry 07FE4874
 entry 07FE4892
 entry 07FE48B0
+entry 07FE48CE
+entry 07FE48EC
+entry 07FE490A
+entry 07FE4928
+entry 07FE4946
+entry 07FE4964
+entry 07FE4982
+entry 07FE3972
+entry 07FE3982
+entry 07FE49A6
+entry 07FE4A90
+entry 07FE4ABC

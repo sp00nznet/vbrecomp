@@ -4,3 +4,8 @@
 entry 07F000AC
 entry 07F42D44
 entry 07F5168C
+entry 07F4026E
+entry 07F40286
+entry 07F4027E
+entry 07F4028A
+entry 07F40282

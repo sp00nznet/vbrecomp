@@ -1,3 +1,22 @@
 # Profile-guided entry points for Snatcher (World) (Demo) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E026FE
+entry 07E02712
+entry 07E02726
+entry 07E02736
+entry 07E02748
+entry 07E025F4
+entry 07E0275A
+entry 07E0277C
+entry 07E0260E
+entry 07E02646
+entry 07E0278C
+entry 07E027B0
+entry 07E02656
+entry 07E17B48
+entry 07E02668
+entry 07E0267A
+entry 07E15602
+entry 07E0268C
+entry 07E15616
