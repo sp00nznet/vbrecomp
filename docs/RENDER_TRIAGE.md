@@ -718,6 +718,36 @@ The ownership array is committed (measured neutral) because it is the
 foundation any real fix here needs, and because the disagreement table above is
 the evidence that the range data was never trustworthy.
 
+### Multi-entry functions: the rule is now exact, and it still does not work
+
+Built on the ownership data, the precise test for "interior label" is two
+conditions, and conformance proves both are needed:
+
+1. `byte_owner[F.addr] == G.addr` -- G actually traced that byte.
+2. G BRANCHES to F.addr -- so G already has a label there.
+
+Ownership alone fails: a function whose first byte was traced by a
+FALL-THROUGH from its neighbour is a real routine, and thunking it breaks
+conformance's `bcond: backward branch loops` in seconds. Adding the branch
+condition restores 77/77 and produces 500 thunks across the corpus.
+
+It is still wrong: advancing 39 -> 32, blank 11 -> 23, with Mario Clash and
+Mario's Tennis going blank. Reverted.
+
+And Galactic Pinball shows why the whole idea is misconceived for its case. The
+thunk for 0x07F000AC is emitted correctly and enters sub_07F00026 at the right
+label -- but entering mid-loop legitimately skips `mov 6, r25`, so every
+external dispatch decrements the counter again. After six of them r25 goes
+negative (observed 0xFFFFFF9F) and the inner loop runs four billion times. The
+dispatches themselves are the artifact; making them land correctly does not
+help, because they should not be happening at all. sub_07F000B4 -- the
+duplicate that transfers back into the loop -- is reached by fall-through, not
+by a branch, so no version of this rule removes it.
+
+What is actually needed is per-EDGE data: for each address, whether anything
+outside the function targets it. The analyzer records neither in-edges nor
+their origins. That is the change to make before this class is attempted again.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
