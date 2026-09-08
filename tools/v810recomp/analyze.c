@@ -796,6 +796,34 @@ void v810_analyze(v810_ctx_t *ctx) {
         }
     }
 
+    /* How much of the jump-table graph confirmation actually reached. A table
+     * whose targets stay unconfirmed is emitted as a set of do-nothing stubs,
+     * i.e. a game state machine that silently does nothing when dispatched.
+     * Jack Bros: 7 tables, NOT ONE in a confirmed function, 221 targets all
+     * unconfirmed. Waterworld: 12 tables, 162 targets, all confirmed.
+     *
+     * Confirming them unconditionally is NOT the fix -- measured, it is +2
+     * advancing but it destroys Space Squash (4,914 drawn pixels -> 4), which
+     * is a net loss. Distinguishing a real dispatch table from bytes that
+     * merely decode like one is the open problem; this line measures it. */
+    {
+        int owned = 0, unowned = 0, tconf = 0, tunconf = 0;
+        for (int jt = 0; jt < ctx->num_jump_tables; jt++) {
+            uint32_t ja = ctx->jump_tables[jt].jmp_addr;
+            bool oc = false;
+            for (int k = 0; k < ctx->num_funcs && !oc; k++)
+                if (ja >= ctx->funcs[k].addr && ja < ctx->funcs[k].end_addr
+                    && ctx->funcs[k].confirmed) oc = true;
+            if (oc) owned++; else unowned++;
+            for (int e = 0; e < ctx->jump_tables[jt].num_entries; e++) {
+                int idx = find_func(ctx, ctx->jump_tables[jt].targets[e]);
+                if (idx >= 0 && ctx->funcs[idx].confirmed) tconf++; else tunconf++;
+            }
+        }
+        fprintf(stderr, "jump tables: %d (owner confirmed %d, not %d); "
+                        "targets confirmed %d, not %d\n",
+                ctx->num_jump_tables, owned, unowned, tconf, tunconf);
+    }
     /* The confirm pass can add entries; analyse them or they emit as stubs. */
     {
         bool progress2 = true;
