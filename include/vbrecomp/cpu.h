@@ -92,6 +92,9 @@ extern uint32_t vb_recomp_tail_target;
  * with unrelated state. */
 void vb_recomp_drain(void);
 
+/* Depth trace: see vb_recomp_deep in cpu.c. */
+void vb_recomp_deep(uint32_t addr, int depth);
+
 /* Bit string op (opcode 0x1F): copies r28 bits from bit r30 of [r26] to bit
  * r29 of [r27], combining with the destination per `op` (VB_BSU_*). */
 void vb_bitstring(int op);
