@@ -293,7 +293,15 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             for (int i = 0; i < insn.size; i++) {
                 if (offset + i < ctx->rom_size) {
                     ctx->code_map[offset + i] = 'C';
-                    if (!ctx->byte_owner[offset + i])
+                    /* Prefer the CONTAINER, not whoever got here first. An
+                     * interior function analysed before the function that
+                     * contains it would otherwise claim its own bytes and
+                     * report as top-level -- Null Pointer Mockup's
+                     * sub_07F93942 sits inside sub_07F93920 and was invisible
+                     * to the interior-entry table for exactly that reason. The
+                     * container starts earlier, so the lower address wins. */
+                    if (!ctx->byte_owner[offset + i]
+                        || func->addr < ctx->byte_owner[offset + i])
                         ctx->byte_owner[offset + i] = func->addr;
                 }
             }
