@@ -194,6 +194,11 @@ void vb_vip_init(void) {
 }
 
 /* Register access (0x5F800 - 0x5FFFF) */
+/* The VIP's register block is 0x80 bytes and MIRRORS through the rest of
+ * 0x0005F800-0x0005FFFF. Decoding the raw offset meant every access through a
+ * mirror missed its register and read back 0 -- Null Pointer Mockup reads
+ * 0x0005FDD2, the mirror of offset 0x52. Mask to 0x7E (the block, halfword
+ * aligned) at every dispatch site. */
 static inline bool is_reg_addr(vb_addr_t addr) {
     return addr >= VB_VIP_REG_BASE && addr < 0x60000;
 }
@@ -276,7 +281,20 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_JPLT2:   return reg_jplt[2];
     case VB_VIP_JPLT3:   return reg_jplt[3];
     case VB_VIP_BKCOL:   return reg_bkcol;
-    default:             return 0;
+    default:
+        /* An unimplemented VIP register reads back 0, and 0 is a real value a
+         * game can spin on -- VER returning 0 instead of 2 cost Hyper Fighting
+         * (Beta) its entire boot. Report the ones a game actually reads. */
+        if (getenv("VBRECOMP_HEARTBEAT")) {
+            static uint16_t seen[64]; static int nseen;
+            int k = 0;
+            for (; k < nseen; k++) if (seen[k] == offset) break;
+            if (k == nseen && nseen < 64) {
+                seen[nseen++] = (uint16_t)offset;
+                fprintf(stderr, "VIP: unimplemented register read at 0x0005F8%02X\n", offset);
+            }
+        }
+        return 0;
     }
 }
 
@@ -338,7 +356,7 @@ static void reg_write(vb_addr_t offset, uint16_t val) {
 
 uint8_t vb_vip_read8(vb_addr_t addr) {
     if (is_reg_addr(addr)) {
-        uint16_t val = reg_read((addr - VB_VIP_REG_BASE) & ~1);
+        uint16_t val = reg_read((addr - VB_VIP_REG_BASE) & 0x7E);
         return (addr & 1) ? (uint8_t)(val >> 8) : (uint8_t)(val);
     }
     if (is_vram_addr(addr)) {
@@ -350,7 +368,7 @@ uint8_t vb_vip_read8(vb_addr_t addr) {
 
 uint16_t vb_vip_read16(vb_addr_t addr) {
     if (is_reg_addr(addr)) {
-        return reg_read((addr - VB_VIP_REG_BASE) & ~1);
+        return reg_read((addr - VB_VIP_REG_BASE) & 0x7E);
     }
     if (is_vram_addr(addr)) {
         uint32_t off = vip_map_addr(addr);
@@ -387,7 +405,7 @@ void vb_vip_write8(vb_addr_t addr, uint8_t val) {
     }
     if (is_reg_addr(addr)) {
         /* Byte write to register: read-modify-write the 16-bit register */
-        uint16_t offset = (addr - VB_VIP_REG_BASE) & ~1;
+        uint16_t offset = (addr - VB_VIP_REG_BASE) & 0x7E;
         uint16_t cur = reg_read(offset);
         if (addr & 1) {
             cur = (cur & 0x00FF) | ((uint16_t)val << 8);
@@ -416,7 +434,7 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
         }
     }
     if (is_reg_addr(addr)) {
-        reg_write((addr - VB_VIP_REG_BASE) & ~1, val);
+        reg_write((addr - VB_VIP_REG_BASE) & 0x7E, val);
         return;
     }
     if (is_vram_addr(addr)) {
