@@ -27,8 +27,9 @@ what used to make this survey disagree with `build_all.ps1`.
 "Renders something" is 65/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
 not running. **Advancing** is the number to drive. Five of the 11 blanks
-(Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
-denominator is 73.
+(Snowball Wars 1-3, Capitan Sevilla 3D, Null Pointer Mockup) draw nothing on
+real hardware either, measured with and without input, so the honest denominator
+is 71.
 
 ## Categories
 
@@ -979,7 +980,7 @@ why our control reaches that jump post-boot at all.
 
 ## Re-verified on hardware: which of the blanks actually draw
 
-The "honest denominator is 73" claim rests on the three Snowball Wars demos
+The earlier "denominator is 73" claim rested on the three Snowball Wars demos
 being blank on real hardware. That was measured in an earlier session, so it was
 re-run, and the same check was applied to the rest of the blank set. All figures
 are `drawcheck.lua`, 600 frames, **no input**:
