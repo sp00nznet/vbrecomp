@@ -670,6 +670,20 @@ void v810_analyze(v810_ctx_t *ctx) {
                         uint32_t target = insn.addr + insn.imm;
                         if (target >= 0x08000000) target &= 0x07FFFFFF;
                         int idx = find_func(ctx, target);
+                        if (idx < 0 && (target < ctx->funcs[i].addr
+                                     || target >= ctx->funcs[i].end_addr)) {
+                            /* A branch or jump that LEAVES this function needs
+                             * an entry to land on: the emitter parks such a
+                             * target for vb_recomp_drain(), which dispatches it
+                             * by address, and that only works if the address is
+                             * in the table. A backward target lands inside an
+                             * existing function; the new entry overlaps it,
+                             * costing duplicated code -- which is what makes a
+                             * dispatcher reachable from the state handler that
+                             * jumps back to it. */
+                            idx = v810_ctx_add_func(ctx, target, false, -1);
+                            if (idx >= 0) changed = true;
+                        }
                         if (idx >= 0 && !ctx->funcs[idx].confirmed) {
                             ctx->funcs[idx].confirmed = true;
                             changed = true;
@@ -677,6 +691,17 @@ void v810_analyze(v810_ctx_t *ctx) {
                     }
                     off += insn.size;
                 }
+            }
+        }
+    }
+
+    /* The confirm pass can add entries; analyse them or they emit as stubs. */
+    {
+        bool progress2 = true;
+        while (progress2) {
+            progress2 = false;
+            for (int i = 0; i < ctx->num_funcs; i++) {
+                if (!ctx->funcs[i].visited) { analyze_func(ctx, i); progress2 = true; }
             }
         }
     }

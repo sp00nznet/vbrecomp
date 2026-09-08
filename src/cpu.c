@@ -10,6 +10,9 @@
 
 vb_cpu_state_t vb_cpu;
 
+/* Pending tail jump; see cpu.h. */
+uint32_t vb_recomp_tail_target;
+
 void vb_cpu_init(void) {
     memset(&vb_cpu, 0, sizeof(vb_cpu));
     /* r0 is always zero - enforced by convention */

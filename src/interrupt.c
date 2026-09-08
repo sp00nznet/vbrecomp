@@ -216,6 +216,9 @@ void vb_interrupt_check(void) {
             }
             uint32_t sp_before = vb_cpu.r[3];
             handlers[i]();
+            /* A handler that ends in a jump parks its target; drain it here, or
+             * the transfer fires later at an unrelated call site. */
+            vb_recomp_drain();
             if (vb_cpu.r[3] != sp_before) {
                 static int leak_log[MAX_INT_LEVELS] = {0};
                 if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)

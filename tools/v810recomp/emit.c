@@ -172,14 +172,15 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                         if (ctx->jump_tables[jt_idx].raw_targets[p] == raw) { dup = true; break; }
                     }
                     if (!dup) {
-                        fprintf(out, "    case 0x%08Xu: vb_func_%08X(); break;\n", raw, mapped);
+                        fprintf(out, "    case 0x%08Xu: VB_JUMP(0x%08Xu);\n", raw, mapped);
                     }
                 }
-                fprintf(out, "    default: break; /* unhandled */\n");
+                fprintf(out, "    default: vb_recomp_stub(%s); return;\n", r1);
                 fprintf(out, "    }\n");
-                /* After dispatch, the stub JR's back to the calling loop.
-                 * Since the stub returns to us, continue to next instruction
-                 * (fall through, don't return). */
+                /* A table dispatch is a JUMP, not a call: every case transfers.
+                 * Calling the handler instead nests a frame per iteration, and
+                 * the game main loop it sits in runs forever -- Mario Clash
+                 * dies partway through a run that way. */
                 break;
             }
             uint32_t resolved = lookup_resolved_jump(ctx, insn->addr);
@@ -200,14 +201,14 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                      * unconfirmed callee that got no stub. The table normalizes
                      * ROM mirrors and no-ops on an unknown address, while still
                      * reaching real heads (the reset-vector entry included). */
-                    fprintf(out, "    vb_recomp_call(0x%08Xu); return; /* resolved jmp -> dispatch */\n",
+                    fprintf(out, "    VB_JUMP(0x%08Xu); /* resolved jmp */\n",
                             resolved);
                 }
             } else {
                 /* Unresolved at compile time: dispatch through the runtime
                  * function table by the register's value (tail call). */
                 fprintf(out, "    vb_cpu.pc = %s & 0xFFFFFFFE;\n", r1);
-                fprintf(out, "    vb_recomp_call(vb_cpu.pc); return; /* indirect jump [%s] */\n", r1);
+                fprintf(out, "    VB_JUMP(vb_cpu.pc); /* indirect jump [%s] */\n", r1);
             }
         }
         break;
@@ -386,17 +387,17 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
             } else if (find_func_by_addr(ctx, target) >= 0) {
                 /* Branch to a known function = conditional tail call */
                 if (insn->cond == 0x05) {
-                    fprintf(out, "    vb_func_%08X(); return;\n", target);
+                    fprintf(out, "    VB_JUMP(0x%08Xu);\n", target);
                 } else {
-                    fprintf(out, "    if (%s) { vb_func_%08X(); return; }\n",
+                    fprintf(out, "    if (%s) { VB_JUMP(0x%08Xu); }\n",
                             cond_expr[insn->cond], target);
                 }
             } else {
                 /* External branch to unknown code */
                 if (insn->cond == 0x05) {
-                    fprintf(out, "    return; /* branch to 0x%08X outside function */\n", target);
+                    fprintf(out, "    VB_JUMP(0x%08Xu); /* out of function */\n", target);
                 } else {
-                    fprintf(out, "    if (%s) return; /* branch to 0x%08X */\n",
+                    fprintf(out, "    if (%s) { VB_JUMP(0x%08Xu); }\n",
                             cond_expr[insn->cond], target);
                 }
             }
@@ -409,13 +410,11 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         uint32_t target = insn->addr + insn->imm;
         if (emit_labels && label_set_has(emit_labels, target)) {
             fprintf(out, "    goto label_%08X;\n", target);
-        } else if (find_func_by_addr(ctx, target) >= 0) {
-            fprintf(out, "    vb_func_%08X(); return; /* tail call */\n", target);
         } else {
-            /* External JR to unknown code — likely shared prologue or
-             * code above function start. Emit as unresolved return. */
-            fprintf(out, "    /* WARNING: JR to 0x%08X outside function */\n", target);
-            fprintf(out, "    return;\n");
+            /* A JR out of the function is a TRANSFER. Park it for the caller's
+             * drain rather than calling it (unbounded recursion once a main-loop
+             * cycle runs through here) or returning (drops the loop entirely). */
+            fprintf(out, "    VB_JUMP(0x%08Xu); /* jr */\n", target);
         }
         break;
     }
@@ -431,9 +430,9 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         uint32_t nt = target;
         if (nt >= 0x08000000) nt &= 0x07FFFFFF;
         if (nt >= ctx->rom_base && nt < ROM_REGION_END) {
-            fprintf(out, "    vb_func_%08X();\n", nt);
+            fprintf(out, "    VB_CALL(vb_func_%08X);\n", nt);
         } else {
-            fprintf(out, "    vb_recomp_call(0x%08Xu);\n", target);
+            fprintf(out, "    vb_recomp_call(0x%08Xu); vb_recomp_drain();\n", target);
         }
         if (skip > 0) {
             fprintf(out, "    /* skip %u bytes of inline data after JAL */\n", skip);
@@ -835,6 +834,23 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     /* Runtime dispatch for indirect jumps the static analysis can't resolve;
      * defined at the bottom of this file. */
     fprintf(out, "void vb_recomp_call(uint32_t addr);\n\n");
+    fprintf(out, "/* Control transfer out of a function.\n");
+    fprintf(out, " *\n");
+    fprintf(out, " * A game main loop is a CYCLE: a state handler ends by jumping back to\n");
+    fprintf(out, " * its dispatcher. Emitting that jump as a call is unbounded mutual\n");
+    fprintf(out, " * recursion; emitting it as a return drops the loop and the boot unwinds\n");
+    fprintf(out, " * after one state. So a jump parks its target and returns, and every CALL\n");
+    fprintf(out, " * SITE drains the chain -- which runs it to completion BEFORE the caller\n");
+    fprintf(out, " * resumes, keeping ordering right and the stack flat. */\n");
+    fprintf(out, "void vb_recomp_drain(void) {\n");
+    fprintf(out, "    while (vb_recomp_tail_target) {\n");
+    fprintf(out, "        uint32_t t = vb_recomp_tail_target;\n");
+    fprintf(out, "        vb_recomp_tail_target = 0;\n");
+    fprintf(out, "        vb_recomp_call(t);\n");
+    fprintf(out, "    }\n");
+    fprintf(out, "}\n");
+    fprintf(out, "#define VB_CALL(f)  do { (f)(); vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_JUMP(a)  do { vb_recomp_tail_target = (a); return; } while (0)\n\n");
 
     /* Forward declarations (confirmed functions only) */
     for (int i = 0; i < ctx->num_funcs; i++) {
@@ -1053,7 +1069,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         }
         fprintf(out, "}\n");
         fprintf(out, "\n/* Run the reset vector (boots the game). */\n");
-        fprintf(out, "void vb_recomp_boot(void) { vb_func_07FFFFF0(); }\n");
+        fprintf(out, "void vb_recomp_boot(void) { VB_CALL(vb_func_07FFFFF0); }\n");
 
         free(emitted_addrs);
     }
