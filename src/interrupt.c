@@ -26,6 +26,16 @@
 #define MAX_INT_LEVELS 5
 
 static uint32_t pending;  /* Bitmask of pending interrupt levels */
+/* The VIP interrupt line is LEVEL-triggered on INTPND & INTENB: it stays
+ * asserted while any enabled source is still pending. We raise several sources
+ * at once per frame (GAMESTART, XPEND, FBEND...), but a game's handler services
+ * ONE of them and clears only that bit -- so requesting the interrupt once per
+ * frame drops every other source on the floor. Jack Bros' handler took its XPEND
+ * branch every time and reached its GAMESTART branch, which sets the frame flag
+ * its main loop spins on, exactly once in 300 frames. Re-request while sources
+ * remain, bounded so a handler that clears nothing cannot livelock us. */
+static int vip_reentry;
+static int vip_reentry_max = -1;   /* VBRECOMP_VIP_REENTRY, default 8 */
 static vb_int_handler_t handlers[MAX_INT_LEVELS];
 
 /* Frame timing */
@@ -88,6 +98,11 @@ void vb_interrupt_check(void) {
             extern void vb_vip_dump_render_chain(void);
             vb_vip_dump_render_chain();
             vb_recomp_dump_stubs();
+            /* VBRECOMP_TRACE=1: the last functions entered. A game that spins
+             * in one function's wait loop shows only the interrupt chain here;
+             * seeing its per-frame worker appear is what says the loop is
+             * actually being released rather than merely re-armed. */
+            if (getenv("VBRECOMP_TRACE")) vb_recomp_dump_trace();
             /* VBRECOMP_PEEK=<hex>[,<hex>...]: print those addresses as 32-bit
              * words. The hot-read list says which address a stalled game is
              * obsessed with and VBRECOMP_WATCH says who reads it, but neither
@@ -122,6 +137,7 @@ void vb_interrupt_check(void) {
             tick_counter = 0;
 
             /* Advance VIP state (sets interrupt pending flags in INTPND) */
+            vip_reentry = 0;
             vb_vip_frame_advance();
 
             /* Only request VIP interrupt if the game has enabled VIP interrupts.
@@ -210,6 +226,8 @@ void vb_interrupt_check(void) {
         /* Set ECR with interrupt code */
         vb_cpu.sr[VB_SREG_ECR] = 0xFE00 + (i * 0x10);
 
+        uint16_t vip_before = (i == VB_INT_VIP)
+            ? (uint16_t)(vb_mem_read16(0x0005F800) & vb_mem_read16(0x0005F802)) : 0;
         /* Call handler if registered */
         if (handlers[i]) {
             static int int_count[MAX_INT_LEVELS] = {0};
@@ -228,6 +246,21 @@ void vb_interrupt_check(void) {
                 if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)
                     fprintf(stderr, "IRQ %d LEAKED SP: %08X -> %08X (delta %d)\n",
                             i, sp_before, vb_cpu.r[3], (int)(vb_cpu.r[3] - sp_before));
+            }
+        }
+        if (vip_reentry_max < 0) {
+            const char *e = getenv("VBRECOMP_VIP_REENTRY");
+            vip_reentry_max = e ? atoi(e) : 8;
+        }
+        if (i == VB_INT_VIP && vip_reentry < vip_reentry_max) {
+            uint16_t after = vb_mem_read16(0x0005F800) & vb_mem_read16(0x0005F802);
+            /* Only when the handler CLEARED something and sources remain. A
+             * handler that cleared nothing is not servicing sources one at a
+             * time -- re-entering it just runs the same work again, which is
+             * what broke Bound High and Virtual Bowling. */
+            if (after && after != vip_before) {
+                vip_reentry++;
+                vb_interrupt_request(VB_INT_VIP);
             }
         }
         return; /* Handle one interrupt at a time */

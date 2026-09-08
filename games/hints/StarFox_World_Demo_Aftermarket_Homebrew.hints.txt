@@ -2,3 +2,37 @@
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
 entry 0005F870
+entry 07FE64E8
+entry 07FE64F8
+entry 07FE6590
+entry 07FE65A2
+entry 07FE65B4
+entry 07FE5824
+entry 07FE65C6
+entry 07FE583E
+entry 07FE5850
+entry 07FE5860
+entry 07FE5FD0
+entry 07FE5FE2
+entry 07FE0212
+entry 07FE65EA
+entry 07FE0012
+entry 00440000
+entry 07FE38FA
+entry 07FE390A
+entry 07FE46E0
+entry 07FE46FE
+entry 07FE471C
+entry 07FE473A
+entry 07FE4758
+entry 07FE4776
+entry 07FE4794
+entry 07FE47B2
+entry 07FE47D0
+entry 07FE47EE
+entry 07FE47FE
+entry 07FE4846
+entry 07FE46C2
+entry 07FE4874
+entry 07FE4892
+entry 07FE48B0

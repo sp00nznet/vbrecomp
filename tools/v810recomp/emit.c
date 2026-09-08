@@ -433,6 +433,17 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         uint32_t target = insn->addr + insn->imm;
         uint32_t skip = v810_get_skip_bytes(ctx, target);
         fprintf(out, "    vb_cpu.r[31] = 0x%08X;\n", insn->addr + 4 + skip);
+        /* `jal <next instruction>` is not a call: it is the compiler's
+         * PC-capture idiom for a long call --
+         *     jal  .+4        ; r31 = address of the next insn
+         *     add  4, r31     ; r31 = the real return address
+         *     jmp  [rN]       ; tail-jump to the far target
+         * Emitting it as a call runs the following instructions twice (once
+         * inside the callee, once inline after it returns) with r31 already
+         * advanced, which is how StarFox lost control: sub_07FE0300 ran a
+         * second time and returned through a corrupted link register. Setting
+         * r31 and falling through is the whole instruction. */
+        if (target == insn->addr + 4 && skip == 0) break;
         /* Normalize the target the same way declarations/stubs do. An
          * in-ROM target is a direct call; an out-of-ROM one (a mirror or a
          * garbage target from data decoded as JAL) has no emitted function,
@@ -881,7 +892,12 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "    while (vb_recomp_tail_target) {\n");
     fprintf(out, "        uint32_t t = vb_recomp_tail_target;\n");
     fprintf(out, "        vb_recomp_tail_target = 0;\n");
-    fprintf(out, "        vb_recomp_call(t);\n");
+    fprintf(out, "        /* A drained target was JUMPED to, not called: dispatch it\n");
+    fprintf(out, "         * WITHOUT raising the depth, or its own `jmp [r31]` reads as a\n");
+    fprintf(out, "         * return and the transfer chain unwinds instead of continuing\n");
+    fprintf(out, "         * (StarFox boots six frames and stops). The loop is iterative,\n");
+    fprintf(out, "         * so a flat depth costs no stack. */\n");
+    fprintf(out, "        vb_recomp_call_inner(t);\n");
     fprintf(out, "    }\n");
     fprintf(out, "}\n");
     fprintf(out, "/* `jmp [r31]` is a RETURN only when a jal frame is open. A function\n");
