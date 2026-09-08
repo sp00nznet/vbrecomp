@@ -26,7 +26,7 @@ what used to make this survey disagree with `build_all.ps1`.
 
 "Renders something" is 65/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
-not running. **Advancing** is the number to drive. Three of the 11 blanks
+not running. **Advancing** is the number to drive. Five of the 11 blanks
 (Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
 denominator is 73.
 
