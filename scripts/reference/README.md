@@ -1,3 +1,21 @@
+## compare.ps1 -- the whole procedure in one command
+
+```powershell
+./scripts/reference/compare.ps1 -Slug Jack_Bros_USA -RefFrame 90 -OurFrame 202
+```
+
+Dumps hardware WRAM at `-RefFrame`, dumps ours at `-OurFrame`, and prints the
+non-zero counts, the 256-byte pages hardware has content in and we do not, and
+the first differing words. That is exactly the sequence that found Jack Bros'
+task table, Capitan Sevilla 3D's half-built object and Null Pointer Mockup's
+first-global divergence -- typed out by hand each time, which is how the wrong
+memory domain went unnoticed for as long as it did.
+
+The two frame numbers are NOT the same clock: a hardware frame is 20 ms of real
+CPU, ours is `VBRECOMP_FRAME_TICKS` interrupt checks. Pick `-OurFrame` well past
+the point the game has settled and read "hardware has this, we do not" as the
+signal rather than expecting equality.
+
 ﻿# Reference comparison
 
 Every other check here measures vbrecomp against itself. These measure it
