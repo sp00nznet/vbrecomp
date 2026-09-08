@@ -1144,6 +1144,63 @@ Nineteen measured negatives now. The Jack Bros diagnosis stands unchanged and
 is the most complete causal chain in this file; what does not stand is any
 version of acting on it by deleting splits.
 
+## Transfers into a function's interior were silently dropped
+
+`vb_recomp_call_inner` binary-searches the function table for an EXACT match.
+A transfer to an address inside a function -- which is most of what a game
+computes at run time -- misses and is counted as a stub. Mario Clash makes
+**128,699 of them in a 600-frame run**, and all four hot targets are interior
+to a known function:
+
+| target | x/run | |
+|---|---|---|
+| 07FF5898 | 127,714 | interior to sub_07FF588C [07FF588C-07FF5C50] |
+| 07F000B2 | 591 | interior to sub_07F0002A [07F0002A-07F013A0] |
+| 07F00DCC | 197 | interior to sub_07F0002A |
+| 07F00A3E | 197 | interior to sub_07F0002A |
+
+So the recompiler was throwing away a hundred thousand real control transfers
+per run in a game that renders. `vb_interior_owner` does NOT cover this -- it
+only maps confirmed functions whose first byte another function traced, and it
+exists purely to detect re-entry for unwinding.
+
+### The fix, and the two guards it needed
+
+Each function now takes an entry address parked in `vb_recomp_entry` and turns
+it into a `goto` via a dispatch block at the bottom; on a table miss the
+dispatcher hands the address to the greatest function below it. The switch over
+the labels that function actually declared IS the range check, so a bogus
+address still lands on the default and is counted exactly as before.
+
+Two things broke first, and both are worth knowing:
+
+1. **Consume the parked entry BEFORE `vb_interrupt_check()`.** That call can run
+   an entire interrupt handler, and every function it enters would otherwise see
+   the pending transfer's target, fail to match it, and discard it.
+2. **Never route an interior entry while `PSW.EP` is set.** Diverting a handler
+   mid-flight abandons its C frame, so it never reaches RETI and EP stays set
+   forever. Mario Clash wedged exactly that way -- `IRQ 1 LEAKED SP: 0500FFC4 ->
+   0500FFC0 (delta -4)`, the vector stub's single push, then `INT blocked
+   ... EP=1` for the rest of the run and a blank screen.
+
+### And one thing that must NOT be done
+
+Only branch targets are labels, so the 127,714-per-run target is still not
+addressable. Labelling **every instruction boundary** makes it addressable and
+grows Mario Clash's generated C from 492k to 810k lines -- and hangs
+conformance. The stub is a safety net: a computed jump to a garbage or data
+address currently does nothing, and making every byte a valid entry point turns
+those into real execution and an infinite loop. Do not remove that net without
+something else validating the target.
+
+### Measured: neutral, and kept anyway
+
+65 rendering / 11 blank before and after, with the **identical** eleven blanks,
+77/77 conformance, ~3,200 of Mario Clash's dropped transfers now routed. It buys
+no game. It is kept because it removes a real hole in the control-flow model
+rather than because it moved the number, and because any future work on interior
+addresses needs it to exist.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved

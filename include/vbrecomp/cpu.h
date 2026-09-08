@@ -110,6 +110,10 @@ void vb_recomp_stub(uint32_t addr);
  * records itself; dump it when a boot chain ends to see what ran last. */
 extern uint32_t vb_recomp_func_hits;  /* VBRECOMP_COUNT_FUNC entry counter */
 extern uint32_t vb_recomp_pc;   /* address of the last basic block entered */
+/* Target of a transfer INTO the middle of a function. The dispatcher parks
+ * it here and calls the enclosing function, whose entry dispatch turns it
+ * into a goto; zero on every ordinary call. */
+extern uint32_t vb_recomp_entry;
 void vb_recomp_trace(uint32_t addr);
 void vb_recomp_dump_trace(void);
 void vb_recomp_dump_stubs(void);
