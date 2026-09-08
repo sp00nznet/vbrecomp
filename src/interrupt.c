@@ -84,6 +84,22 @@ void vb_interrupt_check(void) {
             extern void vb_vip_dump_render_chain(void);
             vb_vip_dump_render_chain();
             vb_recomp_dump_stubs();
+            /* VBRECOMP_PEEK=<hex>[,<hex>...]: print those addresses as 32-bit
+             * words. The hot-read list says which address a stalled game is
+             * obsessed with and VBRECOMP_WATCH says who reads it, but neither
+             * shows the VALUE -- and for a state-machine variable the value is
+             * the whole question: a state that climbs is a game making
+             * progress, a state that sticks is a handler that never hands off. */
+            {
+                const char *pk = getenv("VBRECOMP_PEEK");
+                while (pk && *pk) {
+                    char *end;
+                    uint32_t a = (uint32_t)strtoul(pk, &end, 16);
+                    if (end == pk) break;
+                    fprintf(stderr, "  peek [%08X] = %08X\n", a, vb_mem_read32(a));
+                    pk = (*end == ',') ? end + 1 : end;
+                }
+            }
         }
     }
 
