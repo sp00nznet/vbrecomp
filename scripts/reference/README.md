@@ -62,7 +62,27 @@ $env:VBRECOMP_WRAM_DUMP="$env:TEMP\ours.bin"; $env:VBRECOMP_WRAM_FRAME="10"
 build_all\games\Release\corpus_<slug>.exe "$rom"
 ```
 
-**Caveat that matters:** the two frame counts are not calibrated. A reference
+### The conversion factor
+
+Measured with Waterworld, which renders correctly on both sides, by finding
+where the two agree on how much WRAM is non-zero:
+
+| | non-zero WRAM bytes |
+|---|---|
+| reference, frame 120 | 320 |
+| vbrecomp, frame 240 | 278 |
+| vbrecomp, frame 480 | 480 |
+
+So reference frame 120 lands near our frame 270: **one hardware frame is roughly
+2.25 of ours**, at the default `VBRECOMP_FRAME_TICKS=20000`. Multiply a
+reference frame number by ~2.25 before comparing state, or raise the tick count
+to about 45,000 to bring the two into step.
+
+Worth knowing: raising the tick count does NOT make the blank games draw — 2000,
+5000, 60000 and 200000 were all swept against all 29, 0 of 29 — so pacing is a
+measurement convenience here, not a fix.
+
+**Caveat that remains:** the two frame counts are not naturally calibrated. A reference
 frame is 20 ms of real CPU; ours is `VBRECOMP_FRAME_TICKS` interrupt checks
 (20,000 by default), and the relationship between them has never been measured.
 So "at frame N" is approximate across the two, and a diff shows *a* divergence
