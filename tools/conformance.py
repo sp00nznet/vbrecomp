@@ -102,8 +102,37 @@ def f7(subop, reg2, reg1):
 RET = f1(0x06, 0, 31)   # jmp [r31] -- the emitter turns this into `return`
 
 
+def jal(from_addr, to_addr):
+    """Format IV: jal disp26, relative to the instruction's own address."""
+    d = (to_addr - from_addr) & 0x03FFFFFF
+    return [(0x2B << 10) | (d >> 16), d & 0xFFFF]
+
+
+def jr(from_addr, to_addr):
+    """Format IV: jr disp26."""
+    d = (to_addr - from_addr) & 0x03FFFFFF
+    return [(0x2A << 10) | (d >> 16), d & 0xFFFF]
+
+
+def bcond(cond, from_addr, to_addr):
+    """Format III: a 9-bit signed displacement from the branch's own address."""
+    d = (to_addr - from_addr) & 0x1FF
+    return [(0x4 << 13) | (cond << 9) | d]
+
+
+# A shared callee for the call/return cases, parked past every case slot and
+# before the interrupt vectors. It adds 5 to r7 and returns; a case that comes
+# back with r7 unchanged either never got there or never got back.
+CALLEE = ROM_BASE + 0xF000
+CALLEE_BODY = None   # filled in below, once f2/f1 exist
+
+
 def Case(name, code, setup, expect, why):
     """One conformance case.
+
+    `code` is a list of halfwords, or a callable taking the body's own base
+    address and returning one -- which is what a PC-relative branch or call
+    needs, since the address is only known once the case is laid out.
 
     setup / expect are {register: value}; expect may also carry "psw", a
     space-separated set of the Z/S/OV/CY flags that must be SET -- every flag
@@ -424,6 +453,49 @@ CASES = [
          {}, {7: 0x00000F00},
          "the N forms invert the SOURCE bit, not the result: a mask-out"),
 
+    # ------------------------------------------------------------- control flow
+    # A wrong condition polarity or a call that never comes back does not crash
+    # -- the game takes the other branch of its state machine and settles into a
+    # loop it never leaves. That is what 42 of the 76 ROMs in the corpus look
+    # like, so these pin the shapes the emitter turns into `goto` and a call.
+    Case("bcond: taken branch skips",
+         lambda a: [*f2(0x10, 7, 1),                  # r7 = 1
+                    *f1(0x03, 7, 0),                  # cmp r0, r7  (1 vs 0)
+                    *bcond(0xA, a + 4, a + 8),        # bnz -> past the next insn
+                    *f2(0x10, 7, 0),                  # r7 = 0 (must be skipped)
+                    *f2(0x11, 7, 5)],                 # r7 += 5
+         {}, {7: 6}, "a taken branch must not fall through to what it jumped over"),
+    Case("bcond: untaken branch falls through",
+         lambda a: [*f2(0x10, 7, 0),
+                    *f1(0x03, 7, 0),                  # cmp r0, r7  (0 vs 0)
+                    *bcond(0xA, a + 4, a + 8),        # bnz -> not taken
+                    *f2(0x10, 7, 9),                  # r7 = 9
+                    *f2(0x11, 7, 1)],
+         {}, {7: 10}, "the inverse: an untaken branch runs the code it guards"),
+    Case("bcond: backward branch loops",
+         lambda a: [*f2(0x10, 7, 0),                  # r7 = 0   (counter)
+                    *f2(0x10, 8, 5),                  # r8 = 5   (remaining)
+                    # loop at a+4:
+                    *f2(0x11, 7, 3),                  # r7 += 3
+                    *f2(0x11, 8, 0x1F),               # r8 -= 1
+                    *f1(0x03, 8, 0),                  # cmp r0, r8
+                    *bcond(0xA, a + 10, a + 4)],      # bnz -> back to the loop
+         {}, {7: 15, 8: 0},
+         "a backward branch is a loop: it must run five times and then stop"),
+    Case("jal: calls and comes back",
+         lambda a: [*f2(0x10, 7, 1),                  # r7 = 1
+                    *jal(a + 2, CALLEE),              # r7 += 5 in the callee
+                    *f2(0x11, 7, 1)],                 # r7 += 1 after returning
+         {}, {7: 7},
+         "the callee runs AND control returns to the instruction after the "
+         "call -- a call that never returns leaves r7 at 6"),
+    Case("jr: unconditional jump forward",
+         lambda a: [*f2(0x10, 7, 1),
+                    *jr(a + 2, a + 8),                # skip the next insn
+                    *f2(0x10, 7, 0),                  # must be skipped
+                    *f2(0x11, 7, 4)],
+         {}, {7: 5}, "jr is a branch with no condition and no link register"),
+
     # ------------------------------------------------------------- system
     Case("ldsr / stsr round-trip",
          [*f5(0x2F, 6, 0, 0x0001), *f2(0x1C, 6, 25), *f2(0x1D, 7, 25)],
@@ -451,12 +523,19 @@ def build_rom(cases):
         off = i * SLOT
         if off + SLOT > 0xFE00:
             raise RuntimeError("too many cases for a 64 KB ROM")
-        words = list(case["code"]) + RET
+        base = ROM_BASE + off
+        code = case["code"](base) if callable(case["code"]) else case["code"]
+        words = list(code) + RET
         if len(words) * 2 > SLOT:
             raise RuntimeError(f"{case['name']}: body exceeds the {SLOT}-byte slot")
         for j, hw in enumerate(words):
             struct.pack_into("<H", rom, off + j * 2, hw & 0xFFFF)
         addrs[case["name"]] = ROM_BASE + off
+
+    # The shared callee the jal cases call into. Analysis discovers it as a
+    # function from the call itself, exactly as it would in a real ROM.
+    for j, hw in enumerate(f2(0x11, 7, 5) + RET):
+        struct.pack_into("<H", rom, CALLEE - ROM_BASE + j * 2, hw & 0xFFFF)
 
     # Reset vector (last 16 bytes, mapped to 0xFFFFFFF0): movhi/movea/jmp to
     # case 0. Nothing calls it -- the harness calls each body directly -- but

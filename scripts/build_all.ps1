@@ -31,7 +31,11 @@ if (Test-Path $resJson) {
 
 if (-not (Test-Path (Join-Path $BuildDir "CMakeCache.txt"))) {
     Write-Host "Configuring corpus build..."
-    cmake -S $Root -B $BuildDir -DSDL2_DIR=$SDL2Dir -DVBRECOMP_CORPUS_DIR=$Corpus -DVBRECOMP_BUILD_TESTS=OFF *>&1 |
+    # Each -D must be QUOTED. PowerShell parses a bare argument that starts
+    # with a dash in parameter mode and does not expand $variables inside it,
+    # so the unquoted form hands cmake the literal string "$Corpus" -- which
+    # configures cleanly and silently generates no corpus targets at all.
+    cmake -S $Root -B $BuildDir "-DSDL2_DIR=$SDL2Dir" "-DVBRECOMP_CORPUS_DIR=$Corpus" "-DVBRECOMP_BUILD_TESTS=OFF" *>&1 |
         Select-Object -Last 2
 } else {
     Write-Host "Reusing existing $BuildDir configuration."
