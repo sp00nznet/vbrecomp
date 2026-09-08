@@ -967,6 +967,13 @@ builds a table of handler pointers at 0x05000100-0x050001FF (0xFFF09D99,
 0xFFF09D4C, ... low-mirror ROM addresses, computed rather than immediates or ROM
 data) and we build none of it.
 
+One further reading, checked and withdrawn: sub_07F00976 has exactly ONE caller
+(sub_07F00026's loop) yet appears 15 times in a 64-entry trace window against
+that caller's 4, which looks like it is dispatched from somewhere else. It is
+not -- four entries of a six-iteration loop is twenty-four calls, so fifteen is
+simply the loop running. No anomaly; recorded so the count is not re-read as
+evidence later.
+
 So: not the entry, not the ownership, not the unwind trigger. The question is
 why our control reaches that jump post-boot at all.
 
