@@ -919,6 +919,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         /* Emit label if this address is a branch target */
         if (label_set_has(&labels, insn.addr)) {
             fprintf(out, "label_%08X:\n", insn.addr);
+            fprintf(out, "    vb_recomp_pc = 0x%08Xu;\n", insn.addr);
             label_set_add(&declared, insn.addr);
             /* Add interrupt check at backward branch targets */
             if (insn.addr < func->addr + (end_off - start_off)) {

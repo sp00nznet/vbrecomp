@@ -161,6 +161,14 @@ void vb_recomp_stub(uint32_t addr) {
 static uint32_t trace_ring[TRACE_N];
 static uint32_t trace_pos;
 
+/* Coarse program counter: the generated code stores the address of each
+ * basic block it enters. The trace ring records FUNCTION entries, which
+ * says nothing about a loop that spins inside one function without calling
+ * anything -- Hyper Fighting (Beta) hammers 4 KB of CHR 36,000 times a
+ * frame with no repeated memory read, so neither the ring nor the hot-read
+ * list can place it. One store per block is cheap and does. */
+uint32_t vb_recomp_pc;
+
 void vb_recomp_trace(uint32_t addr) {
     trace_ring[trace_pos++ % TRACE_N] = addr;
 }
