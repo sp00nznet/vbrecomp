@@ -35,7 +35,21 @@ uint8_t vb_gamepad_read8(vb_addr_t addr) {
     case 0x14: /* SDHR - high byte of button data */
         return (uint8_t)(latched >> 8);
     case 0x28: /* SCR */
-        return scr & ~SCR_STAT; /* STAT=0 means ready (instant read) */
+        /* STAT=0 means ready (we latch instantly, so a read is never pending).
+         *
+         * SCR_START reads back SET regardless of what was last written. Two
+         * different idioms start a pad read, and only one of them survives a
+         * register that reads back exactly what was stored:
+         *
+         *   Waterworld:   ld.b SCR; ori  0x0084; st.b SCR   -- sets the bit
+         *   Mario Clash:  ld.h SCR; andi 0x0084; st.h SCR   -- KEEPS the bit
+         *
+         * Mario Clash's read-modify-write only starts a read if the bit is
+         * already there. Its init leaves SCR at 0x80, so `0x80 & 0x84` wrote
+         * 0x80 forever, the pad was never latched, and the game sat on its
+         * warning screen reading zero buttons 161,598 times a run while its
+         * state machine waited at state 2 for `pad & 0x303C0000`. */
+        return (scr | SCR_START) & ~SCR_STAT;
     default:
         return 0;
     }
