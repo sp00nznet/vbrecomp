@@ -107,18 +107,37 @@ every call site drains the chain so the transfer completes before the caller
 resumes. That took the corpus from 41 rendering to 45 and unblocked Mario's
 Tennis, Golf and Virtual Bowling.
 
-Thirteen games still reach this line. What is known about them:
+Thirteen games still reach this line, and they do **not** share a cause. The
+execution trace (`vb_recomp_trace`, dumped by the driver when the reset path
+returns — the last 64 function entries) gives each one's terminal function:
 
-- They hit **no unimplemented calls** — every jump resolves, so nothing is
-  falling into `vb_recomp_stub`.
-- Each leaves a **valid ROM address in r31** when the chain ends (StarFox
-  `0x07FE64EC`, Snatcher `0x07E02702`, Mario Combat `0x07E02480`), so control
-  was lost at a top-level `jmp [r31]` — a return inside a real call, but a
-  transfer at the top level where there is no caller.
-- **Following r31 from the driver does not recover them.** Dispatching there
-  runs exactly one hop and the routine returns without setting a new
-  continuation, leaving the screen blank. So r31 is where control went, but the
-  routine it points at is not the missing main loop.
+| Game | depth | last three functions |
+|---|---|---|
+| StarFox | 10 | `07FE64D0 → 07FE64E4 → 07FE0300` |
+| Snatcher | 12 | `07E02698 → 07E026FA → 07E01058` |
+| Mario Combat | 12 | `07E02400 → 07E02478 → 07E00E08` |
+| Fishbone | 10 | `07E0234C → 07E0238A → 07E01154` |
+| Hyper Fighting | 9 | `07C20A32 → 07C01EC4 → 07C01EC4` |
+| Hyper Fighting (Beta) | 10 | `07E17D12 → 07E01CD4 → 07E01CD4` |
+| Null Pointer Mockup | 24 | `07FBB39C → 07F9ECD4 → 07F8B108` |
+| Space Pinball | 31 | `07EA746E → 07EA748E → 07EA4818` |
+| SPONG | 64+ | `07E32C74 → 07E403D0 → 07E3FC20` |
+| Formula V | 64+ | `07C34C64 → 07C34C98 → 07C388B4` |
+| VUEngine Platformer | 64+ | `07E4CEE0 → 07E4D2C0 → 07E4D2C0` |
+| Capitan Sevilla 3D | 64+ | `07E0F690 → 07E0F6C4 → 07E2A88C` |
+
+No two end in the same place, so there is no single shared fix left in this
+class — it is twelve individual investigations, each starting from a named
+function. The depths split them in two: four games fill the 64-entry ring (they
+execute a great deal and *then* stop) while the rest give up after nine or ten
+functions.
+
+Three things are ruled out for all of them: they hit no unimplemented calls;
+following r31 from the driver recovers nothing (one hop, then the routine
+returns without setting a continuation); and neither dispatching a computed jump
+on the register's real value nor treating a top-level `jmp [r31]` as a transfer
+changes any of them (0 of 13, twice) — though both of those are correctness
+fixes worth keeping and are in `main`.
 
 ### 5. Running, but the state machine never advances — 13 games
 
