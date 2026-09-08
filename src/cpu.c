@@ -126,13 +126,17 @@ void vb_recomp_stub(uint32_t addr) {
     /* A jump to address 0 is always a bug, and the register file at that
      * instant is the whole question: which pointer was null, and what was it
      * read from. Print the first few with context rather than only a count. */
-    if (addr == 0 && getenv("VBRECOMP_HEARTBEAT")) {
+    /* Any target outside ROM is a lost jump, not just zero: Jack Bros lands
+     * on 0x00030002 and Hyper Fighting on 0x0001CC80, both inside VIP VRAM,
+     * where a register holding data has reached a jmp. Same question, same
+     * answer needed. */
+    if (addr < 0x07000000u && getenv("VBRECOMP_HEARTBEAT")) {
         static int z = 0;
-        if (z++ < 4)
+        if (z++ < 8)
             fprintf(stderr,
-                "JUMP TO 0 (#%d) r6=%08X r7=%08X r10=%08X r29=%08X r31=%08X "
+                "LOST JUMP -> %08X (#%d) r6=%08X r7=%08X r10=%08X r29=%08X r31=%08X "
                 "[r29+12]=%08X\n",
-                z, vb_cpu.r[6], vb_cpu.r[7], vb_cpu.r[10], vb_cpu.r[29],
+                addr, z, vb_cpu.r[6], vb_cpu.r[7], vb_cpu.r[10], vb_cpu.r[29],
                 vb_cpu.r[31], vb_mem_read32(vb_cpu.r[29] + 12));
     }
     for (uint32_t i = 0; i < STUB_N; i++) {

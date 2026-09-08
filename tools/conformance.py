@@ -186,6 +186,19 @@ CASES = [
     Case("xori: zero-extended imm16", f5(0x2E, 7, 6, 0xFFFF), {6: 0, 7: 0},
          {7: 0x0000FFFF, "psw": ""}, "same zero-extension for xori"),
 
+    # `andi imm, reg, r0` is the V810 TEST idiom: the result is discarded but
+    # Z/S are still set, and the branch after it depends on them. Emitting
+    # nothing because the destination is r0 costs the whole branch. 3-D Tetris
+    # tested VIP FRAMESTART exactly this way and always took the wrong arm.
+    Case("andi to r0: still sets Z", f5(0x2D, 0, 6, 0x0010), {6: 0x0000},
+         {"psw": "Z"}, "discarding the result must not discard the flags"),
+    Case("andi to r0: still clears Z", f5(0x2D, 0, 6, 0x0010), {6: 0x0010},
+         {"psw": ""}, "the bit is present, so Z must be clear"),
+    Case("ori to r0: still sets S", f5(0x2C, 0, 6, 0x0000), {6: 0x80000000},
+         {"psw": "S"}, "same rule for ori"),
+    Case("and to r0: still sets Z", f1(0x0D, 6, 0), {6: 0xFFFFFFFF},
+         {"psw": "Z"}, "register form of the test idiom"),
+
     # ------------------------------------------------------------- shifts
     # The shift amount is masked to 5 bits and CY is the last bit shifted out.
     # A shift of zero is the case every naive implementation gets wrong.

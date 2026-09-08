@@ -249,6 +249,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s | %s;\n", r2, r2, r1);
             emit_flags_zs(out, r2);
+        } else {  /* r0 destination still sets Z/S -- see ANDI */
+            char e[80];
+            snprintf(e, sizeof(e), "(uint32_t)0 | %s", r1);
+            emit_flags_zs(out, e);
         }
         break;
 
@@ -256,6 +260,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s & %s;\n", r2, r2, r1);
             emit_flags_zs(out, r2);
+        } else {  /* r0 destination still sets Z/S -- see ANDI */
+            char e[80];
+            snprintf(e, sizeof(e), "(uint32_t)0 & %s", r1);
+            emit_flags_zs(out, e);
         }
         break;
 
@@ -263,6 +271,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s ^ %s;\n", r2, r2, r1);
             emit_flags_zs(out, r2);
+        } else {  /* r0 destination still sets Z/S -- see ANDI */
+            char e[80];
+            snprintf(e, sizeof(e), "(uint32_t)0 ^ %s", r1);
+            emit_flags_zs(out, e);
         }
         break;
 
@@ -481,6 +493,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s | 0x%04X;\n", r2, r1, (uint16_t)insn->imm);
             emit_flags_zs(out, r2);
+        } else {  /* r0 destination still sets Z/S -- see ANDI */
+            char e[80];
+            snprintf(e, sizeof(e), "%s | 0x%04X", r1, (uint16_t)insn->imm);
+            emit_flags_zs(out, e);
         }
         break;
 
@@ -488,6 +504,15 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s & 0x%04X;\n", r2, r1, (uint16_t)insn->imm);
             emit_flags_zs(out, r2);
+        } else {
+            /* `andi imm, reg, r0` is the V810 TEST idiom: the result is thrown
+             * away but Z/S are still set, and the very next branch depends on
+             * them. Emitting nothing at all left that branch reading stale
+             * flags -- which is how 3-D Tetris's VIP handler tested FRAMESTART
+             * (`andi 0x0010, r11, r0; bz`) and always took the wrong arm. */
+            char e[80];
+            snprintf(e, sizeof(e), "%s & 0x%04X", r1, (uint16_t)insn->imm);
+            emit_flags_zs(out, e);
         }
         break;
 
@@ -495,6 +520,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         if (insn->reg2 != 0) {
             fprintf(out, "    %s = %s ^ 0x%04X;\n", r2, r1, (uint16_t)insn->imm);
             emit_flags_zs(out, r2);
+        } else {  /* r0 destination still sets Z/S -- see ANDI */
+            char e[80];
+            snprintf(e, sizeof(e), "%s ^ 0x%04X", r1, (uint16_t)insn->imm);
+            emit_flags_zs(out, e);
         }
         break;
 
