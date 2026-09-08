@@ -83,6 +83,7 @@ void vb_interrupt_check(void) {
                     vb_mem_read16(0x0005F860), vb_mem_read16(0x0005F822), vb_mem_read16(0x0005F842));
             extern void vb_vip_dump_render_chain(void);
             vb_vip_dump_render_chain();
+            vb_recomp_dump_stubs();
         }
     }
 

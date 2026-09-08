@@ -932,6 +932,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         else
             fprintf(out, "\nvoid vb_func_%08X(void) {\n", ctx->funcs[i].addr);
         fprintf(out, "    /* STUB: function not yet analyzed */\n");
+        fprintf(out, "    vb_recomp_stub(0x%08Xu);\n", ctx->funcs[i].addr);
         fprintf(out, "}\n");
     }
 
@@ -957,7 +958,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                     if (emitted_addrs[k] == t) { already = true; break; }
                 }
                 if (!already) {
-                    fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: jump table target */ }\n", t);
+                    fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: jump table target */ vb_recomp_stub(0x%08Xu); }\n", t, t);
                     emitted_addrs[n_emitted++] = t;
                 }
             }
@@ -987,7 +988,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                         if (emitted_addrs[k] == target) { already = true; break; }
                     }
                     if (!already && target >= ctx->rom_base && target < ROM_REGION_END) {
-                        fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: callee */ }\n", target);
+                        fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: callee */ vb_recomp_stub(0x%08Xu); }\n", target, target);
                         emitted_addrs[n_emitted++] = target;
                     }
                 }
@@ -1027,7 +1028,10 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "        if (a == addr) { vb_func_table[mid].fn(); return; }\n");
         fprintf(out, "        if (a < addr) lo = mid + 1; else hi = mid - 1;\n");
         fprintf(out, "    }\n");
-        fprintf(out, "    /* No function at this address: unresolved target, no-op. */\n");
+        fprintf(out, "    /* No function at this address. Counted rather than\n");
+        fprintf(out, "     * silently dropped: an unresolved target is the usual\n");
+        fprintf(out, "     * reason a game runs forever having done nothing. */\n");
+        fprintf(out, "    vb_recomp_stub(addr);\n");
         fprintf(out, "}\n");
 
         /* --- Generic boot helpers ---------------------------------------
