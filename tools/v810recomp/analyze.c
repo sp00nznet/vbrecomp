@@ -92,13 +92,7 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
     /* Normalize mirrored ROM addresses to canonical range.
      * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF.
      * High addresses (>=0x08000000) are mirrors of the 27-bit physical map. */
-    if (addr >= 0x08000000) {
-        addr = addr & 0x07FFFFFF;
-    }
-    if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
-        uint32_t offset = (addr - ROM_REGION_BASE) % ctx->rom_size;
-        addr = ctx->rom_base + offset;
-    }
+    addr = v810_normalize_rom_addr(ctx, addr);
 
     /* Already known? */
     int idx = find_func(ctx, addr);
@@ -130,7 +124,20 @@ int v810_ctx_add_func(v810_ctx_t *ctx, uint32_t addr, bool is_interrupt, int int
  * VB ROM is mirrored throughout 0x07000000-0x07FFFFFF; the whole 32-bit space mirrors the 27-bit physical map every 0x08000000. */
 uint32_t v810_normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr) {
     if (addr >= 0x08000000) {
-        addr = addr & 0x07FFFFFF;
+        /* A jal that runs off the top of the ROM window wraps within the CART,
+         * which repeats every rom_size bytes -- not to the bottom of the 27-bit
+         * map. Hyper Fighting calls 0x08000290 from 0x07C20906: exactly one
+         * mirror period past a 4 MB ROM based at 0x07C00000, i.e. 0x07C00290.
+         * Masking to 0x07FFFFFF gave 0x00000290, an address inside VIP memory,
+         * and the call was dropped on the floor -- seven of them in that one
+         * function. Only prefer the cart wrap when the plain mask does NOT
+         * land in the ROM region, so ordinary mirrors keep their old meaning. */
+        uint32_t masked = addr & 0x07FFFFFF;
+        if (masked < ROM_REGION_BASE && addr >= ctx->rom_base && ctx->rom_size) {
+            addr = ctx->rom_base + ((addr - ctx->rom_base) % ctx->rom_size);
+        } else {
+            addr = masked;
+        }
     }
     if (addr >= ROM_REGION_BASE && addr < ctx->rom_base) {
         uint32_t offset = (addr - ROM_REGION_BASE) % ctx->rom_size;
@@ -358,7 +365,7 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                 /* Try to resolve via constant propagation */
                 if (reg_known[insn.reg1]) {
                     uint32_t target = reg_val[insn.reg1] & 0xFFFFFFFE;
-                    if (target >= 0x08000000) target &= 0x07FFFFFF;
+                    target = v810_normalize_rom_addr(ctx, target);
                     if (is_rom_addr(ctx, target)) {
                         uint32_t target_off = addr_to_offset(ctx, target);
                         printf("  Resolved JMP [r%d] at 0x%08X -> 0x%08X\n",
@@ -519,7 +526,7 @@ static void scan_all_jal_targets(v810_ctx_t *ctx) {
             uint32_t addr = ctx->rom_base + off;
             uint32_t target = addr + disp;
 
-            if (target >= 0x08000000) target &= 0x07FFFFFF;
+            target = v810_normalize_rom_addr(ctx, target);
 
             if (target >= ctx->rom_base && target < ROM_REGION_END && (target & 1) == 0) {
                 if (find_func(ctx, target) < 0) {
@@ -740,7 +747,7 @@ void v810_analyze(v810_ctx_t *ctx) {
                                 || (insn.format == FMT_III && insn.cond != 0x0D);
                     if (is_edge) {
                         uint32_t target = insn.addr + insn.imm;
-                        if (target >= 0x08000000) target &= 0x07FFFFFF;
+                        target = v810_normalize_rom_addr(ctx, target);
                         int idx = find_func(ctx, target);
                         /* Target inside another function: CUT that function
                          * there rather than making an overlapping copy of its
