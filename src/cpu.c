@@ -10,6 +10,16 @@
 
 vb_cpu_state_t vb_cpu;
 
+/* Pending tail jump; see cpu.h. */
+uint32_t vb_recomp_tail_target;
+
+/* Depth trace for the generated dispatcher: names the control-flow cycle that
+ * is nesting a frame per iteration instead of running flat. */
+void vb_recomp_deep(uint32_t addr, int depth) {
+    static int shown;
+    if (shown++ < 40) fprintf(stderr, "DEEP %3d -> sub_%08X\n", depth, addr);
+}
+
 void vb_cpu_init(void) {
     memset(&vb_cpu, 0, sizeof(vb_cpu));
     /* r0 is always zero - enforced by convention */
