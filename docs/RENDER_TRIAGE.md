@@ -593,6 +593,30 @@ So the divergence is in early boot, not in the frame loop, and the missing piece
 includes an object at 0x05000EF8 holding {0x0F, 0x0003C5F0} that we never build.
 Non-zero WRAM: 2,370 on hardware at frame 30 against our 1,174 at frame 450.
 
+## Galactic Pinball hangs on a counted loop with a negative count
+
+The basic-block marker parks it at 0x07F00986, an unrolled multiply-by-addition:
+
+```
+07F0097A: mov  r25, r6
+07F00980: add  -1, r6
+07F00984: bz   0x07F0098E     ; skip if zero
+07F00986: add  r7, r23 / add r7, r24 / add -1, r6 / bnz 0x07F00986
+```
+
+Its caller sets `mov 6, r25` and counts down. The heartbeat shows
+**r25 = 0xFFFFFF9F** (-97), so r6 starts at -98 and the inner loop runs four
+billion times -- indistinguishable from a hang, and why this game read as
+"no frames" for so long.
+
+Interrupt handlers are NOT the cause. A new check snapshots r2-r30 across every
+handler and reports the first register that changed; for Galactic Pinball it
+reports none. The handler does still leak 4 bytes of stack per interrupt (see
+above), but it preserves every general register, so the counter is being
+destroyed somewhere in the game's own translated flow -- most likely the
+re-entry of sub_07F00026 through a nested drain that the DEEP trace already
+showed, which re-runs the loop body without re-running `mov 6, r25`.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
