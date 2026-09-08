@@ -144,6 +144,35 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
     return addr - ctx->rom_base;
 }
 
+/* A branch target BELOW the current function's entry is not part of its body.
+ * A function is emitted as one contiguous [addr, end_addr) range and the walk
+ * only ever extends end_addr FORWARDS, so tracing such a target marks it
+ * analysed while the emitter never emits it -- and the branch to it then
+ * degrades to a bare `return`, silently truncating the function.
+ *
+ * The standard V810 boot idiom lands exactly on this, in 16 corpus ROMs:
+ *
+ *     movhi WRAM_END, r0, r11
+ *     jmp   [r1]                  ; -> the loop TEST, which is BELOW
+ *   body: st.w r0, 0[r11] ; add 4, r11
+ *   test: cmp r1, r11 ; blt body
+ *
+ * The jmp target (`test`) becomes a function, `body` sits before it, and
+ * `blt body` emitted `return` -- so the WRAM clear never ran and the entry
+ * gave up after zero frames ("Reset returned after 0 frames").
+ *
+ * Registering the backwards target as its own entry makes the emitter emit it,
+ * and the branch becomes a real call. Returns true if it did so; the caller
+ * must then re-acquire its `func` pointer, because adding an entry can
+ * reallocate ctx->funcs.
+ */
+static bool split_backward_target(v810_ctx_t *ctx, uint32_t func_addr, uint32_t target) {
+    if (target >= func_addr) return false;
+    int idx = v810_ctx_add_func(ctx, target, false, -1);
+    if (idx >= 0) ctx->funcs[idx].confirmed = true;
+    return true;
+}
+
 /* Analyze one function: trace instructions, find calls and branches */
 static void analyze_func(v810_ctx_t *ctx, int func_idx) {
     v810_func_t *func = &ctx->funcs[func_idx];
@@ -333,6 +362,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             case 0x2A: { /* JR disp26 - unconditional jump */
                 uint32_t target = insn.addr + insn.imm;
                 if (is_rom_addr(ctx, target)) {
+                    if (split_backward_target(ctx, func->addr, target)) {
+                        func = &ctx->funcs[func_idx];  /* may have realloc'd */
+                        goto next_path;
+                    }
                     uint32_t target_off = addr_to_offset(ctx, target);
                     /* If target is within function or nearby, it's intraprocedural */
                     if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
@@ -351,6 +384,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     /* BR (always) - unconditional */
                     uint32_t target = insn.addr + insn.imm;
                     if (is_rom_addr(ctx, target)) {
+                        if (split_backward_target(ctx, func->addr, target)) {
+                            func = &ctx->funcs[func_idx];
+                            goto next_path;
+                        }
                         uint32_t target_off = addr_to_offset(ctx, target);
                         if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
                             if (num_targets < 1024) {
@@ -366,10 +403,14 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     /* Conditional: trace both paths */
                     uint32_t target = insn.addr + insn.imm;
                     if (is_rom_addr(ctx, target)) {
-                        uint32_t target_off = addr_to_offset(ctx, target);
-                        if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
-                            if (num_targets < 1024) {
-                                branch_targets[num_targets++] = target_off;
+                        if (split_backward_target(ctx, func->addr, target)) {
+                            func = &ctx->funcs[func_idx];
+                        } else {
+                            uint32_t target_off = addr_to_offset(ctx, target);
+                            if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
+                                if (num_targets < 1024) {
+                                    branch_targets[num_targets++] = target_off;
+                                }
                             }
                         }
                     }
