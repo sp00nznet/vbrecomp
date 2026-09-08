@@ -238,6 +238,11 @@ void vb_interrupt_check(void) {
                         i, int_count[i], psw);
             }
             uint32_t sp_before = vb_cpu.r[3];
+            /* Only pay for the snapshot when someone is looking. */
+            static int reg_chk = -1;
+            if (reg_chk < 0) reg_chk = getenv("VBRECOMP_HEARTBEAT") ? 1 : 0;
+            uint32_t regs_before[32];
+            if (reg_chk) memcpy(regs_before, vb_cpu.r, sizeof(regs_before));
             /* vb_interrupt_check runs at the top of every generated function,
               * including inside a handler, so a handler that re-enables
               * interrupts can nest. The level rule bounds that to one frame per
@@ -262,6 +267,27 @@ void vb_interrupt_check(void) {
                 if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)
                     fprintf(stderr, "IRQ %d LEAKED SP: %08X -> %08X (delta %d)\n",
                             i, sp_before, vb_cpu.r[3], (int)(vb_cpu.r[3] - sp_before));
+            }
+            /* A handler must leave the guest's registers as it found them.
+             * When our translation loses part of an epilogue it does not, and
+             * the damage lands in whatever the interrupted code was holding --
+             * Galactic Pinball's main loop counts down r25 from 6 and finds it
+             * at 0xFFFFFF9F, so its inner loop runs four billion times. */
+            {
+                static int reg_log[MAX_INT_LEVELS] = {0};
+                if (reg_chk && reg_log[i] < 3) {
+                    for (int r = 2; r < 31; r++) {
+                        if (r == 3) continue;   /* SP reported above */
+                        if (vb_cpu.r[r] != regs_before[r]) {
+                            reg_log[i]++;
+                            fprintf(stderr, "IRQ %d CLOBBERED r%d: %08X -> %08X\n",
+                                    i, r, regs_before[r], vb_cpu.r[r]);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (0) {
             }
         }
         if (vip_reentry_max < 0) {
