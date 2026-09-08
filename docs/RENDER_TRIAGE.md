@@ -748,6 +748,31 @@ What is actually needed is per-EDGE data: for each address, whether anything
 outside the function targets it. The analyzer records neither in-edges nor
 their origins. That is the change to make before this class is attempted again.
 
+### sub_07F000B4 is NOT spurious -- the game really jumps there
+
+Every fix above assumed the overlapping entry was an artifact. It is not.
+`VBRECOMP_WATCH_FUNC` names jmp-target promotion as its source, and the source
+instruction is unambiguous:
+
+```
+07F00AEA: movhi 0xFFF0, r0, r1     ; r1 = 0xFFF00000
+07F00AEE: movea 0x00B4, r1, r1     ; r1 = 0xFFF000B4  (= 0x07F000B4)
+07F00AF2: jmp   [r1]
+```
+
+That is a deliberate tail-jump back into the main loop's `add -1, r25`, built
+from immediates. So 0x07F000B4 is a real entry, r25 is meant to be live across
+it, and on hardware it holds the right value. Every attempt above to suppress
+or re-route that entry was therefore attacking the wrong thing -- which is why
+each one cost games elsewhere and none helped this one.
+
+The real question is narrower and different: **why is r25 wrong when we arrive
+there.** The caller sets `mov 6, r25`, neither callee writes r25, and interrupt
+handlers preserve every general register (checked). So either we reach
+0x07F00AF2 when hardware would not, or something between loses r25 in a way the
+per-handler check does not see. That is the thread to pull, and it is a
+game-state question rather than a recompiler-structure one.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
