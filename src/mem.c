@@ -78,6 +78,46 @@ void vb_mem_dump_hot_reads(void) {
     }
 }
 
+/* VBRECOMP_WWATCH=<hex>: the write half of VBRECOMP_WATCH. The read watch says
+ * who is WAITING on an address; this says who is meant to FILL it -- and its
+ * silence is the finding when a buffer stays empty. Jack Bros copies WRAM
+ * 0x05003800 into VRAM every frame and the copy loop is correct, so the fault
+ * is whatever should have written that buffer. */
+static uint32_t wwatch_addr;
+static int wwatch_on = -1;
+static uint32_t wwatch_lr[256], wwatch_lr_cnt[256];
+static uint32_t wwatch_hits;
+
+static inline void wwatch_track(uint32_t addr) {
+    if (wwatch_on < 0) {
+        const char *w = getenv("VBRECOMP_WWATCH");
+        wwatch_on = (w && w[0]);
+        if (wwatch_on) wwatch_addr = (uint32_t)strtoul(w, NULL, 16);
+    }
+    if (!wwatch_on || addr != wwatch_addr) return;
+    wwatch_hits++;
+    uint32_t lr = vb_cpu.r[31];
+    uint32_t h = (lr * 2654435761u) & 255u;
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t j = (h + i) & 255u;
+        if (wwatch_lr_cnt[j] == 0) { wwatch_lr[j] = lr; wwatch_lr_cnt[j] = 1; return; }
+        if (wwatch_lr[j] == lr) { wwatch_lr_cnt[j]++; return; }
+    }
+}
+
+void vb_mem_dump_write_watch(void) {
+    if (wwatch_on <= 0) return;
+    fprintf(stderr, "  writes to 0x%08X: %u total\n", wwatch_addr, wwatch_hits);
+    for (int k = 0; k < 6; k++) {
+        int best = -1; uint32_t bc = 0;
+        for (uint32_t i = 0; i < 256; i++)
+            if (wwatch_lr_cnt[i] > bc) { bc = wwatch_lr_cnt[i]; best = (int)i; }
+        if (best < 0) break;
+        fprintf(stderr, "    from LR=0x%08X x%u\n", wwatch_lr[best], wwatch_lr_cnt[best]);
+        wwatch_lr_cnt[best] = 0;
+    }
+}
+
 static const uint8_t *rom_ptr;
 static uint32_t rom_sz;
 static uint32_t rom_mask;
@@ -250,6 +290,7 @@ uint32_t vb_mem_read32(vb_addr_t addr) {
 }
 
 void vb_mem_write8(vb_addr_t addr, uint8_t val) {
+    wwatch_track(addr);
     switch (REGION(addr)) {
     case 0: vb_vip_write8(addr & 0x00FFFFFF, val); break;
     case 1: vb_vsu_write8(addr & 0x00FFFFFF, val); break;
@@ -261,6 +302,7 @@ void vb_mem_write8(vb_addr_t addr, uint8_t val) {
 }
 
 void vb_mem_write16(vb_addr_t addr, uint16_t val) {
+    wwatch_track(addr);
     switch (REGION(addr)) {
     case 0: vb_vip_write16(addr & 0x00FFFFFF, val); break;
     case 5: {
@@ -283,6 +325,7 @@ void vb_mem_write16(vb_addr_t addr, uint16_t val) {
 }
 
 void vb_mem_write32(vb_addr_t addr, uint32_t val) {
+    wwatch_track(addr);
     switch (REGION(addr)) {
     case 0: vb_vip_write32(addr & 0x00FFFFFF, val); break;
     case 5: {
