@@ -870,6 +870,33 @@ So the shared question for most of the remaining set is not the renderer and not
 the CPU: it is that world setup never runs. Two of them (Jack Bros, Null
 Pointer) prove the renderer and the tile path each work in isolation.
 
+### Null Pointer Mockup takes an error path, repeatedly
+
+It writes NO world attributes at all -- a write watch on 0x0003DBE0 shows one
+write, from the boot clear, and 0x0003DBC0 shows none. The 0x0040 sitting in
+world 31 is ours, not the game's.
+
+The basic-block marker parks it at 0x07F939AA in sub_07F93920:
+
+```
+07F93996: shl  -8, r10        ; imm5 = 24: sign-extend the low byte
+07F939A4: sar  -8, r10        ; (emitted correctly as shl 24 / sar 24)
+07F939A6: cmp  1, r10
+07F939A8: bz   0x07F939E6     ; r10 == 1
+07F939AA: cmp  r0, r10
+07F939AC: bz   0x07F939BA     ; r10 == 0
+07F939AE: movea 0xB0C8, r27, r10  ; else: r10 = 0x0500B0C8
+07F939B6: jr   0x07FBB33C         ;       and jump to the handler
+```
+
+A sign-extended byte that is neither 0 nor 1 sends it down the third arm, and
+sub_07FBB324/sub_07FBB33C -- which run 13 and 12 times in a 64-entry window --
+are that arm. So the game is taking an error/assert path over and over instead
+of initialising, which is why world setup never happens.
+
+The shift emission was checked and is right (imm5 24, not the -8 the
+disassembly prints). The next question is where that byte comes from.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
