@@ -192,7 +192,14 @@ the tile data never runs. Ruled out along the way: the memory bus reads ROM and
 every mirror correctly (`0x07F01000`, `0x07001000` and `0x07801000` all return
 `C4F9002A`, matching the file).
 
-Chased to the end of what static tracing can show: the copy's source pointer is
+**The reference settles it, and disproves the theory below.** BizHawk's
+Mednafen VB core (see `scripts/reference/`) shows WRAM entirely zero on real
+hardware too, at every frame — so the empty buffer is normal and this whole
+line was misdirected. The real divergence is narrow and dated: reference CHR
+goes 0 (frame 30) to 81 non-zero samples (frame 60); vbrecomp stays at 0. The
+game loads character data between frames 30 and 60 and we do not.
+
+The superseded static reading, kept because the addresses are still correct: the copy's source pointer is
 correct (`[0x0500014C] = 0`, so `r7 = 0x05003800` as intended) and the copy loop
 is correct. The buffer is simply never filled — 2 writes to it in a whole run.
 Whatever loads or decompresses the tile data sits in a state-machine branch the
