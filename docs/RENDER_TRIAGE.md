@@ -91,37 +91,46 @@ and `r30 = r7; r27 = (r7 & 3) << 3`, pairing each address with the offset from
 its own low two bits, and Ballface blits with a word-aligned source (`r27 = 0`)
 and a variable destination bit position (`r26 = r5`), a glyph's x.
 
-### 4. Running, but the state machine never advances — 13 games
+### 4. The entry returns instead of looping — 16 games
+
+Clustering the non-drawing set by busiest read address
+(`scripts/diagnose_blanks.ps1`) put sixteen of them on one address,
+`0x0005F800` — but `VBRECOMP_WATCH` showed every one of those reads coming from
+`LR=0`, which is our own `vb_interrupt_check`. They were not polling anything.
+All sixteen print **"Reset returned after 0–9 frames"**: the recompiled entry
+returns, and the driver then spins interrupts with no game code running at all.
+That is why the runtime's own 201 reads per run were the busiest thing in the
+process.
+
+One contributing truncation is understood and is *not* the whole story. A
+function is emitted as one contiguous `[addr, end_addr)` range whose end only
+grows forwards, so a branch target below the entry is traced by analysis and
+then dropped, and the emitter falls back to a bare `return`. The V810 boot idiom
+lands on it — `jmp` to the loop test with the body just above — so Mario's
+Tennis had `blt 0x07F8013E` compiled to `return` and never cleared WRAM.
+
+Pulling the entry back over the body fixes that specific case, and was tried:
+it made the branch a `goto`, but across the corpus it unblocked **nothing** and
+cost one game (Mario Clash stopped advancing), so it was removed rather than
+kept on principle. Mario's Tennis still returns after 0 frames with it applied,
+so the early return has at least one other cause — the chain continues through
+`jmp [r11]` at `0x07F80154` into `sub_07F801B2`, which is where to look next.
+
+Two dead ends worth not repeating, both recorded in `analyze.c`: registering
+each backward target as its own function cascades on every loop back edge
+(Elevated Speed went 56 → 17,892 functions, 1s → 187s), and mutating
+`func->addr` during the trace segfaults.
+
+### 5. Running, but the state machine never advances — 13 games
 
 3-D BattleSnake, BLOX 2, Ballface, Bound High, Nester's Funky Bowling, Panic
-Bomber, SD Gundam, Teleroboxer, Tobidase! Panibon, Tron VB and V-Tetris still
-sit on one frame with the buttons held. This is *not* a second button gate —
-five masks were tried (`303C`, `1000`, `0004`, `0010`, `F03C`) and Teleroboxer
-and Panic Bomber produce a byte-identical frame under every one, out to 6,000
-frames.
+Bomber, SD Gundam, Teleroboxer, Tobidase! Panibon, Tron VB and V-Tetris sit on
+one frame with the buttons held. Not a button gate — five masks (`303C`, `1000`,
+`0004`, `0010`, `F03C`) leave Teleroboxer and Panic Bomber byte-identical out to
+6,000 frames — and not a deadlock: Mario Clash's hot address resolved to the
+standard frame-sync pair on `XPSTTS & 0x000C`, and both halves terminate.
 
-They are not deadlocked either. Mario Clash's hot address resolves (via
-`VBRECOMP_WATCH=0500FFC8`) to `sub_07FF5BB6`, the standard VB frame-sync idiom:
-
-```
-07FF5BA4: loop1: r10 = XPSTTS; if ((r10 & 0x000C) == 0) goto loop1   ; wait for draw start
-07FF5BB6: loop2: r10 = XPSTTS; if ((r10 & 0x000C) != 0) goto loop2   ; wait for draw end
-```
-
-Both halves terminate — `vb_vip_read16` already cycles XPBSY through
-F0 / F1 / both / idle for exactly this reason — so the game reaches its main
-loop every frame and simply redraws the same screen.
-
-What separates this group from Waterworld is `INTENB`: Mario Clash and
-Teleroboxer run with `INTENB=0000`, VIP interrupts never enabled, driven only
-by the timer (`TCR=0B`, level 1 firing 500 times a run). Waterworld runs with
-`INTENB=4000`. V-Tetris (`INTENB=4008`, `INTPND=3036` — its handler *is*
-clearing XPEND) does advance, just slowly enough that a 900-frame sample misses
-it. So the next thing to establish for this group is why VIP interrupts are
-never enabled: whether the game is waiting on a condition before enabling them,
-or an `INTENB` write is not reaching the register.
-
-### 5. Polling a display phase that never arrives — part of the 34 blanks
+### 6. Polling a display phase that never arrives — part of the 34 blanks
 
 Golf reads `DPSTTS` (0x0005F820) 1,248,381 times and writes no character data
 at all (`CHR=0/0`). `vb_vip_frame_advance()` toggles the display status bits
@@ -129,20 +138,20 @@ rather than cycling them through the real phase sequence, so a game waiting on
 a specific phase order waits forever. Space Squash and Elevated Speed show the
 same shape.
 
-### 6. Garbled second character set
+### 7. Garbled second character set
 
 Bound High and V-Tetris render the English warning text correctly and the
 Japanese text below it as wrong tiles. One character set lands and the other
 does not, so this is the transfer of a specific tile range — not the renderer,
 which is drawing exactly what it was given.
 
-### 7. Partial glyph rows
+### 8. Partial glyph rows
 
 Tron VB draws the top strokes of its logo and loses the bottoms. Hamburgers
 renders a full bitmap title correctly but corrupts the small text at bottom
 left. Rows within a tile are being dropped.
 
-### 8. World placement
+### 9. World placement
 
 V-Tetris draws its text block flush left where it should be centred; SD Gundam
 has a column of stray tiles down the left edge. Waterworld's round HUD renders
