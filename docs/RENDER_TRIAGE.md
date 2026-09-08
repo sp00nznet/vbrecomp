@@ -1201,6 +1201,61 @@ no game. It is kept because it removes a real hole in the control-flow model
 rather than because it moved the number, and because any future work on interior
 addresses needs it to exist.
 
+## Galactic Pinball: a function was made out of a call's arguments -- FIXED
+
+GP was writing 1,232 non-zero CHR bytes and 1,024 BGMap entries and still
+drawing nothing, because it wrote **no WAM entries at all** -- no world
+attributes, so the renderer had nothing to draw. The heartbeat's `last block
+entered: 0x07F51728` named the spot exactly.
+
+`sub_07F5168C` ends with `jal 0x07F417B8`, and that callee is a long-call
+helper: it reads its arguments INLINE from the bytes after the call site --
+
+```
+07F417BE: ld.w  0[r31], r21
+07F417C2: ld.w  4[r31], r22
+...
+07F417D2: add   8, r31        <- return PAST the 8 argument bytes
+07F417D4: jmp   [r31]
+```
+
+Those eight argument bytes at 0x07F51728 had a FUNCTION created on them by the
+split pass, so they were decoded as code. The first halfword is 0x9800, which
+decodes as `bp .` -- a branch to itself. `sub_07F5168C` then fell straight into
+it and Galactic Pinball spun there for the rest of the run. Everything after
+that point in the function -- including the three `jal`s that write the world
+attributes -- never ran.
+
+### Two general fixes, no per-game hint
+
+The recompiler already understood inline call arguments, but only from a
+hand-written `skip <target> <n>` hint, and nobody had written one for this game.
+
+1. **Detect skip-after-call helpers.** The `add N, r31` immediately before
+   `jmp [r31]` names the argument size exactly. A linear scan over jal targets
+   before analysis registers them, because the trace needs the amount while it
+   is walking the CALLERS.
+2. **A split point must be an instruction boundary.** `safe_split_point` already
+   walked the function; it now steps over inline arguments after a jal and
+   refuses any cut that never coincided with a decoded instruction. A cut inside
+   an instruction (or inside data) leaves both halves decoding as garbage.
+
+`sub_07F5168C` goes from 0x07F5168C-0x07F51728 (156 bytes, ending in the
+arguments) to 0x07F5168C-0x07F51846 (442 bytes, running through them), the
+bogus function is gone, and:
+
+| | before | after |
+|---|---|---|
+| non-zero CHR writes | 1,232 | **9,442** |
+| WAM writes | **none** | yes (`other` range now 0x04610-0x3DFFE) |
+| framebuffer pixels | 0 | **1,625** |
+
+**Corpus: 65 -> 66 rendering, 11 -> 10 blank, nothing lost, 77/77 conformance.**
+
+Worth remembering as a class: `last block entered` pointing at a function whose
+first instruction is a branch to itself means the decode is on data, not that
+the game is waiting for something.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved

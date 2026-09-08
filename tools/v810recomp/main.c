@@ -392,7 +392,9 @@ int main(int argc, char **argv) {
     /* Analyze */
     printf("Analyzing code...\n");
     fflush(stdout);
+    v810_detect_skip_funcs(&ctx);
     v810_analyze(&ctx);
+    v810_drop_data_funcs(&ctx);
     fflush(stdout);
 
     printf("Emitting C code...\n");

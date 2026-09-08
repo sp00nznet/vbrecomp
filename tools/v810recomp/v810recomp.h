@@ -146,6 +146,8 @@ uint32_t v810_normalize_rom_addr(v810_ctx_t *ctx, uint32_t addr);
 /* Look up how many bytes of inline data a JAL target consumes after the call.
  * Returns 0 if the target is not a registered skip-after-JAL helper. */
 uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target);
+void v810_drop_data_funcs(v810_ctx_t *ctx);
+void v810_detect_skip_funcs(v810_ctx_t *ctx);
 
 /* Analyze: discover functions by following calls from known entry points */
 void v810_analyze(v810_ctx_t *ctx);
