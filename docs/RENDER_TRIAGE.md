@@ -1372,6 +1372,40 @@ copies of the same code are harmless while running, but the dispatcher's
 enclosing-function lookup and the unwinding guard both key on function identity,
 and with overlaps they can pick the wrong copy.
 
+## The drain's depth is load-bearing -- two ways of changing it, both worse
+
+The split fall-through looked like it had a one-line fix. `VB_CALL` is
+
+```c
+(f)(); --vb_call_depth; if (vb_unwinding) { ... } vb_recomp_drain();
+```
+
+so a drained target -- most often the second half of a function the split pass
+cut in two -- runs one level SHALLOWER than the call that parked it. At depth 0
+its `jmp [r31]` parks r31 as a tail target instead of returning, which turns a
+return into a transfer. That is a clean account of Jack Bros' 168-byte leak.
+
+Both ways of acting on it are worse:
+
+1. **Drain before decrementing.** Jack Bros' SP becomes correct (0x0500FFF8, no
+   leak) but it stops enabling VIP interrupts entirely (INTENB=0000) and VRAM
+   writes collapse from 5,687 to 43. Elevated Speed goes to CHR=0/0 -- dead.
+   This contradicts the design note already in emit.c: the drain is deliberately
+   depth-neutral so a transfer CHAIN continues instead of unwinding, and StarFox
+   stops after six frames without it.
+2. **Give the fall-through its own macro** (`VB_FALL`) so only a continuation
+   drains at call depth and real jumps stay depth-neutral. Jack Bros' leak comes
+   straight back at the full 168 bytes, so the relevant fall-through is not
+   being drained through `VB_CALL` at all, and Elevated Speed still goes to
+   CHR=0/0.
+
+So the depth model is doing more work than the two-case reading above suggests,
+and the fall-through Jack Bros is losing control on does not reach the drain by
+the path this assumed. Four variants of the split/depth problem have now been
+measured (drop splits, drop-and-merge, cross-function entries, and these two
+depth changes); the only one that fixes Jack Bros outright is cross-function
+entries, and it costs Elevated Speed for a reason still not identified.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
