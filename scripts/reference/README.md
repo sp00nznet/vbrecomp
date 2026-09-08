@@ -16,17 +16,31 @@ $rom = "roms\Jack Bros. (USA).vb"
 non-zero. `probe.lua` does the same for one specific WRAM range. Both write to
 `%TEMP%` and exit the emulator when done, so they run unattended.
 
-## Memory domains
+## Memory domains -- read the right one
 
-The core names them `DRAM` (the 64 KB the VB calls WRAM), `CHR RAM` (the
-character half of VIP memory), `Framebuffer`, `ROM` and `CARTRAM`. Matching on
-"wram"/"vram" finds nothing â€” use the exact names.
+`scripts/reference/domains.lua` lists them with sizes and how much of each is
+non-zero, because getting this wrong produces confident, wrong conclusions.
+For Jack Bros at frame 90:
 
-Memory-write callbacks (`event.on_bus_write`, `event.onmemorywrite`) do **not**
-fire for this waterbox core, and `emu.getregisters()` returns an empty table, so
-PC is unavailable. What works is sampling memory per frame. That is enough to
-locate a divergence in time, which is what the vbrecomp-side tools
-(`vb_recomp_trace`, `VBRECOMP_WATCH`, `VBRECOMP_WWATCH`) then localise in code.
+```
+WRAM        size=0x10000   <- the CPU's 64 KB work RAM. This is the one.
+CARTRAM     size=0x10000
+ROM         size=0x100000
+CHR RAM     size=0x8000
+DRAM        size=0x20000   <- the VIP's BGMap bank, NOT work RAM
+Framebuffer size=0x18000
+```
+
+**`DRAM` is not the VB's WRAM.** It is 0x20000 bytes of VIP BGMap memory.
+Reading its first 64 KB returns the empty low BGMap segments, which is exactly
+what made Jack Bros' RAM look untouched on hardware and sent a whole line of
+enquiry the wrong way -- the note below that said "WRAM is entirely zero on
+real hardware too" was reading VIP memory. Against the real WRAM domain, Jack
+Bros has 975 non-zero bytes at frame 90 and we have 591.
+
+Memory-write callbacks (`event.on_bus_write`, `event.onmemorywrite`) do not
+fire for this waterbox core, and `emu.getregisters()` returns an empty table,
+so PC is unavailable. Sampling memory per frame is what works.
 
 ## What it has already settled
 
