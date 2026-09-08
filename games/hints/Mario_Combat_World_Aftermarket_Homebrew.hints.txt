@@ -1,3 +1,22 @@
 # Profile-guided entry points for Mario Combat (World) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E0247C
+entry 07E02490
+entry 07E024A4
+entry 07E024B4
+entry 07E024C6
+entry 07E02330
+entry 07E024D8
+entry 07E02526
+entry 07E02360
+entry 07E02398
+entry 07E02536
+entry 07E023A8
+entry 07E0255A
+entry 07E11AC2
+entry 07E023BA
+entry 07E023CC
+entry 07E0281A
+entry 07E023DE
+entry 07E0283A

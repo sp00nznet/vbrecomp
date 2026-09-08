@@ -1,3 +1,37 @@
 # Profile-guided entry points for Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E13324
+entry 07E36E38
+entry 07E4C49C
+entry 07E133D4
+entry 07E1E9EC
+entry 07E23880
+entry 07E26396
+entry 07E26406
+entry 07E135EC
+entry 07E13674
+entry 07E1367E
+entry 07E1B262
+entry 07E136E2
+entry 00038DD8
+entry 07E13742
+entry 07E1B096
+entry 0580002C
+entry 07E13336
+entry 07E2FDDC
+entry 07E26740
+entry 07E18268
+entry 07E327D0
+entry 07E13974
+entry 07E1056C
+entry 07E10648
+entry 07E1387E
+entry 07E260B4
+entry 07E260A0
+entry 07E040FA
+entry 07E25EF8
+entry 07E124D0
+entry 07E10E4C
+entry 07E04D72
+entry 07E32CF8

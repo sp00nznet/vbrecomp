@@ -1,3 +1,15 @@
 # Profile-guided entry points for Fishbone (World) (Aftermarket) (Homebrew).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E0238E
+entry 07E023E8
+entry 07E023FE
+entry 07E02414
+entry 07E02428
+entry 07E01210
+entry 07E011F4
+entry 07E0243C
+entry 07E10CC4
+entry 07E10CE8
+entry 07E10D0C
+entry 07E10D30

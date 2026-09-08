@@ -9,3 +9,5 @@ entry 000201A8
 entry 0000243C
 entry 07C0216A
 entry 00000290
+entry 07C20A36
+entry 07C20A84

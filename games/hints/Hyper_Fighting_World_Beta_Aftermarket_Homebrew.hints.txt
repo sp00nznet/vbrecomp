@@ -8,3 +8,6 @@ entry 00217960
 entry 00201AB0
 entry 00201BE0
 entry 07E01F7A
+entry 07E17D16
+entry 07E17D54
+entry 07E17CB8
