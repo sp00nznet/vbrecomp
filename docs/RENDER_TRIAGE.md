@@ -1256,6 +1256,45 @@ Worth remembering as a class: `last block entered` pointing at a function whose
 first instruction is a branch to itself means the decode is on data, not that
 the game is waiting for something.
 
+## Jack Bros' stack bug is solved -- the fix costs two other games
+
+With interior-entry routing in place, the split that causes Jack Bros' stack
+leak can be replaced rather than merely deleted. A branch from one function to
+an address inside another no longer CUTS the target function; the address is
+recorded as a cross-function entry, becomes a label there, and the entry
+dispatch reaches it. `safe_split_point` still gates it, so only cuts that were
+already legal turn into labels -- labelling an address that is not an
+instruction boundary emits an orphan label whose body is a bare `return`, and
+control vanishes rather than being counted.
+
+On Jack Bros this is exactly right:
+
+| | split | cross-function entry |
+|---|---|---|
+| sub_07F006CA range | 0x07F006CA-0x07F006E4 | 0x07F006CA-**0x07F00722** (correct) |
+| SP at the heartbeat | 0x050100A0 (outside WRAM) | **0x0500FFF8** (hardware's value) |
+| IRQ SP leak | 168 bytes | **none** |
+| WAM writes | 311 | **8,087** |
+
+The stack bug that has shadowed this game for the whole effort is gone, and the
+function ranges are right. It still does not render: CHR stays 0/8192, which is
+the separate tile-source problem below.
+
+And it costs **Elevated Speed, both builds**: 66 -> 64 rendering. They stop
+looping and print `Reset returned after 13 frames`, having written 7,667
+non-zero CHR bytes and 6,270 BGMap entries -- so they are doing real work and
+then losing control out of the reset path, the same signature SPONG had.
+
+The mechanism is the difference in frame semantics: a branch to a split
+function's head was an exact table match and ran as its own call, while the same
+branch now misses, routes into the enclosing function at a label, and meets that
+function's `jmp [r31]` with a different call depth. Two earlier attempts at this
+(dropping splits outright, with and without merging the owner's range back) cost
+seven games; this one costs two, and for the first time the Jack Bros side is
+provably correct. Reverted, but this is the closest the split problem has come
+to a real answer -- what is missing is making a drained interior entry carry the
+same depth as the call it replaces.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
