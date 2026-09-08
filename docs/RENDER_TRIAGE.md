@@ -1027,6 +1027,45 @@ out these games drawing later than the window measured.
 `firstDraw=-1` with a non-zero final -- VUEngine Platformer -- means a sparse
 image the coarse sampling missed, not an absence.)
 
+## Jack Bros: our stack pointer leaves WRAM, and it is the FIRST divergence
+
+Comparing hardware at its first-CHR frame (60) against our settled state, the
+very first differing word is the interesting one:
+
+| address | hardware | ours |
+|---|---|---|
+| 0x0500000C | 0x0500FFF8 | **0x050100A4** |
+
+and the live stack pointer agrees: the heartbeat reports **SP=0x050100A4**,
+which is past the top of WRAM (0x0500FFFF). Memory access is not the problem --
+vb_mem masks WRAM with VB_WRAM_MASK, so it mirrors correctly -- but the VALUE is
+172 bytes above where hardware keeps it, and the game compares and stores it.
+
+The leak detector names the source: `IRQ 4 LEAKED SP: 0500FFFC -> 050100A4
+(delta 168)`, in a SINGLE dispatch of the VIP interrupt, which also clobbers r7.
+
+The handler's own prologue and epilogue are deliberately asymmetric:
+
+```
+sub_07F0061C:  addi 0xFFEC, r3, r3     ; -20, then st.w r6..r10
+   ...
+               addi 0x0014, r3, r3     ; +20
+               ld.w 0[r3], r1          ;
+               add  4, r3              ; +4   -> net +4
+               reti
+```
+
+That +4 is balanced by the VECTOR stub at 0x07FFFE40, which does
+`add -4, r3; st.w r1, 0[r3]` before jumping to the handler. Both are registered
+and emitted correctly -- vb_recomp_init_handlers installs 0x07FFFE40, not the
+handler -- so one vector plus one handler balances exactly.
+
+**Hypothesis, arithmetic only, not verified:** 168 = 42 x 4, so a chain that
+re-enters the handler 42 times without re-entering the vector would produce
+precisely this. The trace does not show the handler looping in the window
+sampled, so this is a number that fits rather than a mechanism observed. Anyone
+picking this up should count handler entries per dispatch before believing it.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
