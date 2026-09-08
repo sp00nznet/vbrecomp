@@ -1295,6 +1295,32 @@ provably correct. Reverted, but this is the closest the split problem has come
 to a real answer -- what is missing is making a drained interior entry carry the
 same depth as the call it replaces.
 
+## The ceiling is 71, not 76 -- five games are blank on real hardware
+
+Re-verified on the Mednafen VB core at **1800 frames** (three times the survey's
+budget) with the survey's own button mask held in the same bursts the driver
+injects, so a slow title screen cannot be mistaken for a dead one
+(`scripts/reference/drawcheck_input.lua`, frame count now settable via
+`VBREF_FRAMES`):
+
+| game | first draw | first CHR | CHR at end | framebuffer at end |
+|---|---|---|---|---|
+| Capitan Sevilla 3D | never | frame 20 | 169 | **0** |
+| Null Pointer Mockup | never | frame 10 | 259 | **0** |
+| Snowball Wars demo 1 | never | never | 0 | **0** |
+| Snowball Wars demo 2 | never | never | 0 | **0** |
+| Snowball Wars demo 3 | never | never | 0 | **0** |
+
+None of the five ever puts a pixel in the framebuffer on hardware. The three
+Snowball Wars demos never load a single character byte either -- they are inert
+ROMs, not games we fail to run. Capitan Sevilla 3D and Null Pointer Mockup do
+load tiles and then never draw, which is a property of those builds.
+
+So of 76 ROMs, **71 can render at all**. The corpus is at 66; the five that are
+genuinely ours and still blank are Formula V (Emulator), SPONG, VUEngine
+Platformer, and Jack Bros x2. Any target above 71 is unreachable by definition,
+and progress should be counted against 71.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
