@@ -67,6 +67,13 @@ our = open(r'$ourBin','rb').read()
 print('non-zero WRAM: hardware %d, ours %d' % (sum(1 for b in ref if b), sum(1 for b in our if b)))
 diff = [i for i,(a,b) in enumerate(zip(ref,our)) if a and not b]
 print('bytes hardware has that we do not: %d' % len(diff))
+nzref = sum(1 for b in ref if b); nzour = sum(1 for b in our if b)
+if nzref <= nzour:
+    print()
+    print('  !! hardware has no more state than we do at this frame.')
+    print('     -RefFrame is probably TOO EARLY -- the game has not done its')
+    print('     work yet, so "we match" here means nothing. Raise it and')
+    print('     re-run before drawing any conclusion.')
 if not diff:
     raise SystemExit
 print()

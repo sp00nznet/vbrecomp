@@ -11,6 +11,14 @@ task table, Capitan Sevilla 3D's half-built object and Null Pointer Mockup's
 first-global divergence -- typed out by hand each time, which is how the wrong
 memory domain went unnoticed for as long as it did.
 
+**Pick `-RefFrame` LATE.** A hardware frame before the game has done its work
+shows little state, and the diff then says "we match" when nothing has been
+compared. Formula V at hardware frame 90 reads 632 non-zero bytes against our
+639 -- apparently fine; at frame 200 it reads 5,603 against the same 639.
+VUEngine Platformer reads 509 against our 1,471 at frame 90 and 3,181 at frame
+250. Both looked like passes and neither was. The script now warns when the
+hardware side has no more state than ours, which is the tell.
+
 The two frame numbers are NOT the same clock: a hardware frame is 20 ms of real
 CPU, ours is `VBRECOMP_FRAME_TICKS` interrupt checks. Pick `-OurFrame` well past
 the point the game has settled and read "hardware has this, we do not" as the
