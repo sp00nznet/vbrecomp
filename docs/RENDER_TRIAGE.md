@@ -667,6 +667,27 @@ hints at all still produces sub_07F000B4, and marking sweep-created functions
 and dropping the overlapping ones does not remove this one. Some other path in
 the analyzer adds it, and finding which is the next step for this game.
 
+### Which pass creates the split, and why multi-entry functions do not fix it
+
+Six sites call `v810_ctx_add_func` and the output never said which made a given
+function. Tagging them (`VBRECOMP_WATCH_FUNC=<hex>`) answers it in one run:
+Galactic Pinball's sub_07F000B4 comes from **jmp-target promotion**, five times
+-- a resolved `jmp [reg]` whose target lands inside sub_07F00026.
+
+Three fixes tried, all measured against the full corpus, all reverted:
+
+| fix | result |
+|---|---|
+| skip promotion when the target is inside a known function | Galactic Pinball loses control 591 -> **1,183** times: the address really is dispatched to, so refusing to make it callable is worse |
+| multi-entry functions: emit the interior entry as a thunk that parks the address and `goto`s the label inside the real function | works exactly as designed for this game -- unimplemented calls drop to **0** -- but corpus advancing 39 -> 32, blank 11 -> 27, Mario Clash and Teleroboxer both go blank |
+| drop entries on a backward-branch target inside another function | advancing 39 -> 32, blank 11 -> 18 |
+
+The multi-entry result is the informative one. It repairs the control flow it
+was aimed at and still costs eight games, because plenty of "interior"
+functions are genuinely separate routines that merely fall inside another
+function's approximate range. So the range data is the real problem: until
+function boundaries are exact, any rule keyed on containment will misfire.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
