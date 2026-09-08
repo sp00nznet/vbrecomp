@@ -71,6 +71,11 @@ typedef struct {
 
     /* Byte classification: which bytes are code vs data */
     uint8_t *code_map;      /* 1 byte per ROM byte: 'C'=code, 'D'=data, 0=unknown */
+    /* Which FUNCTION first traced each ROM byte, by address (0 = none).
+     * func->end_addr is only a high-water mark over every path explored
+     * from the entry, so one forward jump inflates it and 'is this address
+     * inside that function' becomes meaningless. This is the exact answer. */
+    uint32_t *byte_owner;
 
     /* Per-path "already traced" marks for analyze_func, stamped with a
      * generation counter instead of being cleared. This used to be a

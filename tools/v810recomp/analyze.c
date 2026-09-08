@@ -26,6 +26,7 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->num_funcs = 0;
 
     ctx->code_map = calloc(rom_size, 1);
+    ctx->byte_owner = calloc(rom_size, sizeof(uint32_t));
     split_count = 0;
     ctx->visit_stamp = calloc(rom_size, sizeof(uint32_t));
     ctx->visit_gen = 0;
@@ -65,6 +66,7 @@ uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target) {
 void v810_ctx_free(v810_ctx_t *ctx) {
     free(ctx->funcs);
     free(ctx->code_map);
+    free(ctx->byte_owner);
     free(ctx->visit_stamp);
     free(ctx->resolved_jumps);
     for (int i = 0; i < ctx->num_jump_tables; i++) {
@@ -291,6 +293,8 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             for (int i = 0; i < insn.size; i++) {
                 if (offset + i < ctx->rom_size) {
                     ctx->code_map[offset + i] = 'C';
+                    if (!ctx->byte_owner[offset + i])
+                        ctx->byte_owner[offset + i] = func->addr;
                 }
             }
 
@@ -859,6 +863,25 @@ void v810_analyze(v810_ctx_t *ctx) {
     printf("Analysis complete: %d functions found\n", ctx->num_funcs);
     printf("Code coverage: %d / %u bytes (%.1f%%)\n",
            code_bytes, ctx->rom_size, 100.0 * code_bytes / ctx->rom_size);
+
+    {   /* How much does exact ownership disagree with the end_addr range? */
+        int by_range = 0, by_owner = 0;
+        for (int i = 0; i < ctx->num_funcs; i++) {
+            if (!ctx->funcs[i].confirmed) continue;
+            uint32_t fa = ctx->funcs[i].addr;
+            uint32_t off = addr_to_offset(ctx, fa);
+            bool rng = false;
+            for (int k = 0; k < ctx->num_funcs && !rng; k++)
+                if (k != i && ctx->funcs[k].confirmed
+                    && fa > ctx->funcs[k].addr && fa < ctx->funcs[k].end_addr) rng = true;
+            bool own = (off < ctx->rom_size && ctx->byte_owner[off]
+                        && ctx->byte_owner[off] != fa);
+            if (rng) by_range++;
+            if (own) by_owner++;
+        }
+        fprintf(stderr, "  interior functions: %d by end_addr range, %d by exact ownership\n",
+                by_range, by_owner);
+    }
 
     /* Only print first/last few functions to avoid flooding */
     int show = ctx->num_funcs < 20 ? ctx->num_funcs : 10;
