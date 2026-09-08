@@ -977,6 +977,41 @@ evidence later.
 So: not the entry, not the ownership, not the unwind trigger. The question is
 why our control reaches that jump post-boot at all.
 
+## Re-verified on hardware: which of the blanks actually draw
+
+The "honest denominator is 73" claim rests on the three Snowball Wars demos
+being blank on real hardware. That was measured in an earlier session, so it was
+re-run, and the same check was applied to the rest of the blank set. All figures
+are `drawcheck.lua`, 600 frames, **no input**:
+
+| game | first CHR | CHR at 600 | framebuffer at 600 |
+|---|---|---|---|
+| Formula V (Emulator) | 120 | 90 | **191** |
+| SPONG | 20 | 60 | **147** |
+| Galactic Pinball | 10 | 36 | **104** |
+| VUEngine Platformer | 190 | 253 | **100** |
+| Jack Bros | 50 | 81 | **96** |
+| Capitan Sevilla 3D | 20 | 169 | **0** |
+| Null Pointer Mockup | 10 | 259 | **0** |
+| Snowball Wars 1/2/3 | none | 0 | **0** |
+
+Snowball Wars is confirmed: no character data and no framebuffer content at any
+sample. The denominator of 73 stands.
+
+The new result is that **Capitan Sevilla 3D and Null Pointer Mockup also show an
+empty framebuffer on hardware** through 600 frames, despite loading plenty of
+character data. They are not in the same class as the five above, which visibly
+draw.
+
+The caveat matters and is not resolved: `drawcheck.lua` presses nothing, while
+the corpus survey holds 0x303C. Both games may simply be waiting for a player.
+Until that is tested with input, they are "unproven" rather than "ours" -- and
+the five that do draw on hardware are unambiguously ours.
+
+(`firstDraw` samples every 64 bytes and the final count every 16, so
+`firstDraw=-1` with a non-zero final -- VUEngine Platformer -- means a sparse
+image the coarse sampling missed, not an absence.)
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
