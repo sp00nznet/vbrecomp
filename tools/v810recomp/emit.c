@@ -834,6 +834,8 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     /* Runtime dispatch for indirect jumps the static analysis can't resolve;
      * defined at the bottom of this file. */
     fprintf(out, "void vb_recomp_call(uint32_t addr);\n\n");
+    fprintf(out, "void vb_recomp_call(uint32_t addr);\n");
+    fprintf(out, "static void vb_recomp_call_inner(uint32_t addr);\n");
     fprintf(out, "/* Control transfer out of a function.\n");
     fprintf(out, " *\n");
     fprintf(out, " * A game main loop is a CYCLE: a state handler ends by jumping back to\n");
@@ -1032,7 +1034,16 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "};\n");
         fprintf(out, "static const int vb_func_table_count = %d;\n\n", table_count);
 
-        fprintf(out, "void vb_recomp_call(uint32_t addr) {\n");
+    fprintf(out, "/* Depth trace: a cycle that nests instead of running flat blows the\n");
+    fprintf(out, " * stack, and the address printed here is the one doing it. */\n");
+    fprintf(out, "static int vb_call_depth;\n");
+    fprintf(out, "void vb_recomp_call(uint32_t addr) {\n");
+    fprintf(out, "    if (++vb_call_depth > 128 && vb_call_depth < 160)\n");
+    fprintf(out, "        vb_recomp_deep(addr, vb_call_depth);\n");
+    fprintf(out, "    vb_recomp_call_inner(addr);\n");
+    fprintf(out, "    --vb_call_depth;\n");
+    fprintf(out, "}\n");
+    fprintf(out, "static void vb_recomp_call_inner(uint32_t addr) {\n");
         fprintf(out, "    if (addr >= 0x08000000u) addr &= 0x07FFFFFFu;\n");
         if (ctx->rom_base > ROM_REGION_BASE) {
             /* Collapse ROM-internal mirrors below rom_base to canonical range. */

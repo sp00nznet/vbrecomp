@@ -670,7 +670,13 @@ void v810_analyze(v810_ctx_t *ctx) {
                         uint32_t target = insn.addr + insn.imm;
                         if (target >= 0x08000000) target &= 0x07FFFFFF;
                         int idx = find_func(ctx, target);
-                        if (idx < 0 && (target < ctx->funcs[i].addr
+                        bool inside_any = false;
+                        for (int k = 0; k < ctx->num_funcs && !inside_any; k++) {
+                            if (target >= ctx->funcs[k].addr
+                             && target <  ctx->funcs[k].end_addr) inside_any = true;
+                        }
+                        if (idx < 0 && !inside_any
+                                    && (target < ctx->funcs[i].addr
                                      || target >= ctx->funcs[i].end_addr)) {
                             /* A branch or jump that LEAVES this function needs
                              * an entry to land on: the emitter parks such a
@@ -678,9 +684,17 @@ void v810_analyze(v810_ctx_t *ctx) {
                              * by address, and that only works if the address is
                              * in the table. A backward target lands inside an
                              * existing function; the new entry overlaps it,
-                             * costing duplicated code -- which is what makes a
-                             * dispatcher reachable from the state handler that
-                             * jumps back to it. */
+                             * costing duplicated code.
+                             *
+                             * Only when the target is not INSIDE some existing
+                             * function, though. An overlapping duplicate turns
+                             * that function's own loops into cross-function
+                             * jumps: Mario Clash's counted loop at 0x07F000B2
+                             * (jal, jal, add -1 r25, bnz back) got a second
+                             * entry at 0x07F000BA, so the back edge became a
+                             * transfer dispatched from a nested drain and the
+                             * loop grew the stack one frame per iteration until
+                             * it died. A depth trace named the pair. */
                             idx = v810_ctx_add_func(ctx, target, false, -1);
                             if (idx >= 0) changed = true;
                         }
