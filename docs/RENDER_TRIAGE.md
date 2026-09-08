@@ -22,9 +22,9 @@ what used to make this survey disagree with `build_all.ps1`.
 | Advancing | 37 | The frame changes between samples: the game is running. |
 | Drawing, then frozen | 27 | One image, byte-identical at 300/600/900. |
 | Nothing on screen | 13 | Every sample blank. |
-| Dead | 1 | Produced no frame before the timeout (Galactic Pinball). |
+| Dead | 0 | No game crashes any more; see the stack section below. |
 
-"Renders something" is 62/76, but that number is the less useful of the two:
+"Renders something" is 63/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
 not running. **Advancing** is the number to drive. Three of the 13 blanks
 (Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
@@ -386,6 +386,32 @@ worse** -- Mario Clash, Mario's Tennis, Panic Bomber and Teleroboxer all went
 blank. Deferring a tail target until the whole call stack unwinds reorders the
 work those games depend on. Draining at every call site is load-bearing, and
 the fix for Galactic Pinball has to come from somewhere else.
+
+## The stack, and two things that were NOT the problem
+
+Galactic Pinball, 3-D Tetris and Null Pointer Mockup all died with
+STATUS_STACK_OVERFLOW while printing nothing -- the process simply vanished,
+which is why they read as blank. The driver now catches it and dumps the trace
+ring, and all three run to completion.
+
+The cause was **frame size, not runaway recursion**. With the DEEP window
+widened to depth 40 none of them ever reported, and the drain cap never fired,
+so the logical call depth stays under 40. One guest function becomes one C
+function whose frame dwarfs the 8-16 bytes the V810 pushed, and the default
+1 MB does not cover a normal nesting depth. Game targets now link with
+/STACK:1073741824 -- reserved address space on x64, committed only as touched.
+
+### Interrupt handlers do leak stack -- but do NOT restore it
+
+Galactic Pinball's timer handler leaks exactly 4 bytes on every interrupt, and
+Null Pointer Mockup ends up returning to 0x05010000, one byte past the end of
+WRAM. So the leak is real and it does walk the stack pointer off the end.
+
+Restoring the stack pointer after each handler is nevertheless **wrong**:
+measured across the corpus it is advancing 37 -> 34 and blank 13 -> 17. The
+12-game panel showed 0 worse and missed it entirely, which is the case for
+running `-Panel all` before believing a runtime change. Some handlers depend
+on the drift. Reverted; the leak is still logged under VBRECOMP_HEARTBEAT.
 
 ## What is already ruled out
 
