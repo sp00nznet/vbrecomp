@@ -57,7 +57,13 @@ function Invoke-WithTimeout {
     $outTask = $p.StandardOutput.ReadToEndAsync()
     $errTask = $p.StandardError.ReadToEndAsync()
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
-        try { $p.Kill($true) } catch {}
+        # Kill() takes no argument on .NET Framework (Windows PowerShell 5.1):
+        # the Kill($true) tree-kill overload is .NET Core only, so it threw, the
+        # catch swallowed it, and the timed-out process survived -- holding its
+        # .exe open and burning CPU for the rest of the run, which is enough to
+        # time out the games that come after it. Recompiled games spawn nothing,
+        # so a plain Kill() is all that was ever needed.
+        try { $p.Kill() } catch {}
         return @{ Code = -999; TimedOut = $true; StdOut = $outTask.Result; StdErr = $errTask.Result }
     }
     return @{ Code = $p.ExitCode; TimedOut = $false; StdOut = $outTask.Result; StdErr = $errTask.Result }

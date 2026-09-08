@@ -31,11 +31,18 @@ if (Test-Path $resJson) {
 
 if (-not (Test-Path (Join-Path $BuildDir "CMakeCache.txt"))) {
     Write-Host "Configuring corpus build..."
+    # -T host=x64 is REQUIRED here, not a tuning knob. The Visual Studio
+    # generator defaults to the 32-bit hosted compiler, and the largest
+    # generated files (Mario VB, Null Pointer Mockup, BLOX: hundreds of
+    # thousands of lines in one translation unit) exhaust its 2 GB address
+    # space with "C1060: compiler is out of heap space". The 64-bit host
+    # compiles the same files without trouble.
+    #
     # Each -D must be QUOTED. PowerShell parses a bare argument that starts
     # with a dash in parameter mode and does not expand $variables inside it,
     # so the unquoted form hands cmake the literal string "$Corpus" -- which
     # configures cleanly and silently generates no corpus targets at all.
-    cmake -S $Root -B $BuildDir "-DSDL2_DIR=$SDL2Dir" "-DVBRECOMP_CORPUS_DIR=$Corpus" "-DVBRECOMP_BUILD_TESTS=OFF" *>&1 |
+    cmake -S $Root -B $BuildDir -T host=x64 "-DSDL2_DIR=$SDL2Dir" "-DVBRECOMP_CORPUS_DIR=$Corpus" "-DVBRECOMP_BUILD_TESTS=OFF" *>&1 |
         Select-Object -Last 2
 } else {
     Write-Host "Reusing existing $BuildDir configuration."
@@ -57,7 +64,13 @@ function Invoke-Timed([string]$Exe, [string[]]$ArgList, [int]$Timeout, [hashtabl
     $p = [System.Diagnostics.Process]::Start($psi)
     $so = $p.StandardOutput.ReadToEndAsync(); $se = $p.StandardError.ReadToEndAsync()
     if (-not $p.WaitForExit($Timeout * 1000)) {
-        try { $p.Kill($true) } catch {}
+        # Kill() takes no argument on .NET Framework (Windows PowerShell 5.1):
+        # the Kill($true) tree-kill overload is .NET Core only, so it threw, the
+        # catch swallowed it, and the timed-out process survived -- holding its
+        # .exe open and burning CPU for the rest of the run, which is enough to
+        # time out the games that come after it. Recompiled games spawn nothing,
+        # so a plain Kill() is all that was ever needed.
+        try { $p.Kill() } catch {}
         return @{ Code = $null; TimedOut = $true; Out = $so.Result; Err = $se.Result }
     }
     return @{ Code = $p.ExitCode; TimedOut = $false; Out = $so.Result; Err = $se.Result }
@@ -76,7 +89,11 @@ foreach ($slug in $slugs) {
     # Plain single-target build (inherently sequential: one project, cl one
     # file at a time). No parallel flag — passing one mangles cmake's msbuild
     # project resolution under PowerShell.
-    $buildOut = (& cmake --build $BuildDir --config Release --target "corpus_$slug" 2>&1 | Out-String)
+    #
+    # /nodeReuse:false matters over 76 invocations: MSBuild leaves its worker
+    # nodes alive for reuse by default, and they accumulate across the run
+    # until the machine is out of memory and cl cannot even load c2.dll.
+    $buildOut = (& cmake --build $BuildDir --config Release --target "corpus_$slug" -- /nodeReuse:false 2>&1 | Out-String)
     if (Test-Path $exe) { $rec.build = "ok" }
     else { $rec.build = "fail"; $rec.note = (($buildOut -split "`n" | Where-Object { $_ -match ': error' } | Select-Object -First 1)) }
 

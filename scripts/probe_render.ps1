@@ -33,7 +33,13 @@ foreach ($exe in $exes) {
     $env:VBRECOMP_HEADLESS="1"; $env:VBRECOMP_HEADLESS_FRAMES="$Frames"; $env:VBRECOMP_SHOT_PATH=$shot
     $p = Start-Process -FilePath $exe.FullName -ArgumentList "`"$rom`"" -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput "$env:TEMP\probe_out.txt" -RedirectStandardError "$env:TEMP\probe_err.txt"
-    if (-not $p.WaitForExit($RunTimeoutSec * 1000)) { try { $p.Kill($true) } catch {} }
+    # Kill() takes no argument on .NET Framework (Windows PowerShell 5.1):
+    # the Kill($true) tree-kill overload is .NET Core only, so it threw, the
+    # catch swallowed it, and the timed-out process survived -- holding its
+    # .exe open and burning CPU for the rest of the run, which is enough to
+    # time out the games that come after it. Recompiled games spawn nothing,
+    # so a plain Kill() is all that was ever needed.
+    if (-not $p.WaitForExit($RunTimeoutSec * 1000)) { try { $p.Kill() } catch {} }
     $bytes = if (Test-Path $shot) { (Get-Item $shot).Length } else { 0 }
     $drew = $bytes -gt 3800
     if ($drew) { $rendered += $meta[$slug] }
