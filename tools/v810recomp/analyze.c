@@ -557,7 +557,13 @@ void v810_analyze(v810_ctx_t *ctx) {
      * Pattern: SHL 2, rX / MOVHI imm, rX, rY / LD.W disp[rY], rZ / JMP [rZ]
      * The table address is (imm<<16) + disp, entries are 32-bit target addresses. */
     {
-        for (int fi = 0; fi < ctx->num_funcs; fi++) {
+        /* Snapshot the count: this scan ADDS functions (every jump-table target
+         * becomes one), so testing against a live ctx->num_funcs makes the loop
+         * chase its own growth. Anything added here is analysed by the loop
+         * below and scanned on a later pass. SD Gundam never finished otherwise
+         * -- it kept re-resolving the same JMP, printing the same line forever. */
+        int scan_count = ctx->num_funcs;
+        for (int fi = 0; fi < scan_count; fi++) {
             if (!ctx->funcs[fi].visited) continue;
             if (ctx->funcs[fi].addr < ctx->rom_base) continue;
             uint32_t off = addr_to_offset(ctx, ctx->funcs[fi].addr);
