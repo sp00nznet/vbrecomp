@@ -56,6 +56,7 @@
 #define VB_VIP_CTA          0x1E  /* Column table index */
 #define VB_VIP_XPSTTS       0x40  /* Drawing status */
 #define VB_VIP_XPCTRL       0x42  /* Drawing control */
+#define VB_VIP_VER          0x44  /* VIP version: reads back 2 on hardware */
 #define VB_VIP_SPT0         0x48  /* OBJ group 0 end */
 #define VB_VIP_SPT1         0x4A  /* OBJ group 1 end */
 #define VB_VIP_SPT2         0x4C  /* OBJ group 2 end */
