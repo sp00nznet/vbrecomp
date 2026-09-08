@@ -443,6 +443,35 @@ So the open problem is not "confirm more" -- it is telling a real dispatch
 table from bytes that merely decode like one. The counter above is what will
 measure any attempt at that.
 
+## Jack Bros: where its tiles come from, and what it never builds
+
+The reference settles the first half exactly. Dumping CHR RAM at frame 90 and
+searching the ROM for it shows a straight linear block copy: CHR byte X equals
+ROM offset 0xA0000 + X, i.e. the game copies from **0x07FA0000** into VIP
+0x06000, and 25,769 of 32,768 bytes match that mapping. Non-zero tile data
+spans CHR 0x40-0x3FBC, all in segment 0.
+
+On our side exactly ONE write ever reaches CHR 0x6000, from the boot clear.
+The copy is queued through a descriptor that `sub_07F11190` builds -- dest
+0x6000, a source, a length -- and that function has exactly two callers,
+`sub_07F00CB8` and `sub_07F00CE0`, **neither of which has any caller at all**.
+They are reachable only by indirect dispatch, and the game never dispatches to
+them.
+
+A corrected WRAM diff says the same thing from the data side. Against the real
+WRAM domain (see scripts/reference/README.md -- the earlier comparisons were
+reading VIP memory), hardware has 975 non-zero bytes at frame 90 to our 591,
+and the difference is concentrated in a region we never touch at all:
+
+| region | bytes the reference has that we do not |
+|---|---|
+| 0x0500A100-0x0500ACFF | 288 |
+| 0x0500E800-0x0500EEFF | ~120 |
+
+So the game builds a structure at 0x0500A100 that we never build, and the tile
+transfer hangs off it. That is the next thing to chase, and it is a specific
+address rather than a blank screen.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
