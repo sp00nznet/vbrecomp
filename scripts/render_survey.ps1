@@ -4,9 +4,15 @@
 #   - worlds with content?  (render-chain: an enabled L/R world whose BGMap has cells)
 #   - framebuffer drawn?    (driver: max non-zero framebuffer pixels at a shot)
 # and categorize:
-#   RENDERS            fb > threshold
-#   LOADED-NOT-DRAWING fb==0 but CHR>0 and a content world exists  (RENDERER BUG)
-#   NO-GRAPHICS        CHR==0                                       (game-state stall)
+#   RENDERS            a screenshot came out non-blank
+#   LOADED-NOT-DRAWING blank, but CHR>0 and a content world exists  (RENDERER BUG)
+#   CHR-NO-WORLD       blank, CHR>0, no world with content          (RENDERER BUG)
+#   NO-GRAPHICS        blank and no CHR at all                      (game-state stall)
+#   NO-FRAMES          never reached a shot frame before the timeout
+#
+# The CHR / world / unimplemented-call columns need -Diagnose (they come from
+# the runtime heartbeat, which is ~10x slower); the RENDERS verdict does not.
+# Screenshots land in corpus/_timeline/<slug>/ as a filmstrip per game.
 param(
     [string]$BuildDir = (Join-Path $PSScriptRoot "..\build_all"),
     [string]$RomDir   = (Join-Path $PSScriptRoot "..\roms"),
@@ -24,7 +30,11 @@ param(
     # count. Keeping them is what lets a graphical fault be SEEN and sorted into
     # a category, instead of inferred from a number.
     [string]$ShotDir  = (Join-Path $PSScriptRoot "..\corpus\_timeline"),
-    [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll"
+    [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll",
+    # Turn on the runtime heartbeat: CHR writes, render chain, hot reads and
+    # unimplemented calls, at roughly a tenth of the speed. Use it on the games
+    # that did not draw, not on the whole corpus.
+    [switch]$Diagnose
 )
 $ErrorActionPreference = "Stop"
 $ShotDir = [System.IO.Path]::GetFullPath($ShotDir)
@@ -35,7 +45,15 @@ $rel = Join-Path $BuildDir "games\Release"
 Copy-Item $SDL2Dll $rel -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 $env:VBRECOMP_HEADLESS = "1"; $env:VBRECOMP_HEADLESS_FRAMES = "$Frames"
-$env:VBRECOMP_HEARTBEAT = "1"; $env:VBRECOMP_SHOT_EVERY = "$ShotEvery"
+$env:VBRECOMP_SHOT_EVERY = "$ShotEvery"
+# The heartbeat is diagnosis, not measurement. It tracks every memory read and
+# periodically dumps the hardware state, which slows a game by roughly an order
+# of magnitude -- enough that most never reached even the first shot frame
+# before the timeout, and were then recorded as having drawn nothing. Running
+# it by default is what made this survey disagree with build_all.ps1 and move
+# between runs. Off unless asked for; -Diagnose turns it on (and with it the
+# CHR / world / unimplemented-call detail) for the games worth chasing.
+if ($Diagnose) { $env:VBRECOMP_HEARTBEAT = "1" } else { Remove-Item env:VBRECOMP_HEARTBEAT -EA SilentlyContinue }
 
 $exes = Get-ChildItem (Join-Path $rel "corpus_*.exe") | Sort-Object Name
 $results = @()
@@ -70,17 +88,28 @@ foreach ($exe in $exes) {
     if ($vw -and $vw -match "CHR=(\d+)/") { $chr = [int]$matches[1] }
     # any enabled world (L1 or R1) with BGMap cells?
     $contentWorld = ($lines | Select-String "^  W\d+ HEAD=.* (L1|R1) .* NZ=([1-9]\d*) " | Measure-Object).Count
-    # max framebuffer non-zero pixels
-    $fb = 0
-    foreach ($m in ($lines | Select-String "non-zero framebuffer pixels")) {
-        if ($m -match "(\d+) non-zero") { $v=[int]$matches[1]; if ($v -gt $fb) { $fb = $v } }
-    }
-    $cat = if ($fb -gt 30) { "RENDERS" }
+    # Whether the game drew comes from the screenshots it left behind, not from
+    # a stderr line only the heartbeat prints. A blank 384x224 frame is exactly
+    # 3619 bytes; anything meaningfully larger is pixels. Reading it off the
+    # PNGs means the measurement does not depend on running the game slowly.
+    $shots = @(Get-ChildItem $gameShots -Filter *.png -EA SilentlyContinue | Sort-Object Name)
+    $biggest = 0
+    foreach ($sh in $shots) { if ($sh.Length -gt $biggest) { $biggest = $sh.Length } }
+    $drew = $biggest -gt 3800
+    # Unimplemented calls the run hit (heartbeat only): the analysis gap that is
+    # most likely keeping this game where it is.
+    $topStub = ""
+    $st = $lines | Select-String "^    sub_([0-9A-F]{8}) x(\d+)" | Select-Object -First 1
+    if ($st -and $st -match "sub_([0-9A-F]{8}) x(\d+)") { $topStub = "sub_$($matches[1]) x$($matches[2])" }
+
+    $cat = if ($drew) { "RENDERS" }
            elseif ($chr -gt 0 -and $contentWorld -gt 0) { "LOADED-NOT-DRAWING" }
            elseif ($chr -gt 0) { "CHR-NO-WORLD" }
+           elseif ($shots.Count -eq 0) { "NO-FRAMES" }
            else { "NO-GRAPHICS" }
-    $results += [pscustomobject]@{ slug=$slug; name=$meta[$slug]; chr=$chr; world=$contentWorld; fb=$fb; cat=$cat }
-    Write-Host ("{0,-3} {1,-42} CHR={2,-5} worlds={3,-3} fb={4,-6} {5}" -f $i, $slug.Substring(0,[Math]::Min(42,$slug.Length)), $chr, $contentWorld, $fb, $cat)
+    $results += [pscustomobject]@{ slug=$slug; name=$meta[$slug]; chr=$chr; world=$contentWorld;
+                                   shots=$shots.Count; bytes=$biggest; stub=$topStub; cat=$cat }
+    Write-Host ("{0,-3} {1,-42} shots={2,-3} px={3,-7} {4,-18} {5}" -f $i, $slug.Substring(0,[Math]::Min(42,$slug.Length)), $shots.Count, $biggest, $cat, $topStub)
 }
 Write-Host ""
 Write-Host "=== Category counts ==="
