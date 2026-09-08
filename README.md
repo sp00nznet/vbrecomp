@@ -59,8 +59,14 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 ## Status
 
 - **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
-- **27 / 76 games render on screen** through the **generic driver** (`games/driver/main.c`) — no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Among the renderers: Red Alarm (both regions), Mario Clash, Teleroboxer, Panic Bomber, V-Tetris, SD Gundam, Nester's Funky Bowling, Waterworld, Virtual League Baseball, Bound High, and a dozen homebrew titles (Ballface, Hamburgers, 3D Crosswords, BLOX, Fishbone, …).
-- That count came from a focused hardening pass that found **eight shared correctness bugs** in the recompiler/runtime — each fix unblocked a whole class of games at once. Highlights:
+- **59 / 76 games render on screen** and **35 are advancing** (the frame changes between samples, i.e. the game is running) through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Three of the 17 that draw nothing (the Snowball Wars demos) are blank on real hardware too, so the honest denominator is 73.
+- Getting there took repeated passes of the same loop: find a shared correctness bug, fix it once, measure the whole corpus. Recent ones:
+  - **The column table was mapped onto the world attributes.** `0x3DC00-0x3DFFF` is the VIP's per-column brightness ramp, not a mirror of `0x3D800`, so every game that wrote one wiped all 32 worlds with it. StarFox had loaded 7,350 CHR bytes and set up a 380x224 world, then read it back as `GX=254 GY=254` -- 254 being `0x00FE`, the column value landing on top of it.
+  - **`jal <next instruction>` is not a call**, it is the compiler's PC-capture idiom for a long call; emitting it as one ran the following instructions twice with `r31` already advanced.
+  - **A drained tail target is jumped to, not called**, so raising the call depth for it made the target's own `jmp [r31]` read as a return and unwound the transfer chain.
+  - **The VIP interrupt line is level-triggered** on `INTPND & INTENB`; requesting it once per frame dropped every source but the first a handler happened to service.
+  - **Profile-guided function discovery** (`scripts/discover.ps1`): the runtime counts jump targets it could not resolve, those are fed back as `entry` hints, and the loop repeats to a fixpoint. Hints are committed per game under `games/hints/`.
+- Earlier passes in the same style, kept because the reasoning still applies:
   - **ROM-mirror jump normalization** — reset vectors built as low-mirror (`movhi 0x0700`) or `jmp [r31]` computed jumps were mistaken for returns, so the entry never ran (dead boot, SP=0). Fixing both took the most games from "boots dead" to "boots."
   - **VIP status-register phase cycling** (DPSTTS/XPSTTS) — games poll these for a specific display/drawing phase; cycling through each phase (instead of a 2-state toggle) lets their frame-sync loops terminate.
   - **V810 interrupt-priority masking** was inverted (it masked the high-priority VIP interrupt whenever a game raised `PSW.I`); fixed to accept `level ≥ PSW.I`.
