@@ -176,6 +176,25 @@ has a column of stray tiles down the left edge. Waterworld's round HUD renders
 but its play field is empty. World X/Y or BGMap offsets are wrong for some
 worlds and right for others in the same frame.
 
+### 10. Configured but never filled — Jack Bros (2 games)
+
+Jack Bros runs its main loop (six subroutines per frame) and never stops, but
+`CHR=0/8192` — it writes 8,192 character bytes, all zero. `sub_07F0091C` sets
+up a copy of 0x700 words from WRAM `0x05003800` into VRAM `0x0003A000`, and
+that loop is correct; the buffer it copies is simply empty. `VBRECOMP_WWATCH`
+(the write half of `VBRECOMP_WATCH`, added for this) counts **2 writes** to
+that address in a whole run.
+
+The display side is configured properly — worlds 28 and 22 enabled, full-screen
+383x223, BGMaps at 0x2E000 and 0x2C000 — with `NZ=0` and `CHRnz=0` behind them.
+So this is not a renderer fault and not a stall: whatever decompresses or builds
+the tile data never runs. Ruled out along the way: the memory bus reads ROM and
+every mirror correctly (`0x07F01000`, `0x07001000` and `0x07801000` all return
+`C4F9002A`, matching the file).
+
+Jack Bros (USA) and Jack Bros. no Meiro de Hiihoo (Japan) are the same game, so
+one fix covers both.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved

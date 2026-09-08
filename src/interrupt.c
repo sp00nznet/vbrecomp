@@ -76,6 +76,8 @@ void vb_interrupt_check(void) {
                     vb_cpu.r[3], vb_cpu.r[4]);
             extern void vb_mem_dump_hot_reads(void);
             vb_mem_dump_hot_reads();
+            extern void vb_mem_dump_write_watch(void);
+            vb_mem_dump_write_watch();
             extern void vb_vip_dump_write_stats(void);
             vb_vip_dump_write_stats();
             fprintf(stderr, "  BRT A/B/C=%02X/%02X/%02X GPLT0=%04X DPCTRL=%04X XPCTRL=%04X\n",
