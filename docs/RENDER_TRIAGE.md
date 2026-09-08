@@ -202,6 +202,22 @@ against real hardware behaviour.
 Jack Bros (USA) and Jack Bros. no Meiro de Hiihoo (Japan) are the same game, so
 one fix covers both.
 
+## Configuration is exhausted
+
+The 29 remaining blank games do not draw under ANY runtime configuration
+available to the driver. Every combination below was measured across all 29:
+
+| Dimension | Values tried | Result |
+|---|---|---|
+| Frame budget | 900, 3000 | 0 of 29 |
+| Input | buttons held, no input | 0 of 29 |
+| Frame pacing (`VBRECOMP_FRAME_TICKS`) | 2000, 5000, 20000, 60000, 200000 | 0 of 29 |
+
+That is 232 runs in the pacing sweep alone. Only one game was ever recoverable
+this way -- Red Alarm, which renders with no input and goes blank with buttons
+held -- and it is already counted. Everything left is a code-level fault in
+translation or hardware behaviour, not a knob.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
