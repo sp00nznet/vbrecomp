@@ -1119,6 +1119,31 @@ leaves the owner truncated so its branch is still a cross-function transfer.
 The remaining error is in which splits qualify, not in the diagnosis: the
 boundary this computes for sub_07F006CA is provably the right one.
 
+### Two more conditions tried, both still net-negative
+
+The suspicion was that the drop condition was too loose, so a fifth was added:
+the split must also LACK A PROLOGUE (no `addi -N, sp` / `st.w r31, off[sp]`
+in its first few instructions), on the theory that a real function entry is
+identifiable even when nothing happens to target it. It changes nothing:
+117 merges instead of 118, sub_07F006CA still gets its correct range, and the
+corpus still reads 34 advancing / 18 blank with Mario Clash lost.
+
+Then the merge itself was narrowed. Extending the owner to the candidate's
+`end_addr` propagates an over-estimate -- `end_addr` is a HIGH-WATER MARK, not
+an extent -- so the owner was instead extended only to the last ROM byte
+`byte_owner` actually attributes to it. Also unchanged: **65 -> 59 rendering,
+11 -> 17 blank**, the same six-to-seven game loss.
+
+That the loss survives both refinements says it is not the drop predicate and
+not the merge arithmetic. Something else depends on splits existing at
+addresses nothing targets -- most likely the interrupt handler discovery, which
+harvests entry points from exactly this population. Removing 117 of them from
+one game removes them corpus-wide.
+
+Nineteen measured negatives now. The Jack Bros diagnosis stands unchanged and
+is the most complete causal chain in this file; what does not stand is any
+version of acting on it by deleting splits.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
