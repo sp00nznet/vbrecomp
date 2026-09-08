@@ -179,6 +179,7 @@ int vb_recomp_irq_entry;
  * "the handler re-runs 42 times per interrupt" instead of inferring it from
  * an SP delta that happens to divide by four. */
 uint32_t vb_recomp_func_hits;
+uint32_t vb_recomp_func_total;   /* same count, never reset: for the heartbeat */
 static uint32_t vb_recomp_func_watch = 0xFFFFFFFFu;
 
 void vb_recomp_trace(uint32_t addr) {
@@ -187,7 +188,7 @@ void vb_recomp_trace(uint32_t addr) {
         const char *e = getenv("VBRECOMP_COUNT_FUNC");
         vb_recomp_func_watch = e ? (uint32_t)strtoul(e, NULL, 16) : 0;
     }
-    if (vb_recomp_func_watch && addr == vb_recomp_func_watch) vb_recomp_func_hits++;
+    if (vb_recomp_func_watch && addr == vb_recomp_func_watch) { vb_recomp_func_hits++; vb_recomp_func_total++; }
 }
 
 void vb_recomp_dump_trace(void) {
