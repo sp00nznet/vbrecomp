@@ -504,6 +504,30 @@ jump. Measured: advancing 38 -> 36, blank 12 -> 13. Too many ordinary returns
 reach the instruction with r31 legitimately different, and parking those breaks
 more flow than the scheduler case recovers. Reverted.
 
+## Formula V and Jack Bros both copy tiles straight out of ROM
+
+The reference settles where the tile data comes from, for both, exactly:
+
+| game | CHR byte X equals | non-zero CHR span |
+|---|---|---|
+| Jack Bros | ROM 0xA0000 + X (0x07FA0000) | 0x40-0x3FBC |
+| Formula V (Emulator) | ROM 0x306FA0 + X (0x07F06FA0) | 0x22-0xC6F |
+
+Neither is compressed and neither pointer appears anywhere in the ROM as a
+32-bit constant, at any alignment, so both are computed.
+
+For Formula V we now know the read side works and the write side does not:
+a read watch on 0x07F06FC0 fires (LR=0x07C2C316) and the ROM there holds real
+tile bitmaps (0x01FC0000), but every one of its 67,504 CHR writes is zero.
+Raw pre-mapping VIP write addresses span only 0x00000020-0x0003DBE0, so this is
+not the mirror-mapping fault it looked like -- the game reads the right data and
+then never writes it to character memory at all. Its 2,995 non-zero writes go to
+BGMap 0x32000-0x3BB14.
+
+`vb_vip_dump_write_stats` now also prints that raw range, because a count and a
+mapped range together still could not distinguish "wrote to the wrong place"
+from "never wrote".
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved

@@ -25,6 +25,11 @@ static uint32_t g_other_lo = 0xFFFFFFFF, g_other_hi;
  * 2,869 non-zero cells while the world it enables (segment 10, 0x34000)
  * reads back empty. */
 static uint32_t g_bg_lo = 0xFFFFFFFF, g_bg_hi, g_chr_lo = 0xFFFFFFFF, g_chr_hi;
+/* The RAW address the game wrote, before vip_map_addr folds mirrors. If a
+ * game's tile data reads correctly out of ROM but every CHR write lands as
+ * zero, the writes are going somewhere the mapping did not expect, and only
+ * the pre-mapping address can say where. */
+static uint32_t g_raw_lo = 0xFFFFFFFF, g_raw_hi;
 static inline int is_chr_off(uint32_t o) {
     /* CHR lives in four 0x2000 segments interleaved with the framebuffers. */
     return (o >= 0x06000 && o < 0x08000) || (o >= 0x0E000 && o < 0x10000) ||
@@ -52,6 +57,8 @@ void vb_vip_dump_write_stats(void) {
     fprintf(stderr, "  write ranges: CHR 0x%05X-0x%05X  BGMap 0x%05X-0x%05X\n",
             g_chr_writes ? g_chr_lo : 0, g_chr_hi,
             g_bgmap_writes ? g_bg_lo : 0, g_bg_hi);
+    fprintf(stderr, "  raw non-zero VIP writes: 0x%08X-0x%08X\n",
+            g_raw_hi ? g_raw_lo : 0, g_raw_hi);
 }
 
 /* Dump the render chain for enabled (non-OBJ) worlds: does each world's BGMap
@@ -438,6 +445,8 @@ void vb_vip_write16(vb_addr_t addr, uint16_t val) {
         return;
     }
     if (is_vram_addr(addr)) {
+        if (val) { if (addr < g_raw_lo) g_raw_lo = addr;
+                   if (addr > g_raw_hi) g_raw_hi = addr; }
         uint32_t off = vip_map_addr(addr);
         track_vram_write(off, val);
         if (off + 1 < VB_VRAM_SIZE) {
