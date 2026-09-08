@@ -911,7 +911,13 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");
-    fprintf(out, "#define VB_JUMP(a)  do { vb_recomp_tail_target = (a); return; } while (0)\n\n");
+    fprintf(out, "/* A jump to address 0 is never legitimate, and parking it would be\n");
+    fprintf(out, " * invisible: the drain loop treats a zero target as `nothing pending` and\n");
+    fprintf(out, " * exits, so control is lost with no counter moving. Count it as an\n");
+    fprintf(out, " * unimplemented call instead -- it then shows up in the heartbeat and\n");
+    fprintf(out, " * scripts/discover.ps1 can see it. */\n");
+    fprintf(out, "#define VB_JUMP(a)  do { uint32_t _t_ = (a); if (_t_) vb_recomp_tail_target = _t_; else vb_recomp_stub(0); return; } while (0)\n");
+    fprintf(out, "\n");
 
     /* Forward declarations (confirmed functions only) */
     for (int i = 0; i < ctx->num_funcs; i++) {
