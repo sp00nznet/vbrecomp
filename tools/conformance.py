@@ -367,6 +367,16 @@ CASES = [
     # corpus until these cases existed, which is invisible from the outside --
     # the game runs on, having drawn nothing.
     #
+    # r30/r29 are the source/destination WORD ADDRESSES and r27/r26 the
+    # source/destination BIT OFFSETS. These cases first had that inverted, and
+    # passed anyway, because they were written from the same wrong belief as the
+    # implementation -- the exact failure this file's docstring warns about. Two
+    # ROMs settle it: Golf's wrapper at sub_07E0E4D0 loads `r29 = r6;
+    # r26 = (r6 & 3) << 3` and `r30 = r7; r27 = (r7 & 3) << 3`, pairing each
+    # address with the offset from its own low two bits, and Ballface blits with
+    # a word-aligned source (`r27 = 0`) and a variable destination bit position
+    # (`r26 = r5`), which is a glyph's x.
+    #
     # Each case builds its own source word in WRAM, points the register block
     # at it, and reads back what landed at the destination.
     Case("movbsu: aligned word copy",
@@ -374,22 +384,22 @@ CASES = [
           *f5(0x2F, 7, 0, 0xAAAA),                    # r7 = 0xAAAA5555
           *f5(0x28, 7, 7, 0x5555),
           *f6(0x37, 7, 6, 0x40),                      # [r6+0x40] = source
-          *f5(0x28, 26, 6, 0x0040),                   # r26 = source address
-          *f5(0x28, 27, 6, 0x0050),                   # r27 = dest address
+          *f5(0x28, 30, 6, 0x0040),                   # r30 = source address
+          *f5(0x28, 29, 6, 0x0050),                   # r29 = dest address
           *f5(0x29, 28, 0, 32),                       # r28 = 32 bits
-          *f2(0x10, 29, 0), *f2(0x10, 30, 0),         # both offsets 0
+          *f2(0x10, 26, 0), *f2(0x10, 27, 0),         # both offsets 0
           *f2(0x1F, 0, 0x0B),                         # movbsu
           *f6(0x33, 7, 6, 0x50)],                     # r7 = [r6+0x50]
          {}, {7: 0xAAAA5555},
          "a whole word, offset zero: the case every other one is a shift of"),
     Case("movbsu: advances the registers",
          [*f5(0x2F, 6, 0, 0x0500),
-          *f5(0x28, 26, 6, 0x0040),
-          *f5(0x28, 27, 6, 0x0050),
+          *f5(0x28, 30, 6, 0x0040),
+          *f5(0x28, 29, 6, 0x0050),
           *f5(0x29, 28, 0, 32),
-          *f2(0x10, 29, 0), *f2(0x10, 30, 0),
+          *f2(0x10, 26, 0), *f2(0x10, 27, 0),
           *f2(0x1F, 0, 0x0B)],
-         {}, {26: 0x05000044, 27: 0x05000054, 28: 0, 29: 0, 30: 0},
+         {}, {30: 0x05000044, 29: 0x05000054, 28: 0, 27: 0, 26: 0},
          "the instruction is restartable: it must leave the registers pointing "
          "past what it copied, or a continued copy repeats itself forever"),
     Case("movbsu: unaligned destination bit",
@@ -398,11 +408,11 @@ CASES = [
           *f6(0x37, 7, 6, 0x60),                      # source = 0x0000000F
           *f2(0x10, 7, 0),
           *f6(0x37, 7, 6, 0x70),                      # dest starts clear
-          *f5(0x28, 26, 6, 0x0060),
-          *f5(0x28, 27, 6, 0x0070),
+          *f5(0x28, 30, 6, 0x0060),
+          *f5(0x28, 29, 6, 0x0070),
           *f5(0x29, 28, 0, 4),                        # 4 bits
-          *f5(0x29, 29, 0, 8),                        # dest bit offset 8
-          *f2(0x10, 30, 0),                           # source bit offset 0
+          *f5(0x29, 26, 0, 8),                        # dest bit offset 8
+          *f2(0x10, 27, 0),                           # source bit offset 0
           *f2(0x1F, 0, 0x0B),
           *f6(0x33, 7, 6, 0x70)],
          {}, {7: 0x00000F00},
@@ -414,11 +424,11 @@ CASES = [
           *f6(0x37, 7, 6, 0x80),                      # source word = all ones
           *f2(0x10, 7, 0),
           *f6(0x37, 7, 6, 0x90), *f6(0x37, 7, 6, 0x94),
-          *f5(0x28, 26, 6, 0x0080),
-          *f5(0x28, 27, 6, 0x0090),
+          *f5(0x28, 30, 6, 0x0080),
+          *f5(0x28, 29, 6, 0x0090),
           *f5(0x29, 28, 0, 8),                        # 8 bits
-          *f5(0x29, 29, 0, 28),                       # starting at bit 28
-          *f2(0x10, 30, 0),
+          *f5(0x29, 26, 0, 28),                       # starting at bit 28
+          *f2(0x10, 27, 0),
           *f2(0x1F, 0, 0x0B),
           *f6(0x33, 7, 6, 0x94)],                     # read the SECOND word
          {}, {7: 0x0000000F},
@@ -430,10 +440,10 @@ CASES = [
           *f6(0x37, 7, 6, 0xA0),                      # source = 0x000000FF
           *f5(0x2F, 7, 0, 0x0000), *f5(0x28, 7, 7, 0x0F00),
           *f6(0x37, 7, 6, 0xB0),                      # dest   = 0x00000F00
-          *f5(0x28, 26, 6, 0x00A0),
-          *f5(0x28, 27, 6, 0x00B0),
+          *f5(0x28, 30, 6, 0x00A0),
+          *f5(0x28, 29, 6, 0x00B0),
           *f5(0x29, 28, 0, 32),
-          *f2(0x10, 29, 0), *f2(0x10, 30, 0),
+          *f2(0x10, 26, 0), *f2(0x10, 27, 0),
           *f2(0x1F, 0, 0x08),                         # orbsu
           *f6(0x33, 7, 6, 0xB0)],
          {}, {7: 0x00000FFF},
@@ -444,10 +454,10 @@ CASES = [
           *f6(0x37, 7, 6, 0xC0),                      # source = 0x000000FF
           *f5(0x2F, 7, 0, 0x0000), *f5(0x28, 7, 7, 0x0FFF),
           *f6(0x37, 7, 6, 0xD0),                      # dest   = 0x00000FFF
-          *f5(0x28, 26, 6, 0x00C0),
-          *f5(0x28, 27, 6, 0x00D0),
+          *f5(0x28, 30, 6, 0x00C0),
+          *f5(0x28, 29, 6, 0x00D0),
           *f5(0x29, 28, 0, 32),
-          *f2(0x10, 29, 0), *f2(0x10, 30, 0),
+          *f2(0x10, 26, 0), *f2(0x10, 27, 0),
           *f2(0x1F, 0, 0x0D),                         # andnbsu
           *f6(0x33, 7, 6, 0xD0)],
          {}, {7: 0x00000F00},

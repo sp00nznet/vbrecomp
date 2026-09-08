@@ -29,9 +29,19 @@ void vb_cpu_init(void) {
  * or a decompressed tile into VRAM at an arbitrary bit offset. Operands live in
  * fixed registers rather than in the encoding:
  *
- *   r26 = source word address     r30 = source bit offset   (0-31)
- *   r27 = destination word address r29 = destination bit offset (0-31)
+ *   r30 = source word address       r27 = source bit offset      (0-31)
+ *   r29 = destination word address  r26 = destination bit offset (0-31)
  *   r28 = length in BITS
+ *
+ * The addresses live in r29/r30 and the offsets in r26/r27 -- not the other way
+ * round, which is what this originally had. Real ROM code settles it: Golf's
+ * wrapper at sub_07E0E4D0 loads `r29 = r6; r26 = (r6 & 3) << 3` and
+ * `r30 = r7; r27 = (r7 & 3) << 3`, pairing each address with the bit offset
+ * derived from its own low two bits, and Ballface blits with `r27 = 0` (a
+ * word-aligned source) and `r26 = r5` (a variable destination bit position, the
+ * x of a glyph). With the operands swapped, every blit read and wrote near
+ * address zero -- scribbling on the left framebuffer while the real destination
+ * stayed empty, which is worse than the no-op this replaced.
  *
  * The instruction is restartable, so it leaves those registers pointing at
  * whatever it did not finish: addresses advance a word at a time, the offsets
@@ -43,11 +53,11 @@ void vb_cpu_init(void) {
  * arbitrary-offset case obviously right, and correctness came first here.
  */
 void vb_bitstring(int op) {
-    uint32_t src_addr = vb_cpu.r[26] & ~3u;
-    uint32_t dst_addr = vb_cpu.r[27] & ~3u;
+    uint32_t src_addr = vb_cpu.r[30] & ~3u;
+    uint32_t dst_addr = vb_cpu.r[29] & ~3u;
     uint32_t len      = vb_cpu.r[28];
-    uint32_t dst_bit  = vb_cpu.r[29] & 31u;
-    uint32_t src_bit  = vb_cpu.r[30] & 31u;
+    uint32_t src_bit  = vb_cpu.r[27] & 31u;
+    uint32_t dst_bit  = vb_cpu.r[26] & 31u;
 
     while (len > 0) {
         uint32_t s = (vb_mem_read32(src_addr) >> src_bit) & 1u;
@@ -73,11 +83,11 @@ void vb_bitstring(int op) {
         len--;
     }
 
-    vb_cpu.r[26] = src_addr;
-    vb_cpu.r[27] = dst_addr;
+    vb_cpu.r[30] = src_addr;
+    vb_cpu.r[29] = dst_addr;
     vb_cpu.r[28] = 0;
-    vb_cpu.r[29] = dst_bit;
-    vb_cpu.r[30] = src_bit;
+    vb_cpu.r[27] = src_bit;
+    vb_cpu.r[26] = dst_bit;
 }
 
 /*
