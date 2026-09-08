@@ -19,15 +19,28 @@ static int bgmap_writes_per_frame = 0;
  * whether a game loads graphics at all. Dumped by vb_vip_dump_write_stats(). */
 static unsigned long long g_chr_writes, g_chr_any, g_bgmap_writes, g_oam_writes, g_other_writes;
 static uint32_t g_other_lo = 0xFFFFFFFF, g_other_hi;
+/* Where the non-zero writes actually LAND. A count alone cannot tell a game
+ * that fills the WRONG BGMap segment from one that fills none: SPONG writes
+ * 2,869 non-zero cells while the world it enables (segment 10, 0x34000)
+ * reads back empty. */
+static uint32_t g_bg_lo = 0xFFFFFFFF, g_bg_hi, g_chr_lo = 0xFFFFFFFF, g_chr_hi;
 static inline int is_chr_off(uint32_t o) {
     /* CHR lives in four 0x2000 segments interleaved with the framebuffers. */
     return (o >= 0x06000 && o < 0x08000) || (o >= 0x0E000 && o < 0x10000) ||
            (o >= 0x16000 && o < 0x18000) || (o >= 0x1E000 && o < 0x20000);
 }
 static inline void track_vram_write(uint32_t mapped, uint32_t val) {
-    if (is_chr_off(mapped)) { g_chr_any++; if (val) g_chr_writes++; return; }
+    if (is_chr_off(mapped)) {
+        g_chr_any++;
+        if (val) { g_chr_writes++;
+                   if (mapped < g_chr_lo) g_chr_lo = mapped;
+                   if (mapped > g_chr_hi) g_chr_hi = mapped; }
+        return;
+    }
     if (val == 0) return;
-    if (mapped >= 0x20000 && mapped < 0x3D800) g_bgmap_writes++;
+    if (mapped >= 0x20000 && mapped < 0x3D800) { g_bgmap_writes++;
+        if (mapped < g_bg_lo) g_bg_lo = mapped;
+        if (mapped > g_bg_hi) g_bg_hi = mapped; }
     else if (mapped >= 0x3E000 && mapped < 0x40000) g_oam_writes++;
     else { g_other_writes++; if (mapped < g_other_lo) g_other_lo = mapped; if (mapped > g_other_hi) g_other_hi = mapped; }
 }
@@ -35,6 +48,9 @@ void vb_vip_dump_write_stats(void) {
     fprintf(stderr, "  VRAM writes: CHR=%llu/%llu(nonzero/any) BGMap=%llu OAM=%llu other=%llu [0x%05X-0x%05X]\n",
             g_chr_writes, g_chr_any, g_bgmap_writes, g_oam_writes, g_other_writes,
             g_other_writes ? g_other_lo : 0, g_other_hi);
+    fprintf(stderr, "  write ranges: CHR 0x%05X-0x%05X  BGMap 0x%05X-0x%05X\n",
+            g_chr_writes ? g_chr_lo : 0, g_chr_hi,
+            g_bgmap_writes ? g_bg_lo : 0, g_bg_hi);
 }
 
 /* Dump the render chain for enabled (non-OBJ) worlds: does each world's BGMap
