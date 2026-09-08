@@ -177,6 +177,11 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
  * the second half. */
 static bool safe_split_point(v810_ctx_t *ctx, const v810_func_t *f, uint32_t at) {
     if (at <= f->addr || at >= f->end_addr) return false;
+    /* This rescans the whole body per candidate target, so it is quadratic in
+     * (targets x size). On a big function with many jump-table targets that
+     * stops finishing: SD Gundam ran past fifteen minutes. Large functions are
+     * rare and are exactly the expensive ones, so leave them uncut. */
+    if (f->end_addr - f->addr > 0x2000) return false;
     uint32_t off = addr_to_offset(ctx, f->addr);
     uint32_t end = addr_to_offset(ctx, f->end_addr);
     if (off >= ctx->rom_size || end > ctx->rom_size) return false;
@@ -804,6 +809,28 @@ void v810_analyze(v810_ctx_t *ctx) {
             for (int i = 0; i < ctx->num_funcs; i++) {
                 if (!ctx->funcs[i].visited) { analyze_func(ctx, i); progress2 = true; }
             }
+        }
+    }
+
+    /* A function ends where the next one begins.
+     *
+     * Analysis extends a function forward until it hits a terminator, which can
+     * run straight past the start of another known function -- and the emitter
+     * then writes those instructions out TWICE, once in each body. With entries
+     * being added for jump targets that duplication compounds: Virtual Boy
+     * Wario Land reached 83 MB of generated C, against 4 MB for Mario's Tennis
+     * at a quarter the ROM size, and SD Gundam stopped finishing analysis at
+     * all.
+     *
+     * Clamping is only safe because a body that does not end in a transfer now
+     * emits an explicit fall-through to its successor, so cutting a function at
+     * the next entry preserves the flow instead of turning it into a return. */
+    qsort(ctx->funcs, ctx->num_funcs, sizeof(v810_func_t), func_cmp);
+    for (int i = 0; i + 1 < ctx->num_funcs; i++) {
+        if (!ctx->funcs[i].visited) continue;
+        uint32_t next = ctx->funcs[i + 1].addr;
+        if (next > ctx->funcs[i].addr && next < ctx->funcs[i].end_addr) {
+            ctx->funcs[i].end_addr = next;
         }
     }
 
