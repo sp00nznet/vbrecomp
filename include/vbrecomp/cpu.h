@@ -66,6 +66,32 @@ extern vb_cpu_state_t vb_cpu;
 /* Initialize CPU state (clears registers, sets PIR) */
 void vb_cpu_init(void);
 
+/* A pending TAIL JUMP: the address recompiled code transferred to instead of
+ * returning.
+ *
+ * A game's main loop is a control-flow CYCLE. Mario's Tennis dispatches through
+ * a 64-entry jump table and each state handler ends `jr` back to the
+ * dispatcher; translated as calls that is unbounded mutual recursion, and
+ * translated as returns the loop is dropped and the boot unwinds after one
+ * state -- which is why 16 corpus ROMs ran no game code at all.
+ *
+ * So a jump out of a function parks its target here and returns. Every CALL
+ * SITE then drains it (vb_recomp_drain, emitted alongside the dispatch table):
+ * the chain runs to completion there, before the caller resumes, so ordering is
+ * preserved and the stack stays flat.
+ *
+ * Draining at the call site rather than only at boot is the whole trick. An
+ * earlier attempt returned all the way to boot, so a caller resumed before its
+ * callee's transfer had run -- which broke games that had been working. */
+extern uint32_t vb_recomp_tail_target;
+
+/* Run any parked transfer to completion. Defined in the generated code (it
+ * needs the dispatch table). The runtime calls this after invoking an interrupt
+ * handler: a handler that ends in a jump parks its target, and with nobody
+ * draining it there the transfer would fire later at an unrelated call site,
+ * with unrelated state. */
+void vb_recomp_drain(void);
+
 /* Bit string op (opcode 0x1F): copies r28 bits from bit r30 of [r26] to bit
  * r29 of [r27], combining with the destination per `op` (VB_BSU_*). */
 void vb_bitstring(int op);
