@@ -1406,6 +1406,51 @@ measured (drop splits, drop-and-merge, cross-function entries, and these two
 depth changes); the only one that fixes Jack Bros outright is cross-function
 entries, and it costs Elevated Speed for a reason still not identified.
 
+## Pacing is a confound in every control-flow measurement here
+
+A frame is `VBRECOMP_FRAME_TICKS` calls to `vb_interrupt_check()`, and that
+function is emitted **at every function entry** as well as at backward branch
+targets. So the number of checks per unit of real work depends on how the
+recompiler carved the ROM into functions -- and any change to function
+granularity silently changes the frame rate. The timer is driven the same way
+(`vb_timer_tick(VB_CYCLES_PER_CHECK)` per check), so it moves too.
+
+This is not theoretical. Replacing splits with cross-function entries merges 12
+boot functions in Elevated Speed into their owners, including the reset delay
+loop (`movea 0x2000, r0, r6` then `add -1, r6 ; bnz .`), which was its own
+4-byte and 16-byte functions. At the default 20,000 ticks the merged build
+looks broken; at 60,000 it is fine:
+
+| Elevated Speed (High Res) | non-zero CHR | BGMap |
+|---|---|---|
+| baseline, 20,000 ticks | 231,461 | 788,048 |
+| cross-function entries, 20,000 | 7,667 | 6,270 |
+| cross-function entries, 60,000 | **221,142** | **746,028** |
+| cross-function entries, 200,000 | 221,135 | 746,106 |
+
+The trace showed it too: baseline loops on `sub_07C201CC`, and under entries
+that function still exists and is simply never reached, because the game has not
+had the CPU time to get there. Nothing was miscompiled.
+
+And the tick count is not free to raise: **the corpus scores 66/10 at 20,000 and
+65/11 at 60,000**, where Space Invaders flips to blank. There is no single good
+value, and Space Invaders is marginal enough to flip between runs at 60,000.
+
+### What this means for the results in this file
+
+Every "measured negative" recorded here for a control-flow change is partly a
+pacing measurement. A change that merges functions reduces checks and starves
+the game at a fixed tick count; a change that creates functions does the
+opposite. The cross-function-entry result in particular (-2 games) is now known
+to be pacing rather than a correctness regression, which matters because that is
+the only change that fixes Jack Bros' stack leak outright.
+
+The real fix is to make the frame boundary independent of function granularity
+-- drive it from the VIP's own frame timing, which is what defines a frame on
+hardware, rather than from a count of emitted poll sites. Until then, any
+control-flow change should be measured at more than one tick count before it is
+called a regression.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
