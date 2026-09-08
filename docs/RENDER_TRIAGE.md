@@ -568,6 +568,31 @@ So the question is not "why is this pointer null" but "which allocation stops",
 and the answer is a specific address in a specific frame rather than a class of
 bug. One fix should cover all four games.
 
+### The allocator is fine; a later init step never runs, and it is early
+
+Comparing the whole object at 0x0500668C field by field against hardware, most
+of it is already right:
+
+| field | hardware | ours |
+|---|---|---|
+| +32 / +36 / +40 | 0x050089A4 / 0x050089C0 / 0x050089DC | **identical** |
+| +60 | 0x07108130 (ROM) | **identical** |
+| +8 | 0x05007888 | 0 |
+| +16 | 0x05000EFC | 0 |
+| +44 | counter | 0 |
+| +56 | 0x050066D8 | 0 |
+
+Three allocations from `sub_07E2A054` land at the same addresses on both sides,
+so the memory pool works and the constructor runs. `sub_07E32F4C` even zeroes
++8 deliberately (`st.w r0, 8[r29]`) -- it is meant to be filled in later, and
+the later step is what is missing.
+
+Dumping hardware at frames 30, 60 and 200 dates it: +8, +16 and +56 are already
+set at **frame 30**, and +44 is just a counter climbing (0x140, 0x398, 0xE88).
+So the divergence is in early boot, not in the frame loop, and the missing piece
+includes an object at 0x05000EF8 holding {0x0F, 0x0003C5F0} that we never build.
+Non-zero WRAM: 2,370 on hardware at frame 30 against our 1,174 at frame 450.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
