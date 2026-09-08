@@ -238,6 +238,7 @@ void vb_interrupt_check(void) {
                         i, int_count[i], psw);
             }
             uint32_t sp_before = vb_cpu.r[3];
+            vb_recomp_func_hits = 0;
             /* Only pay for the snapshot when someone is looking. */
             static int reg_chk = -1;
             if (reg_chk < 0) reg_chk = getenv("VBRECOMP_HEARTBEAT") ? 1 : 0;
@@ -267,6 +268,9 @@ void vb_interrupt_check(void) {
                 if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)
                     fprintf(stderr, "IRQ %d LEAKED SP: %08X -> %08X (delta %d)\n",
                             i, sp_before, vb_cpu.r[3], (int)(vb_cpu.r[3] - sp_before));
+                if (getenv("VBRECOMP_COUNT_FUNC"))
+                    fprintf(stderr, "    watched function entered %u times in this dispatch\n",
+                            vb_recomp_func_hits);
             }
             /* A handler must leave the guest's registers as it found them.
              * When our translation loses part of an epilogue it does not, and

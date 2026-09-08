@@ -1066,6 +1066,59 @@ precisely this. The trace does not show the handler looping in the window
 sampled, so this is a number that fits rather than a mechanism observed. Anyone
 picking this up should count handler entries per dispatch before believing it.
 
+## Jack Bros, solved as a causal chain (fix measured, not shippable yet)
+
+`VBRECOMP_COUNT_FUNC=<hex>` counts entries to one function and the interrupt
+dispatcher reports it per handler call. That first killed my own hypothesis --
+the handler is entered exactly ONCE per dispatch, not 42 times -- and then
+produced the real chain.
+
+The VIP handler makes six sequential `jal`s. We enter them:
+
+| callee | entries per dispatch |
+|---|---|
+| 07F006CA | 1 |
+| 07F00722 | 2 |
+| 07F0076C | 4 |
+| 07F00812 | 4 |
+| 07F008C2 | 4 |
+| 07F0091C | 4 |
+
+Doubling. The cause is a SPURIOUS SPLIT: sub_07F006CA was cut at 0x07F006E4, an
+address **no jal in the entire ROM targets** -- the genuine routine runs to its
+`jmp [r31]` at 0x07F00720, i.e. 0x07F006CA-0x07F00722. The emitter turns the
+resulting boundary into `VB_JUMP(...); /* falls through */`, a TRANSFER, so the
+drain runs the remainder of the real function and the caller then continues,
+executing everything after it twice, and again at the next split.
+
+Each extra pass also runs the handler's epilogue, which pops 4 bytes more than
+its prologue pushed (the balance belongs to the vector stub's `st.w r1`). That
+is the `IRQ 4 LEAKED SP: 0500FFFC -> 050100A4 (delta 168)` and why SP ends up
+past the top of WRAM -- the first differing word against hardware.
+
+### The fix works on the game and costs the corpus
+
+Dropping splits that (a) nothing outside targets, (b) something inside branches
+BACKWARD to, (c) are owned by another function, (d) are not `entry` hints, and
+then MERGING the owner's range back:
+
+| | before | after |
+|---|---|---|
+| sub_07F006CA range | 0x07F006CA-0x07F006E4 | 0x07F006CA-**0x07F00722** (correct) |
+| SP | 0x050100A4 (outside WRAM) | **0x0500FFF8** (hardware's exact value) |
+| IRQ SP leak | 168 bytes | **none** |
+| non-zero CHR writes | 0 | **857** |
+| conformance | - | 77/77 |
+
+118 splits dropped in Jack Bros alone. And across the corpus it is advancing
+39 -> 34, blank 11 -> 18, Mario Clash lost. Reverted.
+
+All four conditions were needed to keep conformance green, and each was added
+only after a measured failure -- the last being that dropping without merging
+leaves the owner truncated so its branch is still a cross-function transfer.
+The remaining error is in which splits qualify, not in the diagnosis: the
+boundary this computes for sub_07F006CA is provably the right one.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
