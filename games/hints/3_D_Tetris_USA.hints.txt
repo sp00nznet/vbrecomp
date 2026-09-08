@@ -1,3 +1,21 @@
 # Profile-guided entry points for 3-D Tetris (USA).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07FDEBA4
+entry 07F5CB56
+entry 07FDEBAC
+entry 07FDEC66
+entry 07FDF01A
+entry 07FDEAAC
+entry 07F5CB52
+entry 07FDEB4A
+entry 07FDE9F2
+entry 07FDEBC0
+entry 07FDEC00
+entry 07FDEB64
+entry 07FDECC2
+entry 00000040
+entry 07F5CB46
+entry 07FDEBB6
+entry 07FDEDC0
+entry 07FDEBFA

@@ -96,3 +96,13 @@ entry 07F90570
 entry 07F90568
 entry 07F9F280
 entry 07FE738E
+entry 0500E9E8
+entry 07F9B366
+entry 0500B0C8
+entry 07F9360E
+entry 0004AC00
+entry 00003920
+entry 07F934A2
+entry 07F9BB34
+entry 05013920
+entry 07F8FBF4
