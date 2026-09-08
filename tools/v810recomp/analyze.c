@@ -344,6 +344,11 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     reg_known[insn.reg2] = true;
                 }
                 break;
+            case 0x11: /* ADD imm5, reg2 */
+                if (insn.reg2 != 0) {
+                    if (reg_known[insn.reg2]) reg_val[insn.reg2] += (uint32_t)insn.imm;
+                }
+                break;
             case 0x28: /* MOVEA imm16, reg1, reg2 */
                 if (insn.reg2 != 0 && reg_known[insn.reg1]) {
                     reg_val[insn.reg2] = reg_val[insn.reg1] + (uint32_t)(int32_t)(int16_t)insn.imm;
@@ -361,6 +366,16 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                 }
                 break;
             case 0x2B: /* JAL - clobbers r31 */
+                /* ...except `jal .+4`, which is not a call at all: it is how the
+                 * V810 captures the PC. The long-call idiom continues
+                 *     jal .+4 ; add N, r31 ; jmp [rX]
+                 * so r31 ends up holding the address the callee returns to, and
+                 * knowing it is what lets the trace follow the return. */
+                if ((uint32_t)(insn.addr + insn.imm) == insn.addr + (uint32_t)insn.size) {
+                    reg_val[31] = insn.addr + (uint32_t)insn.size;
+                    reg_known[31] = true;
+                    break;
+                }
                 reg_known[31] = false;
                 /* Other registers may be clobbered by callee, but
                  * for simple constant prop we'll be conservative later */
@@ -427,6 +442,21 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                         if (jtgt >= 0 && here_confirmed) {
                             ctx->funcs[jtgt].confirmed = true;
                         }
+                    }
+                }
+                /* A `jmp [rX]` whose r31 we know is a CALL, not a jump: the
+                 * long-call idiom above set r31 to the address after this
+                 * instruction, and the callee returns there. Without following
+                 * it the trace stops at the jmp and the function's epilogue is
+                 * emitted nowhere at all -- SPONG's sub_07E33038 loses the
+                 * `ld.w 0[r3],r31 ; add 4,r3 ; jmp [r31]` at 0x07E33052, so every
+                 * virtual method call in the game returns into a hole. */
+                if (insn.reg1 != 31 && reg_known[31]) {
+                    uint32_t ret = v810_normalize_rom_addr(ctx, reg_val[31] & ~1u);
+                    if (is_rom_addr(ctx, ret)) {
+                        uint32_t ret_off = addr_to_offset(ctx, ret);
+                        if (ret_off < ctx->rom_size && num_targets < 1024)
+                            branch_targets[num_targets++] = ret_off;
                     }
                 }
                 goto next_path;
