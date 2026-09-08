@@ -128,9 +128,36 @@ frames that were genuine JAL calls, and those callers then resume after their
 call site having lost the transfer.
 
 So the fix needs to distinguish a frame entered by JAL from one entered by
-jump — i.e. a real dispatch architecture, not a single global slot. That is a
-design change, not a patch, and it is the one thing standing between the corpus
-and these 16 games.
+jump. **That work is on the `tail-jump-transfers` branch and is the closest
+this has come**, but it is unfinished and off `main` because it crashes two
+games that currently work.
+
+The model on that branch: a `jal` is a call; every other transfer — `jr`,
+`jmp [reg]`, a branch leaving the function, a jump-table case — is a JUMP that
+parks its target in `vb_recomp_tail_target` and returns. Every CALL SITE then
+drains the chain, so the transfer completes *before* the caller resumes
+(ordering preserved) and a main-loop cycle runs flat instead of recursing. Two
+things earlier attempts missed and it gets right: draining only at boot lets a
+caller resume before its callee's transfer has run, and interrupt handlers are
+invoked by the runtime with no drain at all — a handler ending in a jump parked
+a target that fired later at an unrelated call site, which is what broke
+Waterworld.
+
+Measured on that branch (3,619 bytes = a blank frame):
+
+| | before | on branch |
+|---|---|---|
+| Golf | blank | **6437** — first time it has ever drawn |
+| Mario's Tennis | blank | **5732** at frame 600 — first time |
+| Virtual Bowling | blank | 3709 |
+| Waterworld | advancing | advancing |
+| Mario Clash | advancing | **dies partway** |
+| Teleroboxer | frozen | **dies partway** |
+
+The two deaths look like stack exhaustion, so at least one cycle still nests.
+The jump-table dispatch was one of them — it *called* each case, nesting a frame
+per iteration of the loop it sits in — and is a `VB_JUMP` per case on the branch
+now; finding the remaining one is the next step.
 
 ### 5. Running, but the state machine never advances — 13 games
 
