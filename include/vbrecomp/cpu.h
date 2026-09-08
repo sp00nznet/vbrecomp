@@ -70,6 +70,14 @@ void vb_cpu_init(void);
  * r29 of [r27], combining with the destination per `op` (VB_BSU_*). */
 void vb_bitstring(int op);
 
+/* A call the translation could not make: an unanalyzed function's stub, a JAL
+ * to a callee that was never found, or an indirect jump to an address that is
+ * not in the dispatch table. Silent by nature, so they are counted instead --
+ * the heartbeat prints the busiest, which names the analysis gap that is
+ * keeping a game from getting anywhere. */
+void vb_recomp_stub(uint32_t addr);
+void vb_recomp_dump_stubs(void);
+
 /* Convenience accessors for PSW (sr[5]) */
 static inline uint32_t vb_cpu_get_psw(void) { return vb_cpu.sr[VB_SREG_PSW]; }
 static inline void vb_cpu_set_psw(uint32_t val) { vb_cpu.sr[VB_SREG_PSW] = val; }

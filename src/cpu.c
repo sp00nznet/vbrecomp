@@ -5,6 +5,7 @@
 
 #include "vbrecomp/cpu.h"
 #include "vbrecomp/mem.h"
+#include <stdio.h>
 #include <string.h>
 
 vb_cpu_state_t vb_cpu;
@@ -77,4 +78,50 @@ void vb_bitstring(int op) {
     vb_cpu.r[28] = 0;
     vb_cpu.r[29] = dst_bit;
     vb_cpu.r[30] = src_bit;
+}
+
+/*
+ * Unimplemented-call tracking.
+ *
+ * Three places in the generated code are holes the translation left behind: a
+ * function the analyzer confirmed but never walked (emitted as a stub), a JAL
+ * to a callee it never found, and an indirect jump whose target is not in the
+ * dispatch table. All three are silent -- the game calls them, nothing happens,
+ * and it runs on forever with state it never actually computed. That is what a
+ * "boots but draws nothing" ROM usually looks like from the outside.
+ *
+ * Counting them turns that into a name: the address hit 400,000 times is the
+ * function worth teaching the analyzer to find. The heartbeat prints the top
+ * few (VBRECOMP_HEARTBEAT=1), alongside the hot reads.
+ */
+#define STUB_N 512
+static uint32_t stub_addr[STUB_N];
+static uint32_t stub_cnt[STUB_N];
+static uint32_t stub_total;
+
+void vb_recomp_stub(uint32_t addr) {
+    uint32_t h = (addr * 2654435761u) % STUB_N;
+    stub_total++;
+    for (uint32_t i = 0; i < STUB_N; i++) {
+        uint32_t j = (h + i) % STUB_N;
+        if (stub_cnt[j] == 0) { stub_addr[j] = addr; stub_cnt[j] = 1; return; }
+        if (stub_addr[j] == addr) { stub_cnt[j]++; return; }
+    }
+    /* ponytail: table full -- the counts still rank the first 512 addresses,
+     * which is far more than any one game has holes. */
+}
+
+void vb_recomp_dump_stubs(void) {
+    if (!stub_total) return;
+    fprintf(stderr, "  unimplemented calls: %u total\n", stub_total);
+    for (int k = 0; k < 6; k++) {
+        int best = -1; uint32_t bc = 0;
+        for (uint32_t i = 0; i < STUB_N; i++)
+            if (stub_cnt[i] > bc) { bc = stub_cnt[i]; best = (int)i; }
+        if (best < 0) break;
+        fprintf(stderr, "    sub_%08X x%u\n", stub_addr[best], stub_cnt[best]);
+        stub_cnt[best] = 0;
+    }
+    memset(stub_cnt, 0, sizeof(stub_cnt));
+    stub_total = 0;
 }
