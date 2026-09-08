@@ -688,6 +688,36 @@ functions are genuinely separate routines that merely fall inside another
 function's approximate range. So the range data is the real problem: until
 function boundaries are exact, any rule keyed on containment will misfire.
 
+### Function ranges are a high-water mark, and now there is exact data
+
+`func->end_addr` is the highest address reached on ANY path explored from the
+entry, so one forward jump inflates it and "is this address inside that
+function" stops meaning anything. That is why every containment-keyed fix
+above misfired.
+
+The analyzer now also records, per ROM byte, which function first traced it
+(`ctx->byte_owner`). The two measures disagree badly, in both directions:
+
+| game | interior by end_addr range | interior by exact ownership |
+|---|---|---|
+| Mario Clash | 121 | 48 |
+| Galactic Pinball | 8 | 23 |
+| Waterworld | 9 | 29 |
+
+Mario Clash explains the earlier failure exactly: the containment rule thunked
+121 functions, of which 73 were not interior at all.
+
+Re-running the multi-entry fix on exact ownership instead is still wrong, and
+conformance catches it in seconds -- "bcond: backward branch loops" fails,
+because a function whose first byte was traced by a FALL-THROUGH from its
+neighbour is not an interior label either. Ownership is necessary but not
+sufficient: what is wanted is "reached only by a branch from inside", which
+needs edge data the analyzer does not keep.
+
+The ownership array is committed (measured neutral) because it is the
+foundation any real fix here needs, and because the disagreement table above is
+the evidence that the range data was never trustworthy.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
