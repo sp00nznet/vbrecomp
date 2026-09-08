@@ -617,6 +617,33 @@ destroyed somewhere in the game's own translated flow -- most likely the
 re-entry of sub_07F00026 through a nested drain that the DEEP trace already
 showed, which re-runs the loop body without re-running `mov 6, r25`.
 
+### Profile-guided discovery can harvest a LOOP LABEL, and that is poison
+
+Galactic Pinball's hints file contained `entry 07F000AC`. That address is one
+instruction past `mov 6, r25` inside sub_07F00026's counted loop:
+
+```
+07F000AA: mov  6, r25          <- initialisation
+07F000AC: jal  0x07F00976      <- the harvested "entry" starts HERE
+07F000B0: jal  0x07F007C0
+07F000B4: add  -1, r25
+07F000B6: bnz  0x07F000AC
+```
+
+Making it an entry lets control arrive AFTER the initialisation, so `add -1,
+r25` decrements whatever r25 happened to hold. Observed: 0xFFFFFF9F (-97),
+which makes the inner multiply-by-addition loop at 0x07F00986 run about four
+billion times. That is the whole reason this game reported no frames.
+
+Removing the one hint fixes the hang (r25 back to 0, execution moves on).
+
+**Rejecting such entries globally does NOT work.** A rule that drops any entry
+landing on a backward-branch target inside another function catches this one
+and three more in the same ROM -- and is advancing 39 -> 32, blank 11 -> 18
+across the corpus, because plenty of games genuinely are dispatched into the
+middle of a loop. Reverted; the hint is removed per-game with a comment in the
+hints file so discovery does not re-add it.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
