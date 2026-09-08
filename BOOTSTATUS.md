@@ -2,9 +2,9 @@
 
 Every recompiled ROM built with the shared generic driver (no game-specific code) and booted headless for 600 frames. Screenshots in `corpus/_shots/`.
 
-- Builds: **75 / 77**
-- Runs without crashing: **75 / 77**
-- Drew visible output: **46 / 77** (non-blank screenshot)
+- Builds: **76 / 77**
+- Runs without crashing: **76 / 77**
+- Drew visible output: **47 / 77** (non-blank screenshot)
 
 Most games run but don't render under the naive driver yet -- they need per-game boot/timing tuning (as the lead games got). 'Drew visible output' marks the ones that already show something.
 
@@ -39,25 +39,25 @@ Most games run but don't render under the naive driver yet -- they need per-game
 | 27 | Red Alarm (Japan) | ok | yes | yes |  |
 | 28 | Red Alarm (USA) | ok | yes | yes |  |
 | 29 | Red Square (World) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 30 | Soviet Union 2010 (World) (v1.0) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 31 | Soviet Union 2010 (World) (v1.2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 32 | Soviet Union 2011 (World) (Beta 1) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 33 | Soviet Union 2011 (World) (Beta 2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 34 | Soviet Union 2011 (World) (v1.0) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 35 | Soviet Union 2011 (World) (v1.1) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 36 | Soviet Union 2011 (World) (v1.2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 37 | Space Squash (Japan) | ok | yes | yes |  |
-| 38 | T&E Virtual Golf (Japan) | ok | yes | yes |  |
-| 39 | Teleroboxer (Japan, USA) (En) | ok | yes | yes |  |
-| 40 | Tobidase! Panibon (Japan) | ok | yes | yes |  |
-| 41 | Tron VB (World) (Demo) (Aftermarket) (Homebrew) | ok | yes | yes |  |
-| 42 | Virtual Boy Wario Land (Japan, USA) (En) | ok | yes | yes |  |
-| 43 | Virtual League Baseball (USA) | ok | yes | yes |  |
-| 44 | Virtual Pro Yakyuu '95 (Japan) | ok | yes | yes |  |
-| 45 | V-Tetris (Japan) | ok | yes | yes |  |
-| 46 | Waterworld (USA) | ok | yes | yes |  |
-| 47 |  | fail | no | no | vbrecomp.lib(interrupt.obj) : error LNK2019: unresolved external symbol vb_recomp_drain referenced in function vb_interrupt_check [G:\recomp\vb\vbrecomp\build_all\games\corpus__vf.vcxproj] |
-| 48 | SD Gundam - Dimension War (Japan) | fail | no | no | vbrecomp.lib(interrupt.obj) : error LNK2019: unresolved external symbol vb_recomp_drain referenced in function vb_interrupt_check [G:\recomp\vb\vbrecomp\build_all\games\corpus_SD_Gundam_Dimension_War_Japan.vcxproj] |
+| 30 | SD Gundam - Dimension War (Japan) | ok | yes | yes |  |
+| 31 | Soviet Union 2010 (World) (v1.0) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 32 | Soviet Union 2010 (World) (v1.2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 33 | Soviet Union 2011 (World) (Beta 1) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 34 | Soviet Union 2011 (World) (Beta 2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 35 | Soviet Union 2011 (World) (v1.0) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 36 | Soviet Union 2011 (World) (v1.1) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 37 | Soviet Union 2011 (World) (v1.2) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 38 | Space Squash (Japan) | ok | yes | yes |  |
+| 39 | T&E Virtual Golf (Japan) | ok | yes | yes |  |
+| 40 | Teleroboxer (Japan, USA) (En) | ok | yes | yes |  |
+| 41 | Tobidase! Panibon (Japan) | ok | yes | yes |  |
+| 42 | Tron VB (World) (Demo) (Aftermarket) (Homebrew) | ok | yes | yes |  |
+| 43 | Virtual Boy Wario Land (Japan, USA) (En) | ok | yes | yes |  |
+| 44 | Virtual League Baseball (USA) | ok | yes | yes |  |
+| 45 | Virtual Pro Yakyuu '95 (Japan) | ok | yes | yes |  |
+| 46 | V-Tetris (Japan) | ok | yes | yes |  |
+| 47 | Waterworld (USA) | ok | yes | yes |  |
+| 48 |  | fail | no | no | vbrecomp.lib(interrupt.obj) : error LNK2019: unresolved external symbol vb_recomp_drain referenced in function vb_interrupt_check [G:\recomp\vb\vbrecomp\build_all\games\corpus__vf.vcxproj] |
 | 49 | 3-D Tetris (USA) | ok | yes | no |  |
 | 50 | Bound High (Japan) (En) (Proto) | ok | yes | no |  |
 | 51 | Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | ok | yes | no |  |
