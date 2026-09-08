@@ -1,14 +1,14 @@
-# Reference comparison
+﻿# Reference comparison
 
 Every other check here measures vbrecomp against itself. These measure it
 against **real hardware behaviour**, using BizHawk's Mednafen Virtual Boy core
-as the oracle — which is the one thing the corpus work kept needing and did not
+as the oracle â€” which is the one thing the corpus work kept needing and did not
 have.
 
 ```powershell
 $bh  = "G:\recomp\snes\bizhawk\EmuHawk.exe"
 $rom = "roms\Jack Bros. (USA).vb"
-& $bh "$rom" --lua="scripts\reference\fingerprint.lua"
+& $bh "$rom" --lua="scripts\reference\dumpwram.lua"
 # then read %TEMP%\vbpc_out.txt
 ```
 
@@ -20,7 +20,7 @@ non-zero. `probe.lua` does the same for one specific WRAM range. Both write to
 
 The core names them `DRAM` (the 64 KB the VB calls WRAM), `CHR RAM` (the
 character half of VIP memory), `Framebuffer`, `ROM` and `CARTRAM`. Matching on
-"wram"/"vram" finds nothing — use the exact names.
+"wram"/"vram" finds nothing â€” use the exact names.
 
 Memory-write callbacks (`event.on_bus_write`, `event.onmemorywrite`) do **not**
 fire for this waterbox core, and `emu.getregisters()` returns an empty table, so
@@ -30,8 +30,8 @@ locate a divergence in time, which is what the vbrecomp-side tools
 
 ## What it has already settled
 
-**Jack Bros.** vbrecomp reports `CHR=0/8192` — 8,192 character writes, all zero
-— and a blank screen. The chase from the vbrecomp side led to a WRAM buffer at
+**Jack Bros.** vbrecomp reports `CHR=0/8192` â€” 8,192 character writes, all zero
+â€” and a blank screen. The chase from the vbrecomp side led to a WRAM buffer at
 `0x05003800` that `sub_07F0091C` copies into VRAM and that only ever takes two
 writes, which looked like the fault.
 
@@ -56,8 +56,8 @@ the driver's `VBRECOMP_WRAM_DUMP` / `VBRECOMP_WRAM_FRAME` do the same on our
 side. Diffing the two says *where* a divergence lives, not just when.
 
 ```powershell
-$env:VBREF_FRAME="10"; $env:VBREF_OUT="$env:TEMPef.bin"
-& $bh "$rom" --lua="scriptseference\dumpwram.lua"
+$env:VBREF_FRAME="10"; $env:VBREF_OUT="$env:TEMP\ref.bin"
+& $bh "$rom" --lua="scripts\reference\dumpwram.lua"
 $env:VBRECOMP_WRAM_DUMP="$env:TEMP\ours.bin"; $env:VBRECOMP_WRAM_FRAME="10"
 build_all\games\Release\corpus_<slug>.exe "$rom"
 ```
@@ -66,13 +66,13 @@ build_all\games\Release\corpus_<slug>.exe "$rom"
 frame is 20 ms of real CPU; ours is `VBRECOMP_FRAME_TICKS` interrupt checks
 (20,000 by default), and the relationship between them has never been measured.
 So "at frame N" is approximate across the two, and a diff shows *a* divergence
-rather than *the first* one. Calibrating that — by finding the tick count where
-a game that works on both sides reaches the same state — would make these diffs
+rather than *the first* one. Calibrating that â€” by finding the tick count where
+a game that works on both sides reaches the same state â€” would make these diffs
 exact, and is the obvious next improvement.
 
 The domain is live and sparse, not empty: Waterworld, which renders correctly on
 both sides, has 320 non-zero WRAM bytes at reference frame 120. So the near-zero
 WRAM that Jack Bros and Vertical Force show early is real behaviour, not a
 readback artifact. Vertical Force under vbrecomp has 8,932 non-zero WRAM bytes
-at our frame 10 against the reference's 0 — we are doing work the hardware is
+at our frame 10 against the reference's 0 â€” we are doing work the hardware is
 not, which is a different failure from being stuck.
