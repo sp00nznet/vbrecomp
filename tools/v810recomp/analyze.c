@@ -147,69 +147,23 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
     return addr - ctx->rom_base;
 }
 
-/* A branch target BELOW a function's entry cannot be emitted: a function is
- * written out as one contiguous [addr, end_addr) range whose end only ever
- * grows FORWARDS, so anything before the entry is traced by analysis and then
- * silently dropped. The emitter finds no label and no function for the branch
- * and falls back to a bare `return`, truncating the function.
+/* NOTE: a branch target BELOW a function's entry cannot be emitted. A function
+ * is written out as one contiguous [addr, end_addr) range whose end only grows
+ * FORWARDS, so analysis traces such a target and the emitter then drops it,
+ * falling back to a bare `return`. The standard V810 boot idiom -- `jmp` to the
+ * loop test with the body just above -- lands on it.
  *
- * The standard V810 boot idiom lands exactly on this, in 16 corpus ROMs:
- *
- *     movhi WRAM_END, r0, r11
- *     jmp   [r1]                  ; -> the loop TEST, which is BELOW
- *   body: st.w r0, 0[r11] ; add 4, r11
- *   test: cmp r1, r11 ; blt body
- *
- * The resolved jmp target (`test`) becomes the function entry, `body` sits just
- * before it, and `blt body` emitted `return` -- so Mario's Tennis returned from
- * its entry before clearing a single word of WRAM.
- *
- * Pulling the entry back over the body is the fix, but it has to happen AFTER
- * analysis, not during it. Two earlier attempts inside the trace failed:
- * registering each backward target as its own function cascades on the back
- * edge of every loop (Elevated Speed went from 56 functions to 17,892 and three
- * minutes), and mutating func->addr mid-traversal corrupts the walk that is
- * using it. As a settled post-pass over a stable table it is simply a bounded
- * scan.
- *
- * The reach is short because that is the shape of the idiom -- the body sits
- * immediately above its test. A distant backward branch is a real
- * inter-function edge and is left alone.
+ * Pulling the entry back over the body DOES fix that specific truncation
+ * (Mario's Tennis `blt 0x07F8013E` becomes a goto and its WRAM clear survives),
+ * but measured across the corpus it unblocked nothing and cost one game: Mario
+ * Clash stopped advancing. It is removed rather than kept on principle. If it
+ * is tried again, measure `advancing`, not `renders`, and check Mario Clash --
+ * and note that the two obvious in-traversal forms are both wrong (registering
+ * each backward target as a function cascades on every loop back edge, 56
+ * functions to 17,892 on Elevated Speed; mutating func->addr mid-trace
+ * segfaults). A settled post-pass over the function table is the workable
+ * shape. See docs/RENDER_TRIAGE.md.
  */
-#define BACKWARD_REACH 256
-
-static void extend_funcs_backward(v810_ctx_t *ctx) {
-    for (int i = 0; i < ctx->num_funcs; i++) {
-        v810_func_t *f = &ctx->funcs[i];
-        if (!f->visited) continue;
-        uint32_t off = addr_to_offset(ctx, f->addr);
-        uint32_t end = addr_to_offset(ctx, f->end_addr);
-        if (off >= ctx->rom_size || end > ctx->rom_size || off >= end) continue;
-
-        uint32_t lowest = f->addr;
-        while (off < end && off < ctx->rom_size) {
-            v810_insn_t insn;
-            if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
-            insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
-            bool is_branch = (insn.format == FMT_III && insn.cond != 0x0D)
-                          || insn.opcode == 0x2A;
-            if (is_branch) {
-                uint32_t t = insn.addr + insn.imm;
-                if (is_rom_addr(ctx, t)) {
-                    t = v810_normalize_rom_addr(ctx, t);
-                    if (t < lowest && f->addr - t <= BACKWARD_REACH
-                                   && t >= ctx->rom_base) {
-                        lowest = t;
-                    }
-                }
-            }
-            off += insn.size;
-        }
-        if (lowest < f->addr && find_func(ctx, lowest) < 0) {
-            f->addr = lowest;
-        }
-    }
-}
 
 /* Analyze one function: trace instructions, find calls and branches */
 static void analyze_func(v810_ctx_t *ctx, int func_idx) {
@@ -683,9 +637,6 @@ void v810_analyze(v810_ctx_t *ctx) {
         }
     }
 
-    /* Pull entries back over a loop body a short backward branch reaches. */
-    extend_funcs_backward(ctx);
-
     /* Sort functions by address */
     qsort(ctx->funcs, ctx->num_funcs, sizeof(v810_func_t), func_cmp);
 
@@ -705,7 +656,17 @@ void v810_analyze(v810_ctx_t *ctx) {
                     v810_insn_t insn;
                     if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
                     insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
-                    if (insn.opcode == 0x2B) { /* JAL */
+                    /* A JAL target is reachable, and so is a branch target:
+                     * the emitter turns a branch to a known function into a
+                     * direct call, and an UNCONFIRMED function is never
+                     * declared, defined or stubbed -- so leaving these
+                     * unconfirmed means the branch degrades to a bare `return`
+                     * and the rest of the function is unreachable. Confirming
+                     * them is what makes those edges real code. */
+                    bool is_edge = (insn.opcode == 0x2B)   /* JAL */
+                                || (insn.opcode == 0x2A)   /* JR  */
+                                || (insn.format == FMT_III && insn.cond != 0x0D);
+                    if (is_edge) {
                         uint32_t target = insn.addr + insn.imm;
                         if (target >= 0x08000000) target &= 0x07FFFFFF;
                         int idx = find_func(ctx, target);
