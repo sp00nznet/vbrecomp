@@ -105,6 +105,11 @@ void vb_bitstring(int op);
  * the heartbeat prints the busiest, which names the analysis gap that is
  * keeping a game from getting anywhere. */
 void vb_recomp_stub(uint32_t addr);
+
+/* Execution trace: the recompiled code's backtrace. Every function entry
+ * records itself; dump it when a boot chain ends to see what ran last. */
+void vb_recomp_trace(uint32_t addr);
+void vb_recomp_dump_trace(void);
 void vb_recomp_dump_stubs(void);
 
 /* Convenience accessors for PSW (sr[5]) */

@@ -131,6 +131,32 @@ void vb_recomp_stub(uint32_t addr) {
      * which is far more than any one game has holes. */
 }
 
+/*
+ * Execution trace: the last functions entered, as a ring.
+ *
+ * When a recompiled boot chain simply ends, nothing says WHERE. The hot-read
+ * list gives an address, VBRECOMP_WATCH gives its reader and VBRECOMP_PEEK
+ * gives a value, but none of them answer "what ran last" -- which is the only
+ * question that matters for a game whose entry returns having drawn nothing.
+ * This is the backtrace the generated code never had.
+ */
+#define TRACE_N 64
+static uint32_t trace_ring[TRACE_N];
+static uint32_t trace_pos;
+
+void vb_recomp_trace(uint32_t addr) {
+    trace_ring[trace_pos++ % TRACE_N] = addr;
+}
+
+void vb_recomp_dump_trace(void) {
+    uint32_t n = trace_pos < TRACE_N ? trace_pos : TRACE_N;
+    fprintf(stderr, "  last %u functions entered (most recent last):\n", n);
+    for (uint32_t i = 0; i < n; i++) {
+        uint32_t idx = (trace_pos - n + i) % TRACE_N;
+        fprintf(stderr, "    %2u sub_%08X\n", i, trace_ring[idx]);
+    }
+}
+
 void vb_recomp_dump_stubs(void) {
     if (!stub_total) return;
     fprintf(stderr, "  unimplemented calls: %u total\n", stub_total);
