@@ -1321,6 +1321,57 @@ genuinely ours and still blank are Formula V (Emulator), SPONG, VUEngine
 Platformer, and Jack Bros x2. Any target above 71 is unreachable by definition,
 and progress should be counted against 71.
 
+## Jack Bros is a scheduling deadlock, not a tile-copy bug
+
+`VBRECOMP_COUNT_FUNC` now also reports a cumulative total at the heartbeat, not
+just a per-dispatch one, which makes "how often does this ever run" answerable.
+Over a 700-frame run of Jack Bros:
+
+| routine | entries |
+|---|---|
+| `sub_07F02172` task creation | 3 |
+| `sub_07F020B0` context switch | 3 |
+| `sub_07F0091C` tile copy into VRAM | 449 |
+
+Three tasks are created, the scheduler switches three times, and then it is
+never called again for the rest of the run. The copy routine keeps running --
+449 times -- which is why this looked for so long like a broken copy: it is not.
+The copy is fine and its source buffer is empty because **the task that fills it
+never gets scheduled**. The running task loops without yielding.
+
+The switch itself is a countdown, and it explains why so few switches happen:
+
+```
+07F020BE: ld.h  0[r6], r7        ; r6 = 0x0500EC00 + task index
+07F020C4: bnz   0x07F020CA
+07F020C6: jr    0x07F0213E       ; counter zero -> return without switching
+07F020CA: add   -1, r7
+07F020CC: st.h  r7, 0[r6]
+07F020D0: bz    0x07F020D6
+07F020D2: jr    0x07F0213E       ; still counting down -> return
+07F020D6: st.w  r3, 12[r25]      ; only now is SP saved and the task switched
+```
+
+Against hardware at frame 40, our whole task-control block is empty where the
+hardware's is built (`r25 = 0x05000000`, and `0x0500000C` holds the saved SP
+0x0500FFF8 on hardware). The wake counters live around 0x0500E800-0x0500EC00,
+which is exactly one of the regions the hardware diff says we never fill.
+
+That is the question to answer next, and it is a much narrower one than
+"why is the screen blank": **what should be writing the task wake counters
+around 0x0500E800, and why does it not run?**
+
+### Structural noise worth knowing about
+
+Jack Bros' generated C contains **67 overlapping function pairs and 279
+duplicated labels** -- e.g. sub_07F03E5A (0x07F03E5A-0x07F03EF0) and
+sub_07F03E84 (0x07F03E84-0x07F03EF0), the second a duplicated suffix of the
+first rather than a split of it. Splitting is what is meant to prevent this, but
+it is capped at MAX_SPLITS and refuses unsafe cuts, so overlaps remain. Two
+copies of the same code are harmless while running, but the dispatcher's
+enclosing-function lookup and the unwinding guard both key on function identity,
+and with overlaps they can pick the wrong copy.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
