@@ -19,14 +19,14 @@ what used to make this survey disagree with `build_all.ps1`.
 
 | | Count | What it means |
 |---|---|---|
-| Advancing | 35 | The frame changes between samples: the game is running. |
-| Drawing, then frozen | 24 | One image, byte-identical at 300/600/900. |
-| Nothing on screen | 18 | Every sample blank. |
+| Advancing | 37 | The frame changes between samples: the game is running. |
+| Drawing, then frozen | 26 | One image, byte-identical at 300/600/900. |
+| Nothing on screen | 14 | Every sample blank. |
 | Dead | 1 | Produced no frame before the timeout (Galactic Pinball). |
 
-"Renders something" is 58/76, but that number is the less useful of the two:
+"Renders something" is 61/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
-not running. **Advancing** is the number to drive. Three of the 18 blanks
+not running. **Advancing** is the number to drive. Three of the 14 blanks
 (Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
 denominator is 73.
 
@@ -336,6 +336,34 @@ GAMESTART branch, which sets the frame flag the loop spins on, once in 300
 frames instead of every frame - and with that fixed `sub_07F00222` runs and
 the loop is genuinely released. It still loads no tiles, so the tile load sits
 behind a state the game has not reached.
+
+## The 12 that are left, and what each is losing control to
+
+Counting a jump to address 0 as an unimplemented call (rather than letting the
+drain treat it as "nothing pending") made the last invisible failure visible.
+With that, every remaining game now names its own loss:
+
+| Game | lost jumps to |
+|---|---|
+| SPONG | `0x00000000` x5, `0x01000000` x1 |
+| Capitan Sevilla 3D | `0x00000000` x3 |
+| Hyper Fighting | `0x0001CC80`, `0x00001CA0`, `0x00001DD0`, `0x000201A8` |
+| Jack Bros | `0x00030002` |
+
+SPONG and Capitan Sevilla are the same engine and the same shape: a C++ virtual
+dispatch, `r6 = [r29+12]; r10 = [r6]; r10 = [r10+48]; jmp [r10]`, reading a null
+object. Their WRAM is populated (2,184 non-zero bytes for SPONG), so the data
+section did initialise -- one specific object never got constructed.
+
+Hyper Fighting and Jack Bros lose control to addresses inside VIP VRAM
+(0x00000000-0x0003FFFF), which no jump should ever target. Adding this ROM's
+base to them does not land on any emitted function, so they are not bare ROM
+offsets either; a register holding data is reaching a `jmp`.
+
+3-D Tetris remains the outlier: zero CHR writes, zero BGMap writes, zero
+unimplemented calls, no worlds. It does nothing at all and reports nothing.
+Galactic Pinball is classified `dead` -- it never reaches the first sampled
+frame inside the timeout, which is a performance problem, not a blank screen.
 
 ## What is already ruled out
 
