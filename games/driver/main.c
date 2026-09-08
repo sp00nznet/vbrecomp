@@ -111,7 +111,15 @@ int main(int argc, char **argv) {
     vb_cpu.sr[VB_SREG_PSW] = 0;
     vb_recomp_init_handlers();
     vb_interrupt_set_frame_callback(on_frame);
-    vb_interrupt_set_frame_ticks(20000);
+    /* How many interrupt checks make a frame -- i.e. how much CPU time the game
+     * gets per rendered frame. A game that waits on a timing relationship
+     * between its main loop and the VIP is sensitive to this, and 20000 is a
+     * guess that has never been varied. VBRECOMP_FRAME_TICKS makes it sweepable.
+     */
+    {
+        const char *ft = getenv("VBRECOMP_FRAME_TICKS");
+        vb_interrupt_set_frame_ticks(ft ? (uint32_t)strtoul(ft, NULL, 10) : 20000);
+    }
 
     if (!vb_platform_init("vbrecomp", 2)) {
         fprintf(stderr, "Failed to init platform\n");
