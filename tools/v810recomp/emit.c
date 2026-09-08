@@ -942,6 +942,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "void vb_recomp_call(uint32_t addr);\n\n");
     fprintf(out, "void vb_recomp_call(uint32_t addr);\n");
     fprintf(out, "static void vb_recomp_call_inner(uint32_t addr);\n");
+    fprintf(out, "static int vb_call_depth;\n");
     fprintf(out, "/* Control transfer out of a function.\n");
     fprintf(out, " *\n");
     fprintf(out, " * A game main loop is a CYCLE: a state handler ends by jumping back to\n");
@@ -952,6 +953,15 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * resumes, keeping ordering right and the stack flat. */\n");
     fprintf(out, "void vb_recomp_drain(void) {\n");
     fprintf(out, "    while (vb_recomp_tail_target) {\n");
+    fprintf(out, "        /* Too deep to keep going here: leave the target PARKED and\n");
+    fprintf(out, "         * return. Every VB_CALL drains, so an outer, shallower drain\n");
+    fprintf(out, "         * picks it up and the cycle continues iteratively instead of\n");
+    fprintf(out, "         * growing the C stack. Galactic Pinball and 3-D Tetris both\n");
+    fprintf(out, "         * died with STATUS_STACK_OVERFLOW re-entering their main\n");
+    fprintf(out, "         * function through a drain nested inside it. Ordering is\n");
+    fprintf(out, "         * unaffected below the limit, which is why this works where\n");
+    fprintf(out, "         * draining only at depth 0 did not. */\n");
+    fprintf(out, "        if (vb_call_depth > 96) return;\n");
     fprintf(out, "        uint32_t t = vb_recomp_tail_target;\n");
     fprintf(out, "        vb_recomp_tail_target = 0;\n");
     fprintf(out, "        /* A drained target was JUMPED to, not called: dispatch it\n");
@@ -967,7 +977,6 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * and the instruction is a jump -- emitting a plain return there drops\n");
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
-    fprintf(out, "static int vb_call_depth;\n");
     fprintf(out, "#define VB_CALL(f,a) do { if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; vb_recomp_drain(); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");

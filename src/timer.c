@@ -52,7 +52,7 @@ void vb_timer_write8(vb_addr_t addr, uint8_t val) {
     case 0x20: /* TCR */
         {
             static int dbg = -1;
-            if (dbg < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); dbg = (e && e[0] && e[0] != '0'); }
+            if (dbg < 0) { const char *e = getenv("VBRECOMP_HWTRACE"); dbg = (e && e[0] && e[0] != '0'); }
             if (dbg) fprintf(stderr, "TCR write 0x%02X (reload=%u)\n", val, reload);
         }
         if (val & TCR_ZCLR) {

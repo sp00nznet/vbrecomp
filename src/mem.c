@@ -188,7 +188,12 @@ static uint8_t hw_read8(vb_addr_t offset) {
 
 static void hw_write8(vb_addr_t offset, uint8_t val) {
     offset &= 0x3F;
-    if (hot_enabled > 0) {
+    /* Per-write hardware tracing is far too loud to share the heartbeat's
+     * switch: it buries the once-per-N-frames summary that most diagnosis
+     * actually needs. VBRECOMP_HWTRACE=1 turns it on by itself. */
+    static int hw_dbg = -1;
+    if (hw_dbg < 0) { const char *e = getenv("VBRECOMP_HWTRACE"); hw_dbg = (e && e[0] && e[0] != '0'); }
+    if (hw_dbg) {
         static const char *nm[] = {"CCR","?","?","?","CCSR","?","?","?","CDTR","?","?","?","CDRR","?","?","?",
                                    "TCR","?","?","?","TLR","?","?","?","THR","?","?","?","?","?","?","?",
                                    "WCR","?","?","?","?","?","?","?","SCR","?","?","?","SDR","?","?","?","SDHR"};

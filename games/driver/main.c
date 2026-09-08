@@ -18,6 +18,9 @@
 #include <vbrecomp/vbrecomp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "recomp_funcs.h"
 
 static uint32_t framebuffer[VB_SCREEN_WIDTH * VB_SCREEN_HEIGHT];
@@ -143,7 +146,27 @@ int main(int argc, char **argv) {
     /* Boot. If the game loops forever (the common case), on_frame drives
      * rendering until the user quits / the frame budget is hit (via exit()).
      * If the reset path returns, fall through to a manual render loop. */
+    /* A recompiled game that runs off the end of the C stack (a control-flow
+     * cycle translated as calls) otherwise just vanishes: the process dies with
+     * STATUS_STACK_OVERFLOW and prints nothing, which is how Galactic Pinball
+     * and 3-D Tetris read as "blank" for a long time. __except unwinds before
+     * the handler runs, so it is safe to print here -- and the trace ring names
+     * the functions that were cycling. */
+#ifdef _WIN32
+    __try {
+        vb_recomp_boot();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        fprintf(stderr, "CRASH: exception 0x%08lX after %d frames\n",
+                (unsigned long)GetExceptionCode(), frame_count);
+        vb_recomp_dump_trace();
+        vb_recomp_dump_stubs();
+        fflush(stderr);
+        if (shot_path) dump_png(shot_path);
+        return 2;
+    }
+#else
     vb_recomp_boot();
+#endif
 
     /* If the reset path returned, the game is interrupt-driven (its per-frame
      * work runs in the VIP/timer interrupt handlers, not an explicit loop).
