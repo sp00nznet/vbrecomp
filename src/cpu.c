@@ -130,7 +130,10 @@ void vb_recomp_stub(uint32_t addr) {
      * on 0x00030002 and Hyper Fighting on 0x0001CC80, both inside VIP VRAM,
      * where a register holding data has reached a jmp. Same question, same
      * answer needed. */
-    if (addr < 0x07000000u && getenv("VBRECOMP_HEARTBEAT")) {
+    /* Context for ANY unresolved target, not just out-of-ROM ones: an
+     * in-ROM address that still misses the table is just as lost, and the
+     * registers say who sent us there. */
+    if (getenv("VBRECOMP_HEARTBEAT")) {
         static int z = 0;
         if (z++ < 8)
             fprintf(stderr,

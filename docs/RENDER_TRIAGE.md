@@ -644,6 +644,29 @@ across the corpus, because plenty of games genuinely are dispatched into the
 middle of a loop. Reverted; the hint is removed per-game with a comment in the
 hints file so discovery does not re-add it.
 
+### Galactic Pinball, continued: the split is sub_07F000B4, and it is not the hint
+
+Removing `entry 07F000AC` stops the four-billion-iteration hang, but the game
+then loses control 591 times a run to that same address. The lost-jump context
+says why: `r31 = 0x07F000B0`, so the dispatch IS the loop's own back edge
+(`bnz 0x07F000AC`) arriving as a cross-function transfer.
+
+The function that transfers is **sub_07F000B4**, an overlapping entry starting
+at the loop's `add -1, r25`, strictly inside sub_07F00026 (0x07F00026-0x07F00164).
+sub_07F00026 has the back edge as a proper `goto`; the duplicate does not.
+
+Two attempts to remove it generically, both measured and both reverted:
+
+| attempt | result |
+|---|---|
+| drop entries on a backward-branch target inside another function | advancing 39 -> 32, blank 11 -> 18 |
+| drop scan-created entries that land inside a real function | advancing 39 -> 36, **3 games start crashing** |
+
+And it is not the brute-force JAL sweep that creates it: regenerating with no
+hints at all still produces sub_07F000B4, and marking sweep-created functions
+and dropping the overlapping ones does not remove this one. Some other path in
+the analyzer adds it, and finding which is the next step for this game.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
