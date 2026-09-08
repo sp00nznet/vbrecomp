@@ -20,13 +20,13 @@ what used to make this survey disagree with `build_all.ps1`.
 | | Count | What it means |
 |---|---|---|
 | Advancing | 37 | The frame changes between samples: the game is running. |
-| Drawing, then frozen | 26 | One image, byte-identical at 300/600/900. |
-| Nothing on screen | 14 | Every sample blank. |
+| Drawing, then frozen | 27 | One image, byte-identical at 300/600/900. |
+| Nothing on screen | 13 | Every sample blank. |
 | Dead | 1 | Produced no frame before the timeout (Galactic Pinball). |
 
-"Renders something" is 61/76, but that number is the less useful of the two:
+"Renders something" is 62/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
-not running. **Advancing** is the number to drive. Three of the 14 blanks
+not running. **Advancing** is the number to drive. Three of the 13 blanks
 (Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
 denominator is 73.
 
