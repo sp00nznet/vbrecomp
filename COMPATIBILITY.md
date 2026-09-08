@@ -12,7 +12,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 |------|----|-------|------------|----------|-------|---------|----------|-------|
 | 3-D Tetris (USA) | 1024 | 743 | yes | yes | - | no | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 36 | yes | yes | yes | wip | no | First pixels on screen; boots through 4-state dispatch, settles ~frame 527 |
-| Golf (USA) | 2048 | 69 | yes | yes | - | no | - |  |
+| Golf (USA) | 2048 | 69 | yes | yes | yes | yes | - |  |
 | Insmouth no Yakata (Japan) | 1024 | 190 | yes | yes | - | no | - |  |
 | Jack Bros. (USA) | 1024 | 34 | yes | yes | - | no | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 34 | yes | yes | - | no | - |  |
@@ -20,12 +20,12 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Mario's Tennis (Japan, USA) (En) | 512 | 210 | yes | yes | yes | wip | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
 | Nester's Funky Bowling (USA) | 2048 | 194 | yes | yes | yes | yes | - |  |
 | Panic Bomber (USA) | 512 | 193 | yes | yes | yes | yes | - |  |
-| Red Alarm (Japan) | 1024 | 261 | yes | yes | yes | yes | - |  |
+| Red Alarm (Japan) | 1024 | 261 | yes | yes | - | no | - |  |
 | Red Alarm (USA) | 1024 | 261 | yes | yes | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 232 | yes | yes | yes | yes | - |  |
 | Space Invaders - Virtual Collection (Japan) | 512 | 47 | yes | yes | - | no | - |  |
 | Space Squash (Japan) | 512 | 173 | yes | yes | - | no | - |  |
-| T&E Virtual Golf (Japan) | 2048 | 70 | yes | yes | - | no | - |  |
+| T&E Virtual Golf (Japan) | 2048 | 70 | yes | yes | yes | yes | - |  |
 | Teleroboxer (Japan, USA) (En) | 1024 | 612 | yes | yes | yes | yes | - |  |
 | Tobidase! Panibon (Japan) | 512 | 193 | yes | yes | yes | yes | - |  |
 | Vertical Force (Japan) | 1024 | 106 | yes | yes | - | no | - |  |

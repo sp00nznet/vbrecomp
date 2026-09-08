@@ -19,11 +19,11 @@ what used to make this survey disagree with `build_all.ps1`.
 
 | | Count | What it means |
 |---|---|---|
-| Advancing | 27 | The frame changes between samples: the game is running. |
-| Drawing, then frozen | 12 | One image, byte-identical at 300/600/900. |
-| Nothing on screen | 36 | Every sample blank; no character data ever written. |
+| Advancing | 28 | The frame changes between samples: the game is running. |
+| Drawing, then frozen | 13 | One image, byte-identical at 300/600/900. |
+| Nothing on screen | 34 | Every sample blank; no character data ever written. |
 
-"Renders something" is 39/76, but that number is the less useful of the two:
+"Renders something" is 41/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
 not running. **Advancing** is the number to drive.
 
@@ -55,14 +55,50 @@ The earlier suspicion that this was the VIP interrupt path was wrong: the VIP
 handler fires (300+ times per run, no SP leak), and the two WRAM addresses the
 game reads two million times are its own pad-state slots, not an interrupt flag.
 
-### 2. Running, but the state machine never advances — 12 games
+### 2. Mario Clash: SCR's start bit had to read back set — resolved
 
-3-D BattleSnake, BLOX 2, Ballface, Bound High, Mario Clash, Nester's Funky
-Bowling, Panic Bomber, SD Gundam, Teleroboxer, Tobidase! Panibon, Tron VB and
-V-Tetris still sit on one frame with the buttons held. This is *not* a second
-button gate — five masks were tried (`303C`, `1000`, `0004`, `0010`, `F03C`)
-and Mario Clash, Teleroboxer and Panic Bomber produce a byte-identical frame
-under every one of them, out to 6,000 frames.
+Two idioms arm a pad read, and only one survives a register that reads back
+what was stored:
+
+```
+Waterworld:   ld.b SCR; ori  0x0084; st.b SCR   -- sets the start bit
+Mario Clash:  ld.h SCR; andi 0x0084; st.h SCR   -- keeps the start bit
+```
+
+Mario Clash's read-modify-write only arms if `SCR_START` is already there. Its
+init leaves SCR at `0x80`, so `0x80 & 0x84` wrote `0x80` forever and the buttons
+were never latched — it read zero 161,598 times a run while its 64-entry jump
+table sat at state 2 testing `pad & 0x303C0000`. SCR now reads back with the
+start bit set; Mario Clash reaches its OPTION / AUTOMATIC PAUSE screen and
+Waterworld, which never depended on the read-back, is unchanged.
+
+`VBRECOMP_PEEK=<hex>[,<hex>...]` was added for this: the hot-read list gives the
+address and `VBRECOMP_WATCH` gives the reader, but for a state variable the
+*value* is the question.
+
+### 3. movbsu wrote to address zero — resolved
+
+The bit-string block copy takes its addresses in r29/r30 and its bit offsets in
+r26/r27. The first implementation had them inverted, so every blit read and
+wrote near address zero: scribbling on the left framebuffer while the real
+destination stayed empty — worse than the no-op it replaced. Golf makes 1.2
+million trips through its copy helper (`sub_07E0E4D0`, a `movbsu` wrapper) and
+still reported `CHR=0/0`.
+
+The conformance cases had passed while agreeing with the same wrong belief, so
+the assignment now comes from ROM: Golf loads `r29 = r6; r26 = (r6 & 3) << 3`
+and `r30 = r7; r27 = (r7 & 3) << 3`, pairing each address with the offset from
+its own low two bits, and Ballface blits with a word-aligned source (`r27 = 0`)
+and a variable destination bit position (`r26 = r5`), a glyph's x.
+
+### 4. Running, but the state machine never advances — 13 games
+
+3-D BattleSnake, BLOX 2, Ballface, Bound High, Nester's Funky Bowling, Panic
+Bomber, SD Gundam, Teleroboxer, Tobidase! Panibon, Tron VB and V-Tetris still
+sit on one frame with the buttons held. This is *not* a second button gate —
+five masks were tried (`303C`, `1000`, `0004`, `0010`, `F03C`) and Teleroboxer
+and Panic Bomber produce a byte-identical frame under every one, out to 6,000
+frames.
 
 They are not deadlocked either. Mario Clash's hot address resolves (via
 `VBRECOMP_WATCH=0500FFC8`) to `sub_07FF5BB6`, the standard VB frame-sync idiom:
@@ -85,7 +121,7 @@ it. So the next thing to establish for this group is why VIP interrupts are
 never enabled: whether the game is waiting on a condition before enabling them,
 or an `INTENB` write is not reaching the register.
 
-### 3. Polling a display phase that never arrives — part of the 36 blanks
+### 5. Polling a display phase that never arrives — part of the 34 blanks
 
 Golf reads `DPSTTS` (0x0005F820) 1,248,381 times and writes no character data
 at all (`CHR=0/0`). `vb_vip_frame_advance()` toggles the display status bits
@@ -93,20 +129,20 @@ rather than cycling them through the real phase sequence, so a game waiting on
 a specific phase order waits forever. Space Squash and Elevated Speed show the
 same shape.
 
-### 4. Garbled second character set
+### 6. Garbled second character set
 
 Bound High and V-Tetris render the English warning text correctly and the
 Japanese text below it as wrong tiles. One character set lands and the other
 does not, so this is the transfer of a specific tile range — not the renderer,
 which is drawing exactly what it was given.
 
-### 5. Partial glyph rows
+### 7. Partial glyph rows
 
 Tron VB draws the top strokes of its logo and loses the bottoms. Hamburgers
 renders a full bitmap title correctly but corrupts the small text at bottom
 left. Rows within a tile are being dropped.
 
-### 6. World placement
+### 8. World placement
 
 V-Tetris draws its text block flush left where it should be centred; SD Gundam
 has a column of stray tiles down the left edge. Waterworld's round HUD renders
