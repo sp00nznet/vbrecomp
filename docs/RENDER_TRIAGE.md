@@ -472,6 +472,38 @@ So the game builds a structure at 0x0500A100 that we never build, and the tile
 transfer hangs off it. That is the next thing to chase, and it is a specific
 address rather than a blank screen.
 
+## Jack Bros is a cooperative-task game, and the switch is a `jmp [r31]`
+
+`sub_07F02172` creates a task: it shifts the task id left 9, saves r6-r25 into
+a 512-byte context at `0x0500EEA8 + (id << 9)`, stores the entry point, and
+registers the context in a table at `0x0500EC00 + (id << 4)`.
+
+`sub_07F020B0` is the context switch. It loads the task's saved stack pointer,
+restores r6-r25 from the context, pops the task's resume PC into r31, and
+`jmp [r31]`s into it. We emit that as VB_RET.
+
+The task table shows exactly what that costs, against hardware at frame 90:
+
+| | count | context ptr | resume PC |
+|---|---|---|---|
+| reference slot 0 | 1 | 0x0500EEA0 | 0x0701AE8E |
+| ours slot 0 | 1 | 0x0500EEA8 | 0x07F00CE0 |
+
+The reference's context pointer has moved (the task pushed) and its resume PC
+is somewhere in the middle of the task. Ours is still the creation-time value
+and the entry point: **the task has never run**. That is also why the tile
+transfer never happens -- `sub_07F00CB8`/`sub_07F00CE0`, the only callers of
+the routine that queues it, are task entry points and nothing else calls them.
+
+### Distinguishing return from computed jump by shadow stack does NOT work
+
+The obvious repair: have every VB_CALL remember the return address it put in
+r31, and treat `jmp [r31]` as a return only when r31 still equals it -- a
+scheduler that LOADS r31 from a context would then be correctly parked as a
+jump. Measured: advancing 38 -> 36, blank 12 -> 13. Too many ordinary returns
+reach the instruction with r31 legitimately different, and parking those breaks
+more flow than the scheduler case recovers. Reverted.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
