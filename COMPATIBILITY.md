@@ -20,7 +20,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Mario's Tennis (Japan, USA) (En) | 512 | 243 | yes | yes | yes | wip | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
 | Nester's Funky Bowling (USA) | 2048 | 338 | yes | yes | yes | yes | - |  |
 | Panic Bomber (USA) | 512 | 216 | yes | yes | yes | yes | - |  |
-| Red Alarm (Japan) | 1024 | 382 | yes | yes | - | no | - |  |
+| Red Alarm (Japan) | 1024 | 382 | yes | yes | yes | yes | - |  |
 | Red Alarm (USA) | 1024 | 382 | yes | yes | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 324 | yes | yes | yes | yes | - |  |
 | Space Invaders - Virtual Collection (Japan) | 512 | 71 | yes | yes | - | no | - |  |
