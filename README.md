@@ -75,8 +75,11 @@ Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md). Detailed fix notes:
 Requires CMake, a C/C++ compiler (MSVC on Windows), and SDL2 (via vcpkg).
 
 ```powershell
-# Configure (point at your vcpkg SDL2)
-cmake -S . -B build -DSDL2_DIR="C:/vcpkg/installed/x64-windows/share/sdl2"
+# Configure (point at your vcpkg SDL2). -T host=x64 is not optional: the
+# generated C for the largest ROMs is one translation unit of several hundred
+# thousand lines, and the 32-bit hosted compiler CMake picks by default runs
+# out of address space on it ("C1060: compiler is out of heap space").
+cmake -S . -B build -T host=x64 -DSDL2_DIR="C:/vcpkg/installed/x64-windows/share/sdl2"
 
 # Build the recompiler + runtime + all games
 cmake --build build --config Release

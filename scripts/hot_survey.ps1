@@ -32,7 +32,13 @@ foreach ($slug in $slugs) {
     $err = "$env:TEMP\hs_$slug.txt"
     $p = Start-Process -FilePath $exe -ArgumentList "`"$rom`"" -PassThru -WindowStyle Hidden `
         -RedirectStandardError $err -RedirectStandardOutput "$env:TEMP\hs_out.txt"
-    if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill($true) } catch {} }
+    # Kill() takes no argument on .NET Framework (Windows PowerShell 5.1):
+    # the Kill($true) tree-kill overload is .NET Core only, so it threw, the
+    # catch swallowed it, and the timed-out process survived -- holding its
+    # .exe open and burning CPU for the rest of the run, which is enough to
+    # time out the games that come after it. Recompiled games spawn nothing,
+    # so a plain Kill() is all that was ever needed.
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch {} }
     # Top register-region hot reads (VIP 0x0005Fxxx or hw 0x020000xx), ignore WRAM/ROM.
     $tops = Get-Content $err -EA SilentlyContinue | Select-String "hot read 0x(0005F|020000)" |
         ForEach-Object { if ($_ -match "0x([0-9A-Fa-f]{8}) x(\d+)") { [pscustomobject]@{a=$matches[1];c=[int]$matches[2]} } } |
