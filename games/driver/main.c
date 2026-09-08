@@ -129,6 +129,7 @@ int main(int argc, char **argv) {
      * callback (on_frame) does render/present/poll and exits at the frame
      * budget or on quit. Games whose reset loops forever never reach here. */
     fprintf(stderr, "Reset returned after %d frames; driving interrupts.\n", frame_count);
+    vb_recomp_dump_trace();
     for (;;) vb_interrupt_check();
 
     vb_platform_shutdown();

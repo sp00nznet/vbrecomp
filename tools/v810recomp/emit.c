@@ -155,7 +155,7 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
          * (reset-vector idiom: load r31, jmp to entry). A resolved jump takes
          * precedence so the computed-jump path below emits the real dispatch. */
         if (insn->reg1 == 31 && !lookup_resolved_jump(ctx, insn->addr)) {
-            fprintf(out, "    return; /* jmp [r31] */\n");
+            fprintf(out, "    VB_RET(); /* jmp [r31] */\n");
         } else {
             /* Check for jump table first */
             int jt_idx = lookup_jump_table(ctx, insn->addr);
@@ -201,8 +201,18 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
                      * unconfirmed callee that got no stub. The table normalizes
                      * ROM mirrors and no-ops on an unknown address, while still
                      * reaching real heads (the reset-vector entry included). */
-                    fprintf(out, "    VB_JUMP(0x%08Xu); /* resolved jmp */\n",
-                            resolved);
+                    /* Dispatch on the register's ACTUAL value, not the constant
+                     * analysis resolved it to. A `jmp [rN]` is a runtime
+                     * dispatch and rN takes many values; the static resolution
+                     * finds one of them, which is what makes the target a
+                     * discoverable function -- but hardcoding it sends every
+                     * dispatch to the same place. StarFox's sub_07FE64E4 is
+                     * `add 4, r31; jmp [r10]`, a vtable-style dispatcher, and
+                     * pinning it to 0x07FE0300 made the game run the same two
+                     * states forever and then fall out of its boot chain. */
+                    fprintf(out, "    vb_cpu.pc = %s & 0xFFFFFFFEu;\n", r1);
+                    fprintf(out, "    VB_JUMP(vb_cpu.pc); /* jmp [r%d], resolved target 0x%08X */\n",
+                            insn->reg1, resolved);
                 }
             } else {
                 /* Unresolved at compile time: dispatch through the runtime
@@ -759,8 +769,11 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     else
         fprintf(out, "void vb_func_%08X(void) {\n", func->addr);
 
-    /* Interrupt check at function entry */
+    /* Interrupt check at function entry, and a trace record so a boot chain
+     * that simply ends can say what ran last -- the backtrace the generated
+     * code otherwise does not have. */
     fprintf(out, "    vb_interrupt_check();\n");
+    fprintf(out, "    vb_recomp_trace(0x%08Xu);\n", func->addr);
 
     /* Second pass: emit code, tracking which labels get declared.
      * Branch targets that fall mid-instruction (decoder skipped over them
@@ -871,7 +884,17 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "        vb_recomp_call(t);\n");
     fprintf(out, "    }\n");
     fprintf(out, "}\n");
-    fprintf(out, "#define VB_CALL(f)  do { (f)(); vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "/* `jmp [r31]` is a RETURN only when a jal frame is open. A function\n");
+    fprintf(out, " * entered by a TRANSFER has no caller, so its r31 holds a continuation\n");
+    fprintf(out, " * and the instruction is a jump -- emitting a plain return there drops\n");
+    fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
+    fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
+    fprintf(out, "static int vb_call_depth;\n");
+    fprintf(out, "#define VB_CALL(f)  do { vb_call_depth++; (f)(); vb_call_depth--; \\\n");
+    fprintf(out, "                         vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
+    fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
+    fprintf(out, "                         return; } while (0)\n");
     fprintf(out, "#define VB_JUMP(a)  do { vb_recomp_tail_target = (a); return; } while (0)\n\n");
 
     /* Forward declarations (confirmed functions only) */
