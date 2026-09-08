@@ -870,7 +870,7 @@ So the shared question for most of the remaining set is not the renderer and not
 the CPU: it is that world setup never runs. Two of them (Jack Bros, Null
 Pointer) prove the renderer and the tile path each work in isolation.
 
-### Null Pointer Mockup takes an error path, repeatedly
+### Null Pointer Mockup: the three-way branch is NORMAL (earlier reading was wrong)
 
 It writes NO world attributes at all -- a write watch on 0x0003DBE0 shows one
 write, from the boot clear, and 0x0003DBC0 shows none. The 0x0040 sitting in
@@ -920,6 +920,33 @@ Fixing that means resolving overlaps when they are DETECTED rather than trusting
 whoever got there first -- a small change in principle, but it re-opens the same
 question the four reverted attempts above ran into, so it needs measuring rather
 than assuming.
+
+### Correction: Null Pointer's guard byte is right, the branch is not an error
+
+Two entries above read the three-way branch at 0x07F939AA as an assert: the
+byte at 0x0500B0C0 holds 2, neither 0 nor 1, so the game takes a third arm into
+sub_07FBB33C. **The reference says that byte is 2 on hardware too.** So the
+third arm is ordinary behaviour and nothing is asserting. That reading was
+wrong and the conclusions drawn from it -- "running an error path in a loop",
+"the init is re-entered" -- do not follow from this evidence.
+
+What the reference does show, at frame 200 against our frame 450:
+
+| | non-zero WRAM |
+|---|---|
+| hardware | 3,323 |
+| ours | 1,370 |
+
+and the divergence starts at the very first word: 0x05000000 holds 0x0703C6C4
+on hardware and 0x00003920 for us. Both of our writes to it come from the boot
+path (LR = 0, before anything has set a link register), so hardware's value is
+written later by code we never reach -- it is not a truncated pointer, which
+was my next guess and is also wrong.
+
+The honest state for this game: it loads characters, fills a BGMap segment,
+enables display and drawing with correct brightness, sets no world attributes,
+and diverges from hardware at the first global. Where it stops running the
+hardware's path is not yet known.
 
 ## What is already ruled out
 
