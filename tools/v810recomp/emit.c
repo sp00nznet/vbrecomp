@@ -769,6 +769,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     label_set_t declared = { .addrs = malloc(256 * sizeof(uint32_t)), .count = 0, .cap = 256 };
     off = start_off;
     int insn_count = 0;
+    bool last_terminates = false;
     while (off < end_off && off < ctx->rom_size) {
         v810_insn_t insn;
         if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
@@ -785,6 +786,12 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         }
 
         emit_insn(ctx, out, &insn, &labels);
+        /* Does control leave the function here, or fall through to the next
+         * instruction? Only an unconditional transfer ends the flow. */
+        last_terminates = (insn.opcode == 0x06)                       /* jmp [reg] */
+                       || (insn.opcode == 0x2A)                       /* jr        */
+                       || (insn.opcode == 0x19)                       /* reti      */
+                       || (insn.format == FMT_III && insn.cond == 0x05); /* br     */
         off += insn.size;
         if (insn.opcode == 0x2B) { /* JAL - skip inline data, don't emit it as code */
             uint32_t target = insn.addr + insn.imm;
@@ -797,6 +804,19 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
             fprintf(out, "    /* TRUNCATED: too many instructions */\n");
             break;
         }
+    }
+
+    /* A body that does not end in a transfer FALLS THROUGH on hardware, into
+     * whatever follows it in ROM. Emitting nothing here silently turns that
+     * fall-through into a return -- which is exactly what a function SPLIT
+     * creates, since cutting a function in two leaves the first half ending
+     * mid-flow. Hand control to the next address instead -- but ONLY when that
+     * address is already a function. Emitting it unconditionally makes every
+     * function's end a jump target, which gets registered as a function, which
+     * has its own fall-through: SD Gundam ran past 83 MB of generated C that
+     * way. */
+    if (!last_terminates && find_func_by_addr(ctx, func->end_addr) >= 0) {
+        fprintf(out, "    VB_JUMP(0x%08Xu); /* falls through */\n", func->end_addr);
     }
 
     /* Emit orphan label stubs for any branch target that wasn't an

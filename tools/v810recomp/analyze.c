@@ -11,6 +11,9 @@
 #include <string.h>
 #include <stdio.h>
 
+/* Bounded split budget; see split_func_at. */
+static int split_count;
+
 void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     memset(ctx, 0, sizeof(*ctx));
     ctx->rom = rom;
@@ -23,6 +26,7 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->num_funcs = 0;
 
     ctx->code_map = calloc(rom_size, 1);
+    split_count = 0;
     ctx->visit_stamp = calloc(rom_size, sizeof(uint32_t));
     ctx->visit_gen = 0;
 
@@ -164,6 +168,69 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
  * segfaults). A settled post-pass over the function table is the workable
  * shape. See docs/RENDER_TRIAGE.md.
  */
+
+
+/* Can this function be cut at `at` without turning a branch into a transfer?
+ * A branch that crosses the cut becomes a cross-function jump; if it is a loop
+ * back edge the loop grows the stack per iteration. A branch that lands exactly
+ * ON the cut is fine -- that is the loop-head case, and the loop stays whole in
+ * the second half. */
+static bool safe_split_point(v810_ctx_t *ctx, const v810_func_t *f, uint32_t at) {
+    if (at <= f->addr || at >= f->end_addr) return false;
+    uint32_t off = addr_to_offset(ctx, f->addr);
+    uint32_t end = addr_to_offset(ctx, f->end_addr);
+    if (off >= ctx->rom_size || end > ctx->rom_size) return false;
+    while (off < end && off < ctx->rom_size) {
+        v810_insn_t insn;
+        if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) return false;
+        insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+        bool is_branch = (insn.format == FMT_III && insn.cond != 0x0D)
+                      || insn.opcode == 0x2A;
+        if (is_branch) {
+            uint32_t t = insn.addr + insn.imm;
+            if (is_rom_addr(ctx, t)) {
+                t = v810_normalize_rom_addr(ctx, t);
+                if (t > f->addr && t < f->end_addr) {
+                    bool src_after = insn.addr >= at;
+                    bool dst_after = t >= at;
+                    if (src_after != dst_after) return false;  /* crosses */
+                }
+            }
+        }
+        off += insn.size;
+    }
+    return true;
+}
+
+/* Cut `fi` at `at`: the tail becomes its own function, so a jump can land on it
+ * without duplicating a single instruction. Returns false if the cut is unsafe
+ * or the entry already exists. */
+/* Splitting creates functions, each of which is analysed and can produce more
+ * split points. On most ROMs that settles immediately; on SD Gundam it does
+ * not, and the emitted file passed 13 MB with analysis still running after five
+ * minutes. Cap it: past the limit the remaining jumps fall back to being
+ * counted as unimplemented, which is where they were before any of this. */
+/* One budget for every entry these passes add -- splits AND registrations.
+ * Each new entry is analysed and can produce more targets; on SD Gundam that
+ * does not settle, and analysis ran past two minutes with the emitted file over
+ * 80 MB. Past the budget the remaining jumps fall back to being counted as
+ * unimplemented, which is where they were before any of this. */
+#define MAX_SPLITS 512
+
+static bool split_func_at(v810_ctx_t *ctx, int fi, uint32_t at) {
+    if (split_count >= MAX_SPLITS) return false;
+    if (find_func(ctx, at) >= 0) return false;
+    if (!safe_split_point(ctx, &ctx->funcs[fi], at)) return false;
+    uint32_t old_end = ctx->funcs[fi].end_addr;
+    int ni = v810_ctx_add_func(ctx, at, false, -1);
+    if (ni < 0) return false;
+    ctx->funcs[ni].confirmed = true;
+    ctx->funcs[ni].visited = true;
+    ctx->funcs[ni].end_addr = old_end;
+    ctx->funcs[fi].end_addr = at;
+    split_count++;
+    return true;
+}
 
 /* Analyze one function: trace instructions, find calls and branches */
 static void analyze_func(v810_ctx_t *ctx, int func_idx) {
@@ -643,8 +710,13 @@ void v810_analyze(v810_ctx_t *ctx) {
     /* Propagate confirmed status: re-analyze confirmed functions
      * to mark their callees as confirmed too */
     {
+        /* Each pass rescans every confirmed function's whole body, so the cost
+         * is O(functions x code size) per pass. Confirmation settles in a few
+         * passes on every ROM in the corpus; bounding it stops a ROM where it
+         * does not (SD Gundam) from running for minutes. */
         bool changed = true;
-        while (changed) {
+        int passes = 0;
+        while (changed && passes++ < 8) {
             changed = false;
             for (int i = 0; i < ctx->num_funcs; i++) {
                 if (!ctx->funcs[i].confirmed) continue;
@@ -670,9 +742,22 @@ void v810_analyze(v810_ctx_t *ctx) {
                         uint32_t target = insn.addr + insn.imm;
                         if (target >= 0x08000000) target &= 0x07FFFFFF;
                         int idx = find_func(ctx, target);
+                        /* Target inside another function: CUT that function
+                         * there rather than making an overlapping copy of its
+                         * tail, and only where the cut is safe. */
+                        if (idx < 0) {
+                            for (int k = 0; k < ctx->num_funcs; k++) {
+                                if (target > ctx->funcs[k].addr
+                                 && target < ctx->funcs[k].end_addr) {
+                                    if (split_func_at(ctx, k, target)) changed = true;
+                                    break;
+                                }
+                            }
+                            idx = find_func(ctx, target);
+                        }
                         bool inside_any = false;
                         for (int k = 0; k < ctx->num_funcs && !inside_any; k++) {
-                            if (target >= ctx->funcs[k].addr
+                            if (target > ctx->funcs[k].addr
                              && target <  ctx->funcs[k].end_addr) inside_any = true;
                         }
                         if (idx < 0 && !inside_any
@@ -695,8 +780,10 @@ void v810_analyze(v810_ctx_t *ctx) {
                              * transfer dispatched from a nested drain and the
                              * loop grew the stack one frame per iteration until
                              * it died. A depth trace named the pair. */
-                            idx = v810_ctx_add_func(ctx, target, false, -1);
-                            if (idx >= 0) changed = true;
+                            if (split_count < MAX_SPLITS) {
+                                idx = v810_ctx_add_func(ctx, target, false, -1);
+                                if (idx >= 0) { changed = true; split_count++; }
+                            }
                         }
                         if (idx >= 0 && !ctx->funcs[idx].confirmed) {
                             ctx->funcs[idx].confirmed = true;
