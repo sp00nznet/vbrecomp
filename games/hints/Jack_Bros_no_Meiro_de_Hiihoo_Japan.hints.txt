@@ -1,0 +1,3 @@
+# Profile-guided entry points for Jack Bros. no Meiro de Hiihoo! (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.

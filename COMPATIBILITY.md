@@ -28,12 +28,12 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | T&E Virtual Golf (Japan) | 2048 | 100 | yes | yes | yes | yes | - |  |
 | Teleroboxer (Japan, USA) (En) | 1024 | 748 | yes | yes | yes | yes | - |  |
 | Tobidase! Panibon (Japan) | 512 | 216 | yes | yes | yes | yes | - |  |
-| Vertical Force (Japan) | 1024 | 125 | yes | yes | - | no | - |  |
-| Vertical Force (USA) | 1024 | 125 | yes | yes | - | no | - |  |
-| Virtual Bowling (Japan) | 1024 | 337 | yes | yes | - | no | - |  |
+| Vertical Force (Japan) | 1024 | 125 | yes | yes | yes | yes | - |  |
+| Vertical Force (USA) | 1024 | 125 | yes | yes | yes | yes | - |  |
+| Virtual Bowling (Japan) | 1024 | 337 | yes | yes | yes | yes | - |  |
 | Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3151 | yes | yes | yes | yes | - |  |
-| Virtual Fishing (Japan) | 1024 | 92 | yes | yes | - | no | - |  |
-| Virtual Lab (Japan) | 1024 | 238 | yes | yes | - | no | - |  |
+| Virtual Fishing (Japan) | 1024 | 92 | yes | yes | yes | yes | - |  |
+| Virtual Lab (Japan) | 1024 | 238 | yes | yes | yes | yes | - |  |
 | Virtual League Baseball (USA) | 1024 | 121 | yes | yes | yes | yes | - |  |
 | Virtual Pro Yakyuu '95 (Japan) | 1024 | 111 | yes | yes | yes | yes | - |  |
 | V-Tetris (Japan) | 512 | 365 | yes | yes | yes | yes | - |  |
@@ -43,9 +43,9 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 
 | Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Playable | Notes |
 |------|----|-------|------------|----------|-------|---------|----------|-------|
-| Bound High (Japan) (En) (Proto) | 2048 | 471 | yes | yes | - | no | - |  |
+| Bound High (Japan) (En) (Proto) | 2048 | 471 | yes | yes | yes | yes | - |  |
 | Niko-chan Battle (Japan) (Proto) | 1024 | 395 | yes | yes | yes | yes | - |  |
-| Space Pinball (Japan) (En) (Proto) | 2048 | 58 | yes | yes | - | no | - |  |
+| Space Pinball (Japan) (En) (Proto) | 2048 | 58 | yes | yes | yes | yes | - |  |
 
 ## Homebrew (45)
 
@@ -62,8 +62,8 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | BLOX 2 (World) (En,Fr,De,Es,It,Sv,Fi,Cs,Sl) (Aftermarket) (Homebrew) | 2048 | 137 | yes | yes | yes | yes | - |  |
 | Capitan Sevilla 2 (World) (Es) (Aftermarket) (Homebrew) | 1024 | 52 | yes | yes | yes | yes | - |  |
 | Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 238 | yes | yes | - | no | - |  |
-| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 66 | yes | yes | - | no | - |  |
-| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 66 | yes | yes | - | no | - |  |
+| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 66 | yes | yes | yes | yes | - |  |
+| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 66 | yes | yes | yes | yes | - |  |
 | Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 22 | yes | yes | - | no | - |  |
 | Fishbone (World) (Demo 1) (Aftermarket) (Homebrew) | 2048 | 48 | yes | yes | yes | yes | - |  |
 | Fishbone (World) (Demo 2) (Aftermarket) (Homebrew) | 2048 | 111 | yes | yes | yes | yes | - |  |

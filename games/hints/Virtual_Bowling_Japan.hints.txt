@@ -1,0 +1,13 @@
+# Profile-guided entry points for Virtual Bowling (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F02604
+entry 07F0248E
+entry 07F02148
+entry 07F25084
+entry 07F021CA
+entry 07F02B38
+entry 07F023B8
+entry 07F24EFE
+entry 07F02A58
+entry 07F02256

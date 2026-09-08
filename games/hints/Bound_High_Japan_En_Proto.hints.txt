@@ -1,0 +1,8 @@
+# Profile-guided entry points for Bound High (Japan) (En) (Proto).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E3B982
+entry 07E00DE6
+entry 07E25176
+entry 07E08AF4
+entry 07E21EBC

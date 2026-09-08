@@ -1,0 +1,6 @@
+# Profile-guided entry points for Galactic Pinball (Japan, USA) (En).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F000AC
+entry 07F42D44
+entry 07F5168C

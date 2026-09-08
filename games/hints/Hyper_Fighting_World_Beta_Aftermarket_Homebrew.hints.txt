@@ -1,0 +1,10 @@
+# Profile-guided entry points for Hyper Fighting (World) (Beta) (Aftermarket) (Homebrew).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E01D86
+entry 00208D5C
+entry 002170E0
+entry 00217960
+entry 00201AB0
+entry 00201BE0
+entry 07E01F7A

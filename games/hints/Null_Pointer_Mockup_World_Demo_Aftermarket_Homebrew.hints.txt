@@ -1,0 +1,9 @@
+# Profile-guided entry points for Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F8BFA4
+entry 07F84898
+entry 07FBB3A8
+entry 07F8B98C
+entry 07FBB38C
+entry 0500BE4C
