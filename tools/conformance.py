@@ -581,7 +581,7 @@ def harness_source(cases, addrs):
            ' * finding: the V810 completes those instructions. */',
            '#define RUN(addr, fn) do { \\',
            '    int _i; \\',
-           '    __try { fn(); } \\',
+           '    __try { fn(); vb_recomp_drain(); } \\',
            '    __except (EXCEPTION_EXECUTE_HANDLER) { \\',
            '        printf("FAULT %08X %08X\\n", addr, GetExceptionCode()); \\',
            '        fflush(stdout); break; \\',
