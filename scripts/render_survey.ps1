@@ -1,4 +1,4 @@
-# Survey every built corpus game's RENDER state, to find the next shared renderer
+﻿# Survey every built corpus game's RENDER state, to find the next shared renderer
 # bugs. For each game (heartbeat + periodic shots on), capture:
 #   - CHR loaded?           (VRAM-write stats: nonzero CHR writes)
 #   - worlds with content?  (render-chain: an enabled L/R world whose BGMap has cells)
@@ -105,6 +105,26 @@ foreach ($exe in $exes) {
     $biggest = 0
     foreach ($sh in $shots) { if ($sh.Length -gt $biggest) { $biggest = $sh.Length } }
     $drew = $biggest -gt 3800
+
+    # Held buttons can push a game PAST something it was drawing: Red Alarm
+    # renders its title with no input and goes blank with A|B|L|R|Start|Select
+    # held. The question this survey answers is whether the driver can render
+    # the game at all, not whether it does so under one fixed input schedule --
+    # so a blank result gets a second run with no input, and the better of the
+    # two counts.
+    if (-not $drew -and $Press) {
+        Remove-Item env:VBRECOMP_PRESS -EA SilentlyContinue
+        Remove-Item $gameShots -Recurse -Force -EA SilentlyContinue
+        New-Item -ItemType Directory -Force $gameShots | Out-Null
+        $p2 = Start-Process -FilePath $exe.FullName -ArgumentList "`"$rom`"" -PassThru -WindowStyle Hidden `
+            -RedirectStandardError $err -RedirectStandardOutput (Join-Path $env:TEMP "rs_out.txt")
+        if (-not $p2.WaitForExit($TimeoutSec * 1000)) { try { $p2.Kill() } catch {} }
+        $env:VBRECOMP_PRESS = $Press
+        $shots2 = @(Get-ChildItem $gameShots -Filter *.png -EA SilentlyContinue | Sort-Object Name)
+        $b2 = 0
+        foreach ($sh in $shots2) { if ($sh.Length -gt $b2) { $b2 = $sh.Length } }
+        if ($b2 -gt $biggest) { $shots = $shots2; $biggest = $b2; $drew = $b2 -gt 3800 }
+    }
     # Unimplemented calls the run hit (heartbeat only): the analysis gap that is
     # most likely keeping this game where it is.
     $topStub = ""
