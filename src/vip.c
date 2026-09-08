@@ -143,14 +143,15 @@ static inline uint32_t vip_map_addr(uint32_t addr) {
      * the mirror mid-frame. We keep them separate so both tile sets
      * coexist for whole-frame rendering. Reads handle both segments. */
 
-    /* World attribute mirror: 0x3DC00-0x3DFFF mirrors 0x3D800-0x3DBFF.
-     * NOTE: The VIP handler writes clear/END values through this mirror
-     * which can overwrite valid world data from the game's decompression.
-     * Block clear writes (0x00FE, 0x0040) to prevent handler from
-     * destroying game-set worlds. */
-    if (addr >= 0x3DC00 && addr < 0x3E000) {
-        addr = 0x3D800 + ((addr - 0x3DC00) & 0x3FF);
-    }
+    /* 0x3DC00-0x3DFFF is NOT a mirror of the world attributes: it is the
+     * COLUMN TABLE (CTA), a separate region the VIP reads for the per-column
+     * brightness ramp. Folding it onto 0x3D800 meant every game that writes a
+     * column table -- 512 halfwords, typically 0x00FE -- wiped all 32 world
+     * attributes with it. StarFox, Fishbone and Mario Combat each ended up
+     * with one world reading HEAD=0x00FE or 0x0040 (END) and GX/GY/MX/MY all
+     * 254, having loaded real tiles and set up real BGMap cells they could
+     * then never display. The "block clear writes" workaround that used to sit
+     * here was treating that symptom. */
 
     return addr;
 }

@@ -294,6 +294,23 @@ pad slots and the two VIP interrupt registers, nothing else. So the CHR
 traffic is the engine clearing character memory and the charset copy never
 runs at all. Four games move together on whatever gates it.
 
+### The column table was being written over the world attributes - resolved
+
+`vip_map_addr` folded 0x3DC00-0x3DFFF onto 0x3D800 as a "world attribute
+mirror". It is not a mirror: 0x3DC00-0x3DFFF is the COLUMN TABLE (CTA), the
+per-column brightness ramp the VIP reads separately. Every game that writes a
+column table -- 512 halfwords, typically 0x00FE -- was therefore wiping all 32
+world attributes with it.
+
+The symptom was a game that had done everything right and displayed nothing.
+StarFox loaded 7,350 non-zero CHR bytes, filled 396 BGMap cells, and set up a
+380x224 world, then read back `GX=254 GY=254 MX=254 MY=254` -- 254 being
+0x00FE, the column value landing on top of its world. A workaround here used
+to block writes of the clear values 0x00FE and 0x0040 to fight the same
+symptom; removing the bogus mapping removes the need for it.
+
+StarFox and Virtual Lab go blank -> advancing. Nothing regressed.
+
 ### B. Tiles are loaded and nothing is drawn - 5 games
 
 StarFox, Fishbone, Mario Combat, Snatcher and Galactic Pinball all write real
