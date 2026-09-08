@@ -900,8 +900,20 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     /* Interrupt check at function entry, and a trace record so a boot chain
      * that simply ends can say what ran last -- the backtrace the generated
      * code otherwise does not have. */
+    /* Consume the parked entry FIRST. vb_interrupt_check() below can run an
+     * entire interrupt handler, and every function it enters would otherwise
+     * see this transfer's target, fail to match it, and discard it. */
+    fprintf(out, "    uint32_t _e = vb_recomp_entry; vb_recomp_entry = 0;\n");
     fprintf(out, "    vb_interrupt_check();\n");
     fprintf(out, "    vb_recomp_trace(0x%08Xu);\n", func->addr);
+    /* A transfer to an address INSIDE this function enters here with the
+     * target parked in vb_recomp_entry; the dispatch block at the bottom
+     * turns it into a goto. Without this the target is not in the function
+     * table and the transfer is dropped -- Mario Clash drops 129,000 of them
+     * in a 600-frame run, all four hot addresses interior to a known
+     * function. Entering mid-function deliberately skips the prologue,
+     * which is what the hardware does too. */
+    fprintf(out, "    if (_e) goto vb_entry_dispatch;\n");
 
     /* Second pass: emit code, tracking which labels get declared.
      * Branch targets that fall mid-instruction (decoder skipped over them
@@ -970,7 +982,18 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         }
     }
 
-    fprintf(out, "}\n");
+        /* Entry dispatch. Only labels the body actually declared are reachable;
+     * anything else stays a counted stub rather than restarting the function
+     * from the top, which would re-run the prologue and unbalance the stack. */
+    fprintf(out, "vb_entry_dispatch:\n");
+    fprintf(out, "    {\n");
+    fprintf(out, "      switch (_e) {\n");
+    for (int i = 0; i < declared.count; i++)
+        fprintf(out, "      case 0x%08Xu: goto label_%08X;\n",
+                declared.addrs[i], declared.addrs[i]);
+    fprintf(out, "      default: vb_recomp_stub(_e); return;\n");
+    fprintf(out, "      } }\n");
+fprintf(out, "}\n");
     free(labels.addrs);
     free(declared.addrs);
 }
@@ -1221,7 +1244,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                         if (emitted_addrs[k] == target) { already = true; break; }
                     }
                     if (!already && target >= ctx->rom_base && target < ROM_REGION_END) {
-                        fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: callee */ vb_recomp_stub(0x%08Xu); }\n", target, target);
+                        fprintf(out, "\nvoid vb_func_%08X(void) { /* STUB: callee */ vb_recomp_entry = 0; vb_recomp_stub(0x%08Xu); }\n", target, target);
                         emitted_addrs[n_emitted++] = target;
                     }
                 }
@@ -1295,9 +1318,23 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "        if (a == addr) { vb_func_table[mid].fn(); return; }\n");
         fprintf(out, "        if (a < addr) lo = mid + 1; else hi = mid - 1;\n");
         fprintf(out, "    }\n");
-        fprintf(out, "    /* No function at this address. Counted rather than\n");
-        fprintf(out, "     * silently dropped: an unresolved target is the usual\n");
-        fprintf(out, "     * reason a game runs forever having done nothing. */\n");
+        fprintf(out, "    /* No exact match. The greatest function below the target\n");
+        fprintf(out, "     * encloses it if anything does: park the address and let\n");
+        fprintf(out, "     * that function's entry dispatch decide. Its switch over\n");
+        fprintf(out, "     * the labels it actually declared IS the range check, so a\n");
+        fprintf(out, "     * bogus address still hits the default and is counted --\n");
+        fprintf(out, "     * which is all this used to do, for 129,000 transfers a run\n");
+        fprintf(out, "     * in Mario Clash alone. Not inside an interrupt handler,\n");
+        fprintf(out, "     * though: diverting one mid-flight abandons its C frame, so\n");
+        fprintf(out, "     * it never reaches RETI and EP stays set forever -- Mario\n");
+        fprintf(out, "     * Clash wedges that way, leaking exactly the vector stub's\n");
+        fprintf(out, "     * one push. */\n");
+        fprintf(out, "    if (lo > 0 && vb_func_table[lo-1].addr != addr\n");
+        fprintf(out, "        && !(vb_cpu.sr[VB_SREG_PSW] & VB_PSW_EP)) {\n");
+        fprintf(out, "        vb_recomp_entry = addr;\n");
+        fprintf(out, "        vb_func_table[lo-1].fn();\n");
+        fprintf(out, "        return;\n");
+        fprintf(out, "    }\n");
         fprintf(out, "    vb_recomp_stub(addr);\n");
         fprintf(out, "}\n");
 
