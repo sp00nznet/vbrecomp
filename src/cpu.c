@@ -172,8 +172,20 @@ static uint32_t trace_pos;
  * list can place it. One store per block is cheap and does. */
 uint32_t vb_recomp_pc;
 
+/* VBRECOMP_COUNT_FUNC=<hex>: count entries to one function. The interrupt
+ * dispatcher reports it per handler call, which is how you test a claim like
+ * "the handler re-runs 42 times per interrupt" instead of inferring it from
+ * an SP delta that happens to divide by four. */
+uint32_t vb_recomp_func_hits;
+static uint32_t vb_recomp_func_watch = 0xFFFFFFFFu;
+
 void vb_recomp_trace(uint32_t addr) {
     trace_ring[trace_pos++ % TRACE_N] = addr;
+    if (vb_recomp_func_watch == 0xFFFFFFFFu) {
+        const char *e = getenv("VBRECOMP_COUNT_FUNC");
+        vb_recomp_func_watch = e ? (uint32_t)strtoul(e, NULL, 16) : 0;
+    }
+    if (vb_recomp_func_watch && addr == vb_recomp_func_watch) vb_recomp_func_hits++;
 }
 
 void vb_recomp_dump_trace(void) {
