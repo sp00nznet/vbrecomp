@@ -1,7 +1,12 @@
 # Profile-guided entry points for Galactic Pinball (Japan, USA) (En).
 # Addresses the game jumps to at run time, harvested by scripts/discover.ps1
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
-entry 07F000AC
+# entry 07F000AC -- REMOVED. This address is one instruction past
+# `mov 6, r25` inside sub_07F00026's counted loop, so making it an
+# entry let control arrive after the initialisation: r25 counted down
+# from whatever it held (observed 0xFFFFFF9F) and the inner loop at
+# 0x07F00986 ran four billion times, which is why this game reported
+# no frames at all. Discovery harvested it; do not re-add it.
 entry 07F42D44
 entry 07F5168C
 entry 07F4026E
