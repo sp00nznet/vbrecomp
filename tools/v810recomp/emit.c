@@ -1330,7 +1330,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         fprintf(out, "     * Clash wedges that way, leaking exactly the vector stub's\n");
         fprintf(out, "     * one push. */\n");
         fprintf(out, "    if (lo > 0 && vb_func_table[lo-1].addr != addr\n");
-        fprintf(out, "        && !(vb_cpu.sr[VB_SREG_PSW] & VB_PSW_EP)) {\n");
+        fprintf(out, "        && (vb_recomp_irq_entry || !(vb_cpu.sr[VB_SREG_PSW] & VB_PSW_EP))) {\n");
         fprintf(out, "        vb_recomp_entry = addr;\n");
         fprintf(out, "        vb_func_table[lo-1].fn();\n");
         fprintf(out, "        return;\n");

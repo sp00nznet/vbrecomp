@@ -189,10 +189,12 @@ static bool safe_split_point(v810_ctx_t *ctx, const v810_func_t *f, uint32_t at)
     uint32_t off = addr_to_offset(ctx, f->addr);
     uint32_t end = addr_to_offset(ctx, f->end_addr);
     if (off >= ctx->rom_size || end > ctx->rom_size) return false;
+    bool on_boundary = false;
     while (off < end && off < ctx->rom_size) {
         v810_insn_t insn;
         if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) return false;
         insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+        if (insn.addr == at) on_boundary = true;
         bool is_branch = (insn.format == FMT_III && insn.cond != 0x0D)
                       || insn.opcode == 0x2A;
         if (is_branch) {
@@ -207,8 +209,18 @@ static bool safe_split_point(v810_ctx_t *ctx, const v810_func_t *f, uint32_t at)
             }
         }
         off += insn.size;
+        /* Inline arguments after a long call are DATA. Stepping over them is
+         * what keeps the cut off a byte that only looks like an instruction:
+         * Galactic Pinball split at 0x07F51728, the first argument word of a
+         * `jal 0x07F417B8`, and 0x9800 there decodes as `bp .` -- a branch to
+         * itself that the preceding function then fell into. */
+        if (insn.opcode == 0x2B)
+            off += v810_get_skip_bytes(ctx,
+                       v810_normalize_rom_addr(ctx, insn.addr + insn.imm));
     }
-    return true;
+    /* A cut that is not on an instruction boundary splits an instruction (or a
+     * run of data) in half, and both halves then decode as garbage. */
+    return on_boundary;
 }
 
 /* Cut `fi` at `at`: the tail becomes its own function, so a jump can land on it
@@ -910,4 +922,103 @@ void v810_analyze(v810_ctx_t *ctx) {
                    ctx->funcs[i].is_interrupt ? " (interrupt)" : "");
         }
     }
+}
+
+/* Drop functions whose entry byte the trace already proved is DATA.
+ *
+ * A jal to a skip-after-call helper is followed by inline argument bytes; the
+ * trace marks them 'D' and steps over them. Nothing stops a function being
+ * created there anyway, and then those bytes get DECODED. Galactic Pinball's
+ * sub_07F5168C ends with `jal 0x07F417B8` whose 8 argument bytes at 0x07F51728
+ * became a function -- and the first halfword of that data, 0x9800, decodes as
+ * `bp .`, a branch to itself. The preceding function's fall-through jumps
+ * straight into it and the game spins there forever: that is the whole of
+ * Galactic Pinball's blank screen.
+ *
+ * Give the range back to the function that traced those bytes, so its own
+ * fall-through lands past the arguments where execution really resumes. */
+void v810_drop_data_funcs(v810_ctx_t *ctx) {
+    if (!ctx->code_map || !ctx->byte_owner) return;
+    int dropped = 0;
+    for (int i = 0; i < ctx->num_funcs; i++) {
+        uint32_t off = addr_to_offset(ctx, ctx->funcs[i].addr);
+        if (off >= ctx->rom_size) continue;
+        if (ctx->code_map[off] != 'D') continue;
+        if (ctx->funcs[i].is_interrupt) continue;
+        uint32_t own = ctx->byte_owner[off];
+        if (!own || own == ctx->funcs[i].addr) continue;
+        for (int k = 0; k < ctx->num_funcs; k++) {
+            if (ctx->funcs[k].addr != own) continue;
+            if (ctx->funcs[i].end_addr > ctx->funcs[k].end_addr)
+                ctx->funcs[k].end_addr = ctx->funcs[i].end_addr;
+            break;
+        }
+        ctx->funcs[i].confirmed = false;
+        ctx->funcs[i].addr = 0;   /* skipped by the emitter */
+        dropped++;
+    }
+    fprintf(stderr, "  dropped %d function(s) sitting on inline call data\n", dropped);
+}
+
+/* Detect skip-after-call helpers automatically.
+ *
+ * The V810 long-call idiom passes arguments INLINE, in the bytes right after
+ * the `jal`. The callee reads them through r31 (which holds the return
+ * address) and then returns past them:
+ *
+ *     ld.w  0[r31], r21
+ *     ld.w  4[r31], r22
+ *     ...
+ *     add   8, r31
+ *     jmp   [r31]
+ *
+ * Until now the only way the recompiler learned about those bytes was a
+ * hand-written `skip <target> <n>` hint. Without it the argument bytes get
+ * decoded as code, and whatever they happen to encode runs. Galactic Pinball's
+ * arguments at 0x07F51728 start with 0x9800, which decodes as `bp .` -- a
+ * branch to itself. The caller falls straight into it and the game spins there
+ * for the rest of the run.
+ *
+ * The `add N, r31` immediately before `jmp [r31]` names the argument size
+ * exactly, so detect it rather than asking someone to write it down. Runs
+ * before analysis over the targets of a linear jal scan, because the trace
+ * needs the skip amount while it is walking the CALLERS. */
+void v810_detect_skip_funcs(v810_ctx_t *ctx) {
+    int found = 0;
+    for (uint32_t off = 0; off + 4 <= ctx->rom_size; off += 2) {
+        v810_insn_t j;
+        if (!v810_decode(ctx->rom, off, ctx->rom_size, &j)) continue;
+        if (j.opcode != 0x2B) continue;                 /* jal */
+        uint32_t target = v810_normalize_rom_addr(ctx,
+                              ROM_OFF_TO_ADDR(off, ctx->rom_base) + j.imm);
+        if (v810_get_skip_bytes(ctx, target)) continue; /* already known */
+        uint32_t toff = addr_to_offset(ctx, target);
+        if (toff >= ctx->rom_size) continue;
+
+        /* Walk the callee to its first return, remembering the previous
+         * instruction, and see whether that pair is `add N, r31` + `jmp [r31]`. */
+        int32_t prev_add = -1;
+        for (int n = 0; n < 64 && toff + 2 <= ctx->rom_size; n++) {
+            v810_insn_t k;
+            if (!v810_decode(ctx->rom, toff, ctx->rom_size, &k)) break;
+            if (k.opcode == 0x06 && k.reg1 == 31) {     /* jmp [r31] */
+                if (prev_add > 0 && prev_add <= 64 && (prev_add & 1) == 0) {
+                    if (ctx->num_skip_funcs >= ctx->max_skip_funcs) {
+                        ctx->max_skip_funcs *= 2;
+                        ctx->skip_funcs = realloc(ctx->skip_funcs,
+                            ctx->max_skip_funcs * sizeof(ctx->skip_funcs[0]));
+                    }
+                    ctx->skip_funcs[ctx->num_skip_funcs].target = target;
+                    ctx->skip_funcs[ctx->num_skip_funcs].skip_bytes = (uint32_t)prev_add;
+                    ctx->num_skip_funcs++;
+                    found++;
+                }
+                break;
+            }
+            if (k.opcode == 0x19 || k.opcode == 0x2A) break;   /* reti / jr */
+            prev_add = (k.opcode == 0x11 && k.reg2 == 31) ? k.imm : -1;
+            toff += k.size;
+        }
+    }
+    fprintf(stderr, "  skip-after-call helpers detected: %d\n", found);
 }

@@ -6,8 +6,10 @@
  */
 
 #include "vbrecomp/vbrecomp.h"
+#include <stdlib.h>
 
 void vb_init(const uint8_t *rom_data, uint32_t rom_size) {
+    vb_recomp_irq_entry = getenv("VBRECOMP_IRQ_ENTRY") != NULL;
     vb_cpu_init();
     vb_mem_init(rom_data, rom_size);
     vb_vip_init();

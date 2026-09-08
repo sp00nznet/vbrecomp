@@ -114,6 +114,9 @@ extern uint32_t vb_recomp_pc;   /* address of the last basic block entered */
  * it here and calls the enclosing function, whose entry dispatch turns it
  * into a goto; zero on every ordinary call. */
 extern uint32_t vb_recomp_entry;
+/* VBRECOMP_IRQ_ENTRY=1: also route interior transfers while PSW.EP is set.
+ * Off by default because diverting a handler mid-flight can lose its RETI. */
+extern int vb_recomp_irq_entry;
 void vb_recomp_trace(uint32_t addr);
 void vb_recomp_dump_trace(void);
 void vb_recomp_dump_stubs(void);

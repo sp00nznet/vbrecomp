@@ -172,6 +172,7 @@ static uint32_t trace_pos;
  * list can place it. One store per block is cheap and does. */
 uint32_t vb_recomp_pc;
 uint32_t vb_recomp_entry;
+int vb_recomp_irq_entry;
 
 /* VBRECOMP_COUNT_FUNC=<hex>: count entries to one function. The interrupt
  * dispatcher reports it per handler call, which is how you test a claim like
