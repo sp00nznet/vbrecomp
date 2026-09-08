@@ -86,6 +86,7 @@ void vb_interrupt_check(void) {
                     vb_cpu.r[3], vb_cpu.r[4]);
             fprintf(stderr, "  r7=%08X r25=%08X r26=%08X r31=%08X\n",
                     vb_cpu.r[7], vb_cpu.r[25], vb_cpu.r[26], vb_cpu.r[31]);
+            fprintf(stderr, "  last block entered: 0x%08X\n", vb_recomp_pc);
             extern void vb_mem_dump_hot_reads(void);
             vb_mem_dump_hot_reads();
             extern void vb_mem_dump_write_watch(void);

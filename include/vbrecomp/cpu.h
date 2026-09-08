@@ -108,6 +108,7 @@ void vb_recomp_stub(uint32_t addr);
 
 /* Execution trace: the recompiled code's backtrace. Every function entry
  * records itself; dump it when a boot chain ends to see what ran last. */
+extern uint32_t vb_recomp_pc;   /* address of the last basic block entered */
 void vb_recomp_trace(uint32_t addr);
 void vb_recomp_dump_trace(void);
 void vb_recomp_dump_stubs(void);
