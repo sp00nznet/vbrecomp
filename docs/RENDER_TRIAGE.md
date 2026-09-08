@@ -773,6 +773,50 @@ handlers preserve every general register (checked). So either we reach
 per-handler check does not see. That is the thread to pull, and it is a
 game-state question rather than a recompiler-structure one.
 
+### Root cause: a tail-jump into a caller's loop NESTS instead of unwinding
+
+Galactic Pinball's structure is:
+
+```
+sub_07F00026:
+  07F000AA: mov 6, r25
+  07F000AC: jal 0x07F00976      <- loop body, part 1
+  07F000B0: jal 0x07F007C0      <- loop body, part 2
+  07F000B4: add -1, r25
+  07F000B6: bnz 0x07F000AC
+
+...and inside the body, at 0x07F00AF2:
+  movhi 0xFFF0, r0, r1 / movea 0x00B4, r1, r1 / jmp [r1]   -> 0x07F000B4
+```
+
+That last jump is a callee ending by tail-jumping back into its CALLER's loop,
+at the decrement. On hardware control simply arrives there with r25 live and the
+loop continues, once per iteration.
+
+Our tail-jump model parks the target and drains it, which DISPATCHES
+sub_07F000B4 as a nested call -- and then the original `VB_CALL(vb_func_07F00976)`
+still returns to sub_07F00026, which runs its own copy of the loop as well. The
+execution profile shows it outright:
+
+| function | entries in a 64-sample window |
+|---|---|
+| sub_07F00976 (body part 1) | 15 |
+| sub_07F007C0 (body part 2) | 15 |
+| sub_07F000B4 (the decrement) | 15 |
+| **sub_07F00026 (owns the loop)** | **4** |
+
+The loop advances roughly four times per real iteration. r25 goes 6, 5, ... 0,
+exits the inner run, and the outer run then decrements past zero -- the `bnz`
+never sees zero again and the count observed at the heartbeat is 0xFFFFFF9F.
+
+This is why every structural fix attempted here failed: the entry is real, the
+jump is real, and the defect is that a transfer INTO AN ACTIVE FRAME is executed
+as a new frame. Fixing it needs the drain to unwind to the frame that owns the
+target (a longjmp, or an explicit unwind flag checked by every VB_CALL) rather
+than nest. That is a redesign of the transfer model, not a patch to the
+analyzer, and the four analyzer-level attempts recorded above are all dead ends
+for exactly that reason.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
