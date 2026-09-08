@@ -494,7 +494,7 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
          * garbage target from data decoded as JAL) has no emitted function,
          * so dispatch it at run time (no-op on miss) to stay linkable. */
         uint32_t nt = target;
-        if (nt >= 0x08000000) nt &= 0x07FFFFFF;
+        nt = v810_normalize_rom_addr(ctx, nt);
         if (nt >= ctx->rom_base && nt < ROM_REGION_END) {
             fprintf(out, "    VB_CALL(vb_func_%08X, 0x%08Xu);\n", nt, nt);
         } else {
@@ -1026,7 +1026,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
         if (ctx->funcs[i].addr < ctx->rom_base) continue;
         uint32_t foff = ctx->funcs[i].addr;
-        if (foff >= 0x08000000) foff &= 0x07FFFFFF;
+        foff = v810_normalize_rom_addr(ctx, foff);
         foff -= ctx->rom_base;
         uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
         if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
@@ -1037,7 +1037,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
             insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
             if (insn.opcode == 0x2B) {
                 uint32_t target = insn.addr + insn.imm;
-                if (target >= 0x08000000) target &= 0x07FFFFFF;
+                target = v810_normalize_rom_addr(ctx, target);
                 if (target >= ctx->rom_base && target < ROM_REGION_END) {
                     fprintf(out, "void vb_func_%08X(void);\n", target);
                 }
@@ -1126,7 +1126,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
             if (!ctx->funcs[i].confirmed || !ctx->funcs[i].visited) continue;
             if (ctx->funcs[i].addr < ctx->rom_base) continue;
             uint32_t foff = ctx->funcs[i].addr;
-            if (foff >= 0x08000000) foff &= 0x07FFFFFF;
+            foff = v810_normalize_rom_addr(ctx, foff);
             foff -= ctx->rom_base;
             uint32_t fend = foff + (ctx->funcs[i].end_addr - ctx->funcs[i].addr);
             if (foff >= ctx->rom_size || fend > ctx->rom_size) continue;
@@ -1139,7 +1139,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
 
                 if (insn.opcode == 0x2B) { /* JAL */
                     uint32_t target = insn.addr + insn.imm;
-                    if (target >= 0x08000000) target &= 0x07FFFFFF;
+                    target = v810_normalize_rom_addr(ctx, target);
                     bool already = false;
                     for (int k = 0; k < n_emitted; k++) {
                         if (emitted_addrs[k] == target) { already = true; break; }
