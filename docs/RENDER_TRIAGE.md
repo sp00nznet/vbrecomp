@@ -55,15 +55,35 @@ The earlier suspicion that this was the VIP interrupt path was wrong: the VIP
 handler fires (300+ times per run, no SP leak), and the two WRAM addresses the
 game reads two million times are its own pad-state slots, not an interrupt flag.
 
-### 2. A different gate — 12 games
+### 2. Running, but the state machine never advances — 12 games
 
 3-D BattleSnake, BLOX 2, Ballface, Bound High, Mario Clash, Nester's Funky
 Bowling, Panic Bomber, SD Gundam, Teleroboxer, Tobidase! Panibon, Tron VB and
-V-Tetris still sit on one frame with those buttons held. Their gate is not the
-one Waterworld uses — a different button, a release edge, or a hold length.
-Each needs its wait loop read the way Waterworld's was above; `VBRECOMP_WATCH=<hex>`
-tallies the link register of every reader of an address, which is how that loop
-was found.
+V-Tetris still sit on one frame with the buttons held. This is *not* a second
+button gate — five masks were tried (`303C`, `1000`, `0004`, `0010`, `F03C`)
+and Mario Clash, Teleroboxer and Panic Bomber produce a byte-identical frame
+under every one of them, out to 6,000 frames.
+
+They are not deadlocked either. Mario Clash's hot address resolves (via
+`VBRECOMP_WATCH=0500FFC8`) to `sub_07FF5BB6`, the standard VB frame-sync idiom:
+
+```
+07FF5BA4: loop1: r10 = XPSTTS; if ((r10 & 0x000C) == 0) goto loop1   ; wait for draw start
+07FF5BB6: loop2: r10 = XPSTTS; if ((r10 & 0x000C) != 0) goto loop2   ; wait for draw end
+```
+
+Both halves terminate — `vb_vip_read16` already cycles XPBSY through
+F0 / F1 / both / idle for exactly this reason — so the game reaches its main
+loop every frame and simply redraws the same screen.
+
+What separates this group from Waterworld is `INTENB`: Mario Clash and
+Teleroboxer run with `INTENB=0000`, VIP interrupts never enabled, driven only
+by the timer (`TCR=0B`, level 1 firing 500 times a run). Waterworld runs with
+`INTENB=4000`. V-Tetris (`INTENB=4008`, `INTPND=3036` — its handler *is*
+clearing XPEND) does advance, just slowly enough that a 900-frame sample misses
+it. So the next thing to establish for this group is why VIP interrupts are
+never enabled: whether the game is waiting on a condition before enabling them,
+or an `INTENB` write is not reaching the register.
 
 ### 3. Polling a display phase that never arrives — part of the 36 blanks
 
