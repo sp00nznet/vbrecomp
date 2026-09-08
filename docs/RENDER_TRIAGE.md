@@ -91,73 +91,34 @@ and `r30 = r7; r27 = (r7 & 3) << 3`, pairing each address with the offset from
 its own low two bits, and Ballface blits with a word-aligned source (`r27 = 0`)
 and a variable destination bit position (`r26 = r5`), a glyph's x.
 
-### 4. The entry returns instead of looping — 16 games
+### 4. The entry returns instead of looping — 13 games (was 16)
 
-Clustering the non-drawing set by busiest read address
-(`scripts/diagnose_blanks.ps1`) put sixteen of them on `0x0005F800` — but
-`VBRECOMP_WATCH` showed every one of those reads coming from `LR=0`, our own
-`vb_interrupt_check`. They poll nothing. All sixteen print **"Reset returned
-after 0–9 frames"**: the recompiled entry returns and the driver then spins
-interrupts with no game code running.
+A game's main loop is a control-flow CYCLE, and the recompiler used to translate
+it as call/return. Mario's Tennis was the clean specimen: `sub_07F801B2` ends in
+a 64-entry jump-table dispatch, and each state handler ends `jr 0x07F801F4` back
+to that dispatcher. Called, that is unbounded mutual recursion; returned, the
+loop is dropped and the boot unwinds after one state — which is why these ROMs
+print "Reset returned after 0–9 frames" and then run no game code at all.
 
-**The root cause is understood: a game's main loop is a control-flow CYCLE, and
-we translate it as call/return.** Mario's Tennis is the clean specimen:
+**Fixed in the tail-jump model (merged).** A `jal` is a call; every other
+transfer — `jr`, `jmp [reg]`, a branch leaving the function, a jump-table case —
+is a jump that parks its target in `vb_recomp_tail_target` and returns, and
+every call site drains the chain so the transfer completes before the caller
+resumes. That took the corpus from 41 rendering to 45 and unblocked Mario's
+Tennis, Golf and Virtual Bowling.
 
-```
-sub_07F801B2:  ... 07F80210: jmp [r30]     ; 64-entry jump table, LAST instruction
-sub_07F80216:  jal 07F81940
-               07F8021A: jr 0x07F801F4      ; back to the dispatcher
-```
+Thirteen games still reach this line. What is known about them:
 
-The emitter calls the handler, the handler's `jr` back to the dispatcher has no
-label and no function to land on so it becomes `return`, the dispatcher falls
-off its own end, and the whole boot unwinds after exactly one state. The
-emitter even prints `WARNING: JR to 0x07F801F4 outside function`.
-
-Neither obvious translation works. Emitting the `jr` as a call is unbounded
-recursion — the loop never returns. Emitting it as a return is what we do now.
-
-**A trampoline was built and reverted.** Tail jumps parked their target in
-`vb_recomp_tail_target` and returned to a loop in `vb_recomp_boot()`, and the
-analyzer registered out-of-function branch targets so the dispatch table could
-reach them (function counts stayed sane: Mario's Tennis 216→222, Wario Land
-3026→3144). It did stop Mario's Tennis returning — and it broke Waterworld and
-Mario Clash, which had been advancing, while fixing nothing. The flaw is
-structural: a tail jump *deep inside a real call chain* unwinds intermediate
-frames that were genuine JAL calls, and those callers then resume after their
-call site having lost the transfer.
-
-So the fix needs to distinguish a frame entered by JAL from one entered by
-jump. **That work is on the `tail-jump-transfers` branch and is the closest
-this has come**, but it is unfinished and off `main` because it crashes two
-games that currently work.
-
-The model on that branch: a `jal` is a call; every other transfer — `jr`,
-`jmp [reg]`, a branch leaving the function, a jump-table case — is a JUMP that
-parks its target in `vb_recomp_tail_target` and returns. Every CALL SITE then
-drains the chain, so the transfer completes *before* the caller resumes
-(ordering preserved) and a main-loop cycle runs flat instead of recursing. Two
-things earlier attempts missed and it gets right: draining only at boot lets a
-caller resume before its callee's transfer has run, and interrupt handlers are
-invoked by the runtime with no drain at all — a handler ending in a jump parked
-a target that fired later at an unrelated call site, which is what broke
-Waterworld.
-
-Measured on that branch (3,619 bytes = a blank frame):
-
-| | before | on branch |
-|---|---|---|
-| Golf | blank | **6437** — first time it has ever drawn |
-| Mario's Tennis | blank | **5732** at frame 600 — first time |
-| Virtual Bowling | blank | 3709 |
-| Waterworld | advancing | advancing |
-| Mario Clash | advancing | **dies partway** |
-| Teleroboxer | frozen | **dies partway** |
-
-The two deaths look like stack exhaustion, so at least one cycle still nests.
-The jump-table dispatch was one of them — it *called* each case, nesting a frame
-per iteration of the loop it sits in — and is a `VB_JUMP` per case on the branch
-now; finding the remaining one is the next step.
+- They hit **no unimplemented calls** — every jump resolves, so nothing is
+  falling into `vb_recomp_stub`.
+- Each leaves a **valid ROM address in r31** when the chain ends (StarFox
+  `0x07FE64EC`, Snatcher `0x07E02702`, Mario Combat `0x07E02480`), so control
+  was lost at a top-level `jmp [r31]` — a return inside a real call, but a
+  transfer at the top level where there is no caller.
+- **Following r31 from the driver does not recover them.** Dispatching there
+  runs exactly one hop and the routine returns without setting a new
+  continuation, leaving the screen blank. So r31 is where control went, but the
+  routine it points at is not the missing main loop.
 
 ### 5. Running, but the state machine never advances — 13 games
 
