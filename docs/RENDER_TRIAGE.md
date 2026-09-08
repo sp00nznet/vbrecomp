@@ -209,6 +209,24 @@ against real hardware behaviour.
 Jack Bros (USA) and Jack Bros. no Meiro de Hiihoo (Japan) are the same game, so
 one fix covers both.
 
+## The reference says which 29 are actually ours
+
+Every one of the 29 blank games was run on BizHawk's Mednafen VB core for the
+same 600 frames (`scripts/reference/drawcheck.lua`), recording the frame at
+which character data first appears:
+
+- **26 load CHR on real hardware and not under vbrecomp.** Those are ours, and
+  each now carries a deadline: the reference has tiles by frame 10 for most of
+  them, frame 40-70 for Jack Bros and Space Invaders, frame 120-190 for
+  Formula V and VUEngine Platformer. "Why is it blank" becomes "what happens
+  before frame N that we miss".
+- **3 draw nothing on hardware either** — Snowball Wars demos 1, 2 and 3, all
+  reporting `firstChr=-1, chrFinal=0, fbFinal=0`. They are not vbrecomp
+  defects, and counting them against the driver overstates the gap.
+
+So the honest target is 73, not 76, and the real remaining work is 26 games —
+each with a frame window rather than an open question.
+
 ## Configuration is exhausted
 
 The 29 remaining blank games do not draw under ANY runtime configuration
