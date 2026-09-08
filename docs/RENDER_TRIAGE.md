@@ -948,6 +948,28 @@ enables display and drawing with correct brightness, sets no world attributes,
 and diverges from hardware at the first global. Where it stops running the
 hardware's path is not yet known.
 
+### Galactic Pinball: the dispatches are POST-BOOT, and that is the whole problem
+
+`entry 07F000AC` was re-tried once ownership began preferring the container, so
+that it registers as an interior entry of sub_07F00026 and the unwinding drain
+should catch it. It does register -- and r25 is still 0xFFFFFF9F.
+
+The reason closes the loop on this game. sub_07F00026 is a BOUNDED routine: it
+runs its counted loop, restores its saved registers and returns. By the time the
+591 dispatches to 0x07F000AC happen -- from the interrupt-driven loop, long
+after boot -- there is no sub_07F00026 frame on the stack to unwind to. So the
+dispatches run the loop body with no `mov 6, r25` before them, forever.
+
+On hardware the jump at 0x07F00AF2 into that loop happens WHILE sub_07F00026 is
+executing. Ours happens after it has returned. So the defect is upstream: we
+reach 0x07F00AF2 at a time hardware does not. The WRAM diff agrees -- hardware
+builds a table of handler pointers at 0x05000100-0x050001FF (0xFFF09D99,
+0xFFF09D4C, ... low-mirror ROM addresses, computed rather than immediates or ROM
+data) and we build none of it.
+
+So: not the entry, not the ownership, not the unwind trigger. The question is
+why our control reaches that jump post-boot at all.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
