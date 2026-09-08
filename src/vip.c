@@ -10,6 +10,7 @@
 #include "vbrecomp/vip.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>  /* getenv: without this it is implicitly int, truncating the pointer */
 
 /* VRAM backing store */
 static uint8_t vram[VB_VRAM_SIZE];

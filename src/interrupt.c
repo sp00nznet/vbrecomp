@@ -237,7 +237,22 @@ void vb_interrupt_check(void) {
                         i, int_count[i], psw);
             }
             uint32_t sp_before = vb_cpu.r[3];
-            handlers[i]();
+            /* vb_interrupt_check runs at the top of every generated function,
+              * including inside a handler, so a handler that re-enables
+              * interrupts can nest. The level rule bounds that to one frame per
+              * level -- if this counter climbs past that, the bound is broken
+              * and the C stack is what pays. */
+             {
+                 static int nest, warned;
+                 nest++;
+                 if (nest > 8 && warned < 6) {
+                     warned++;
+                     fprintf(stderr, "IRQ NEST %d at level %d (PSW=%08X)\n",
+                             nest, i, vb_cpu_get_psw());
+                 }
+                 handlers[i]();
+                 nest--;
+             }
             /* A handler that ends in a jump parks its target; drain it here, or
              * the transfer fires later at an unrelated call site. */
             vb_recomp_drain();

@@ -1,3 +1,17 @@
+# Recompiled code needs a far bigger stack than the V810 original did: one
+# guest function becomes one C function, the transfer chain nests real C
+# frames, and those frames are much larger than the 8-16 bytes the guest
+# pushed. 3-D Tetris and Null Pointer Mockup both died with
+# STATUS_STACK_OVERFLOW (0xC00000FD) on the default 1 MB while their logical
+# call depth stayed under 40 -- it is frame SIZE, not runaway recursion. Both
+# run to completion with this. On x64 the value is reserved address space and
+# is committed only as it is touched, so it costs nothing until used.
+function(vb_set_stack target)
+    if(MSVC)
+        target_link_options(${target} PRIVATE "/STACK:1073741824")
+    endif()
+endfunction()
+
 # Per-game recompiled executables.
 #
 # Each game is a hand-written src/main.c (boot/loop glue) plus the
@@ -15,6 +29,7 @@ function(vb_add_game target dir)
     )
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${dir})
     target_link_libraries(${target} PRIVATE vbrecomp)
+    vb_set_stack(${target})
     # Generated code is intentionally noisy; silence it.
     if(MSVC)
         target_compile_options(${target} PRIVATE /W1 /wd4244 /wd4146)
@@ -22,6 +37,7 @@ function(vb_add_game target dir)
         target_compile_options(${target} PRIVATE -w)
     endif()
 endfunction()
+
 
 # vb_add_game_generic(<target> <dir>) — register a game that uses the shared
 # generic driver (games/driver/main.c) instead of a hand-written src/main.c.
@@ -33,6 +49,7 @@ function(vb_add_game_generic target dir)
     )
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated)
     target_link_libraries(${target} PRIVATE vbrecomp)
+    vb_set_stack(${target})
     if(MSVC)
         target_compile_options(${target} PRIVATE /W1 /wd4244 /wd4146)
     else()
@@ -61,6 +78,7 @@ if(DEFINED VBRECOMP_CORPUS_DIR)
                 ${CMAKE_CURRENT_SOURCE_DIR}/driver/main.c ${gen})
             target_include_directories(corpus_${slug} PRIVATE ${VBRECOMP_CORPUS_DIR}/${slug})
             target_link_libraries(corpus_${slug} PRIVATE vbrecomp)
+            vb_set_stack(corpus_${slug})
             if(MSVC)
                 # /Od: these generated files are huge and only boot-tested,
                 # so skip optimization to keep the 76-target build tractable.
