@@ -7,6 +7,7 @@
 #include "vbrecomp/mem.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 vb_cpu_state_t vb_cpu;
 
@@ -122,6 +123,18 @@ static uint32_t stub_total;
 void vb_recomp_stub(uint32_t addr) {
     uint32_t h = (addr * 2654435761u) % STUB_N;
     stub_total++;
+    /* A jump to address 0 is always a bug, and the register file at that
+     * instant is the whole question: which pointer was null, and what was it
+     * read from. Print the first few with context rather than only a count. */
+    if (addr == 0 && getenv("VBRECOMP_HEARTBEAT")) {
+        static int z = 0;
+        if (z++ < 4)
+            fprintf(stderr,
+                "JUMP TO 0 (#%d) r6=%08X r7=%08X r10=%08X r29=%08X r31=%08X "
+                "[r29+12]=%08X\n",
+                z, vb_cpu.r[6], vb_cpu.r[7], vb_cpu.r[10], vb_cpu.r[29],
+                vb_cpu.r[31], vb_mem_read32(vb_cpu.r[29] + 12));
+    }
     for (uint32_t i = 0; i < STUB_N; i++) {
         uint32_t j = (h + i) % STUB_N;
         if (stub_cnt[j] == 0) { stub_addr[j] = addr; stub_cnt[j] = 1; return; }

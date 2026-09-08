@@ -365,6 +365,28 @@ unimplemented calls, no worlds. It does nothing at all and reports nothing.
 Galactic Pinball is classified `dead` -- it never reaches the first sampled
 frame inside the timeout, which is a performance problem, not a blank screen.
 
+## Galactic Pinball is a stack overflow, not a blank screen - diagnosed
+
+It was classified `dead` because it produced no frame before the timeout. It is
+not slow: it exits in 0.2 seconds with `0xC00000FD`, STATUS_STACK_OVERFLOW.
+
+`vb_recomp_deep` only ever fired from `vb_recomp_call`, so a runaway chain of
+plain `VB_CALL`s reported nothing. VB_CALL now carries its target address and
+checks the same depth window, which names the cycle immediately: one group per
+level, `07F0068C -> 07F00976 x6 -> 07F00298 -> 07F007C0 -> 07F00976`, with the
+depth climbing by exactly one per iteration. `sub_07F00026` is the game's main
+function and is re-entered once per group through a drain that is itself nested
+inside it, so the loop nests instead of unwinding.
+
+### Draining only at the outermost level does NOT fix it - measured
+
+The obvious repair is to have `VB_CALL` drain only when the depth returns to
+zero, which would keep the stack flat. Measured on the panel: **0 better, 4
+worse** -- Mario Clash, Mario's Tennis, Panic Bomber and Teleroboxer all went
+blank. Deferring a tail target until the whole call stack unwinds reorders the
+work those games depend on. Draining at every call site is load-bearing, and
+the fix for Galactic Pinball has to come from somewhere else.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved

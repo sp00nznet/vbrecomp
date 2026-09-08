@@ -451,7 +451,7 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         uint32_t nt = target;
         if (nt >= 0x08000000) nt &= 0x07FFFFFF;
         if (nt >= ctx->rom_base && nt < ROM_REGION_END) {
-            fprintf(out, "    VB_CALL(vb_func_%08X);\n", nt);
+            fprintf(out, "    VB_CALL(vb_func_%08X, 0x%08Xu);\n", nt, nt);
         } else {
             fprintf(out, "    vb_recomp_call(0x%08Xu); vb_recomp_drain();\n", target);
         }
@@ -906,8 +906,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
     fprintf(out, "static int vb_call_depth;\n");
-    fprintf(out, "#define VB_CALL(f)  do { vb_call_depth++; (f)(); vb_call_depth--; \\\n");
-    fprintf(out, "                         vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_CALL(f,a) do { if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; vb_recomp_drain(); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");
@@ -1145,7 +1144,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         }
         fprintf(out, "}\n");
         fprintf(out, "\n/* Run the reset vector (boots the game). */\n");
-        fprintf(out, "void vb_recomp_boot(void) { VB_CALL(vb_func_07FFFFF0); }\n");
+        fprintf(out, "void vb_recomp_boot(void) { VB_CALL(vb_func_07FFFFF0, 0x07FFFFF0u); }\n");
 
         free(emitted_addrs);
     }
