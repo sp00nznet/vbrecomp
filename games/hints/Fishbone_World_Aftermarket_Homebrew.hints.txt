@@ -13,3 +13,13 @@ entry 07E10CC4
 entry 07E10CE8
 entry 07E10D0C
 entry 07E10D30
+entry 07E042E0
+entry 07E0430C
+entry 07E04338
+entry 07E04364
+entry 07E04390
+entry 07E10D40
+entry 07E10D50
+entry 07E10D60
+entry 07E0FEBA
+entry 07E0FEDA

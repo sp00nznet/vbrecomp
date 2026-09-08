@@ -20,3 +20,14 @@ entry 07E0267A
 entry 07E15602
 entry 07E0268C
 entry 07E15616
+entry 07E00212
+entry 07E15626
+entry 07E17B58
+entry 07E029E4
+entry 07E02A04
+entry 07E00626
+entry 07E0060C
+entry 07E02B30
+entry 07E027E0
+entry 07E0280E
+entry 07E02B4E

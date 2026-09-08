@@ -20,3 +20,11 @@ entry 07E023CC
 entry 07E0281A
 entry 07E023DE
 entry 07E0283A
+entry 07E00212
+entry 07E00710
+entry 07E006F6
+entry 07E02966
+entry 07E025B6
+entry 07E025E4
+entry 07E02984
+entry 07E02968
