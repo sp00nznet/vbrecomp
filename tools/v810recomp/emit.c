@@ -113,6 +113,35 @@ static uint32_t lookup_resolved_jump(v810_ctx_t *ctx, uint32_t from_addr) {
     return 0;
 }
 
+/* Wholesale loads of the STACK POINTER from memory in the function being
+ * emitted. Ordinary code only ADDS to r3; replacing it outright is either a
+ * context SWITCH (loading another task's stack) or the RESTORE of a stack this
+ * same function saved. They are told apart by whether the function also stores
+ * r3 to that exact slot: a save/restore pair has a matching `st.w r3, off[rN]`,
+ * a switch does not.
+ *
+ * It matters because after a switch, `jmp [r31]` resumes a DIFFERENT stack's
+ * continuation instead of returning to our caller. Jack Bros' scheduler
+ * (sub_07F020B0) restores a task's registers, pops its resume PC into r31 and
+ * jumps -- emitted as a plain return, its cooperative tasks are created and
+ * never run. Rare enough to key on: 128 such loads in the whole corpus, none
+ * at all in most games. */
+#define MAX_SP_LOADS 24
+static struct { uint32_t addr; bool is_switch; } g_sp_loads[MAX_SP_LOADS];
+static int g_num_sp_loads;
+
+/* Was the most recent stack-pointer load before `addr` a context switch? */
+static bool after_stack_switch(uint32_t addr) {
+    bool sw = false;
+    uint32_t best = 0;
+    for (int i = 0; i < g_num_sp_loads; i++) {
+        if (g_sp_loads[i].addr < addr && g_sp_loads[i].addr >= best) {
+            best = g_sp_loads[i].addr;
+            sw = g_sp_loads[i].is_switch;
+        }
+    }
+    return sw;
+}
 static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label_set_t *emit_labels) {
     char r1[32], r2[32];
     snprintf(r1, sizeof(r1), "vb_cpu.r[%d]", insn->reg1);
@@ -165,7 +194,10 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         /* jmp [r31] is a return UNLESS we resolved r31 to a constant target
          * (reset-vector idiom: load r31, jmp to entry). A resolved jump takes
          * precedence so the computed-jump path below emits the real dispatch. */
-        if (insn->reg1 == 31 && !lookup_resolved_jump(ctx, insn->addr)) {
+        if (insn->reg1 == 31 && after_stack_switch(insn->addr)) {
+            fprintf(out, "    /* jmp [r31] after a stack switch: a context resume, not a return */\n");
+            fprintf(out, "    VB_JUMP(vb_cpu.r[31] & ~1u);\n");
+        } else if (insn->reg1 == 31 && !lookup_resolved_jump(ctx, insn->addr)) {
             fprintf(out, "    VB_RET(); /* jmp [r31] */\n");
         } else {
             /* Check for jump table first */
@@ -790,6 +822,29 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
         fprintf(stderr, "  warning: func_%08X is %u bytes, capping at 64KB\n",
                 func->addr, func_size);
         end_off = start_off + 0x10000;
+    }
+
+    /* Catalogue stack-pointer loads before walking the body, and mark each as
+     * a switch or a restore by looking for a matching store (see g_sp_loads). */
+    g_num_sp_loads = 0;
+    for (uint32_t o = start_off; o < end_off && o < ctx->rom_size; ) {
+        v810_insn_t si;
+        if (!v810_decode(ctx->rom, o, ctx->rom_size, &si)) break;
+        if (si.opcode == 0x33 && si.reg2 == 3 && si.reg1 != 3
+            && g_num_sp_loads < MAX_SP_LOADS) {
+            bool matched = false;
+            for (uint32_t p = start_off; p < end_off && p < ctx->rom_size; ) {
+                v810_insn_t pi;
+                if (!v810_decode(ctx->rom, p, ctx->rom_size, &pi)) break;
+                if (pi.opcode == 0x37 && pi.reg2 == 3 && pi.reg1 == si.reg1
+                    && pi.imm == si.imm) { matched = true; break; }
+                p += pi.size;
+            }
+            g_sp_loads[g_num_sp_loads].addr = ROM_OFF_TO_ADDR(o, ctx->rom_base);
+            g_sp_loads[g_num_sp_loads].is_switch = !matched;
+            g_num_sp_loads++;
+        }
+        o += si.size;
     }
 
     /* First pass: collect all branch targets for labels */
