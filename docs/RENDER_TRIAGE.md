@@ -773,7 +773,7 @@ handlers preserve every general register (checked). So either we reach
 per-handler check does not see. That is the thread to pull, and it is a
 game-state question rather than a recompiler-structure one.
 
-### Root cause: a tail-jump into a caller's loop NESTS instead of unwinding
+### Root cause: a tail-jump into a caller's loop NESTS instead of unwinding -- FIXED
 
 Galactic Pinball's structure is:
 
@@ -816,6 +816,34 @@ target (a longjmp, or an explicit unwind flag checked by every VB_CALL) rather
 than nest. That is a redesign of the transfer model, not a patch to the
 analyzer, and the four analyzer-level attempts recorded above are all dead ends
 for exactly that reason.
+
+### The unwinding transfer model (implemented)
+
+The drain now asks, before dispatching a parked target, whether that target is
+an INTERIOR ENTRY of a function still on the call stack. If it is, the target
+stays parked, `vb_unwinding` is set, and every VB_CALL returns immediately until
+the depth reaches zero -- at which point the transfer is dispatched from the
+outermost frame. So a callee tail-jumping back into its caller's loop unwinds to
+it instead of running a second, nested copy while the original call site also
+returns into the caller's own copy.
+
+Three pieces: a stack of active function addresses (`vb_frames`), the unwind
+flag, and a generated `vb_interior_owner()` built from the byte-ownership data
+-- 4,742 interior entries across the corpus, 38 in Galactic Pinball.
+
+Galactic Pinball's counter is fixed: r25 reads **0** at the heartbeat where it
+read 0xFFFFFF9F, and the loop terminates instead of running four billion times.
+It still does not draw -- it now loses control 591 times a run to 0x07F000AC,
+which is a separate question -- but the double-execution is gone.
+
+Measured: 39 advancing, 28 frozen, 11 blank, **0 worse**. Conformance 77/77.
+This is the first change in this area that costs nothing; the four analyzer-
+level attempts before it each cost seven games because they were aimed at the
+wrong thing.
+
+Re-adding `entry 07F000AC` on top of it does NOT work: those dispatches arrive
+when sub_07F00026 is not on the stack, so there is no frame to unwind to and
+the loop runs uninitialised again. The hint stays out.
 
 ## What is already ruled out
 

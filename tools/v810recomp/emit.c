@@ -999,6 +999,21 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "void vb_recomp_call(uint32_t addr);\n");
     fprintf(out, "static void vb_recomp_call_inner(uint32_t addr);\n");
     fprintf(out, "static int vb_call_depth;\n");
+    fprintf(out, "/* A transfer INTO A FRAME THAT IS STILL ACTIVE must unwind to it, not run as\n");
+    fprintf(out, " * a nested call. Galactic Pinball's loop body tail-jumps back to its caller's\n");
+    fprintf(out, " * `add -1, r25` at 0x07F000B4; dispatched as a nested call, that runs the\n");
+    fprintf(out, " * loop AND lets the original call site return into the caller's own copy of\n");
+    fprintf(out, " * it, so the loop advances about four times per iteration and r25 walks\n");
+    fprintf(out, " * past zero (observed 0xFFFFFF9F). Park the target, unwind to depth 0, then\n");
+    fprintf(out, " * dispatch it. */\n");
+    fprintf(out, "static uint32_t vb_frames[256];\n");
+    fprintf(out, "static int vb_unwinding;\n");
+    fprintf(out, "static uint32_t vb_interior_owner(uint32_t a);\n");
+    fprintf(out, "static int vb_frame_active(uint32_t f) {\n");
+    fprintf(out, "    for (int i = 0; i < vb_call_depth && i < 256; i++)\n");
+    fprintf(out, "        if (vb_frames[i] == f) return 1;\n");
+    fprintf(out, "    return 0;\n");
+    fprintf(out, "}\n");
     fprintf(out, "/* Control transfer out of a function.\n");
     fprintf(out, " *\n");
     fprintf(out, " * A game main loop is a CYCLE: a state handler ends by jumping back to\n");
@@ -1019,12 +1034,17 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "         * draining only at depth 0 did not. */\n");
     fprintf(out, "        if (vb_call_depth > 96) return;\n");
     fprintf(out, "        uint32_t t = vb_recomp_tail_target;\n");
-    fprintf(out, "        vb_recomp_tail_target = 0;\n");
     fprintf(out, "        /* A drained target was JUMPED to, not called: dispatch it\n");
     fprintf(out, "         * WITHOUT raising the depth, or its own `jmp [r31]` reads as a\n");
     fprintf(out, "         * return and the transfer chain unwinds instead of continuing\n");
     fprintf(out, "         * (StarFox boots six frames and stops). The loop is iterative,\n");
     fprintf(out, "         * so a flat depth costs no stack. */\n");
+    fprintf(out, "        uint32_t _own = vb_interior_owner(t);\n");
+    fprintf(out, "        if (_own && vb_call_depth > 0 && vb_frame_active(_own)) {\n");
+    fprintf(out, "            vb_unwinding = 1;   /* leave it parked and unwind first */\n");
+    fprintf(out, "            return;\n");
+    fprintf(out, "        }\n");
+    fprintf(out, "        vb_recomp_tail_target = 0;\n");
     fprintf(out, "        vb_recomp_call_inner(t);\n");
     fprintf(out, "    }\n");
     fprintf(out, "}\n");
@@ -1033,7 +1053,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * and the instruction is a jump -- emitting a plain return there drops\n");
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
-    fprintf(out, "#define VB_CALL(f,a) do { if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_CALL(f,a) do { vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain(); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");
@@ -1224,6 +1244,31 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
         }
         fprintf(out, "};\n");
         fprintf(out, "static const int vb_func_table_count = %d;\n\n", table_count);
+
+        /* Interior entries: a confirmed function whose first byte was traced by
+         * a DIFFERENT function. The drain needs this to tell a transfer into an
+         * active frame from an ordinary call. */
+        fprintf(out, "static uint32_t vb_interior_owner(uint32_t a) {\n");
+        fprintf(out, "    switch (a) {\n");
+        {
+            int n_int = 0;
+            for (int i = 0; i < ctx->num_funcs; i++) {
+                if (!ctx->funcs[i].confirmed) continue;
+                uint32_t fo = resolve_addr(ctx, ctx->funcs[i].addr);
+                if (fo >= ctx->rom_size) continue;
+                uint32_t own = ctx->byte_owner[fo];
+                if (!own || own == ctx->funcs[i].addr) continue;
+                bool own_ok = false;
+                for (int k = 0; k < ctx->num_funcs && !own_ok; k++)
+                    if (ctx->funcs[k].addr == own && ctx->funcs[k].confirmed) own_ok = true;
+                if (!own_ok) continue;
+                fprintf(out, "    case 0x%08Xu: return 0x%08Xu;\n",
+                        ctx->funcs[i].addr, own);
+                n_int++;
+            }
+            fprintf(stderr, "  interior entries emitted: %d\n", n_int);
+        }
+        fprintf(out, "    default: return 0;\n    }\n}\n\n");
 
     fprintf(out, "/* Depth trace: a cycle that nests instead of running flat blows the\n");
     fprintf(out, " * stack, and the address printed here is the one doing it. */\n");
