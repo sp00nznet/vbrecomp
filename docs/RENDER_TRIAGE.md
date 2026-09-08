@@ -1003,10 +1003,24 @@ empty framebuffer on hardware** through 600 frames, despite loading plenty of
 character data. They are not in the same class as the five above, which visibly
 draw.
 
-The caveat matters and is not resolved: `drawcheck.lua` presses nothing, while
-the corpus survey holds 0x303C. Both games may simply be waiting for a player.
-Until that is tested with input, they are "unproven" rather than "ours" -- and
-the five that do draw on hardware are unambiguously ours.
+**The caveat is now resolved.** `drawcheck_input.lua` repeats the measurement
+holding 0x303C in the same burst pattern `games/driver/main.c` uses. On real
+hardware, over 600 frames, WITH input:
+
+| game | CHR at 600 | framebuffer at 600 |
+|---|---|---|
+| Capitan Sevilla 3D | 169 | **0** |
+| Null Pointer Mockup | 259 | **0** |
+| Snowball Wars 1 | 0 | **0** |
+
+So input was not the explanation: both games load character data and put nothing
+on screen on real hardware, pressed or not. **Five of the eleven blanks are
+hardware-blank, not three**, and the honest denominator is **71**, not 73 --
+65 of 71.
+
+Scope of the claim: 600 hardware frames. The corpus survey runs longer in our
+own frame units, and the two clocks are not comparable, so this does not rule
+out these games drawing later than the window measured.
 
 (`firstDraw` samples every 64 bytes and the final count every 16, so
 `firstDraw=-1` with a non-zero final -- VUEngine Platformer -- means a sparse
