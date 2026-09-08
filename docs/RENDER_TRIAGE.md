@@ -897,6 +897,30 @@ of initialising, which is why world setup never happens.
 The shift emission was checked and is right (imm5 24, not the -8 the
 disassembly prints). The next question is where that byte comes from.
 
+### ...because its init runs more than once, and byte_owner cannot see it
+
+The byte the three-way branch tests is at **0x0500B0C0**, and it holds **2**.
+The game wrote it itself, from two sites inside sub_07F93920 (LR 0x07F939D4 and
+0x07F93942). So this is an initialisation guard -- 0 = not started, 1 = in
+progress, 2 = done -- and the third arm is the "already initialised" error.
+
+sub_07F93920 runs 12 times in a 64-entry window and sub_07F93942 -- a label
+INSIDE it that is also a function, with zero direct callers -- runs 13. So the
+init is being re-entered, the guard correctly says "done", and the game loops in
+its error handler forever. Same double-execution family as Galactic Pinball.
+
+The unwinding model does not catch this one, and the reason is worth recording:
+`byte_owner` is first-writer-wins, so when the interior function happens to be
+ANALYSED BEFORE its container, it claims its own bytes and ownership reports it
+as a top-level routine. 213 interior entries are found in this ROM; 0x07F93942
+is not among them. The ownership data is therefore order-dependent in exactly
+the way `end_addr` was, just less often.
+
+Fixing that means resolving overlaps when they are DETECTED rather than trusting
+whoever got there first -- a small change in principle, but it re-opens the same
+question the four reverted attempts above ran into, so it needs measuring rather
+than assuming.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
