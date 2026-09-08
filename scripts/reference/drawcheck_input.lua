@@ -29,7 +29,7 @@ event.onframeend(function()
     if firstChr < 0 and nonzero("CHR RAM", 0x8000, 64) > 0 then firstChr = frame end
     if firstDraw < 0 and nonzero("Framebuffer", 0x6000, 64) > 0 then firstDraw = frame end
   end
-  if frame >= 600 then
+  if frame >= (tonumber(os.getenv("VBREF_FRAMES")) or 600) then
     f:write(string.format("firstDraw=%d firstChr=%d chrFinal=%d fbFinal=%d\n",
                           firstDraw, firstChr,
                           nonzero("CHR RAM", 0x8000, 16),
