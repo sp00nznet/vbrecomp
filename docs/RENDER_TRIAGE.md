@@ -413,6 +413,36 @@ measured across the corpus it is advancing 37 -> 34 and blank 13 -> 17. The
 running `-Panel all` before believing a runtime change. Some handlers depend
 on the drift. Reverted; the leak is still logged under VBRECOMP_HEARTBEAT.
 
+## Jack Bros' state machine is emitted as 207 do-nothing stubs
+
+v810recomp now prints, per ROM, how much of the jump-table graph confirmation
+reached. The contrast is stark:
+
+| | tables | owner confirmed | targets confirmed | targets NOT |
+|---|---|---|---|---|
+| Waterworld (works) | 12 | 4 | 162 | 0 |
+| Jack Bros (blank) | 7 | **0** | **0** | **221** |
+
+An unconfirmed jump-table target is emitted as `vb_recomp_stub(addr)` -- a
+function that does nothing when the game dispatches to it. Jack Bros has 207
+of those against Waterworld's 2, so its entire state machine is stubs.
+
+Confirmation happens once, at table-DISCOVERY time, and only if the enclosing
+function is confirmed *at that moment*. Not one of Jack Bros' 7 tables sits in
+a confirmed function, so nothing propagated.
+
+### Confirming them all is NOT the fix - measured
+
+Doing it unconditionally clears every stub in the corpus (hundreds -> 2) and is
++2 advancing, but it destroys Space Squash: 4,914 drawn pixels -> 4, verified
+by rebuilding that one game against both analyzers. Net it is 63 -> 62
+rendering. Restricting it to targets that do not land inside an existing
+function is worse still (37 advancing, and Space Squash stays broken).
+
+So the open problem is not "confirm more" -- it is telling a real dispatch
+table from bytes that merely decode like one. The counter above is what will
+measure any attempt at that.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
