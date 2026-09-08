@@ -192,6 +192,13 @@ the tile data never runs. Ruled out along the way: the memory bus reads ROM and
 every mirror correctly (`0x07F01000`, `0x07001000` and `0x07801000` all return
 `C4F9002A`, matching the file).
 
+Chased to the end of what static tracing can show: the copy's source pointer is
+correct (`[0x0500014C] = 0`, so `r7 = 0x05003800` as intended) and the copy loop
+is correct. The buffer is simply never filled — 2 writes to it in a whole run.
+Whatever loads or decompresses the tile data sits in a state-machine branch the
+game never takes, and finding that branch means reading its state machine
+against real hardware behaviour.
+
 Jack Bros (USA) and Jack Bros. no Meiro de Hiihoo (Japan) are the same game, so
 one fix covers both.
 
