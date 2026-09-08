@@ -528,6 +528,46 @@ BGMap 0x32000-0x3BB14.
 mapped range together still could not distinguish "wrote to the wrong place"
 from "never wrote".
 
+## The VUEngine cluster: construction stops partway, and hardware says where
+
+Capitan Sevilla 3D, Formula V (Emulator), SPONG and VUEngine Platformer all die
+the same way -- a C++ virtual dispatch through a null pointer:
+
+```
+07E13D5C: ld.w 12[r6], r6     ; an object field
+07E13D60: ld.w  0[r6], r10    ; its vtable
+07E13D64: ld.w 40[r10], r10   ; the method
+07E13D68: jal  .+4            ; PC capture
+07E13D6E: jmp  [r10]          ; -> 0
+```
+
+Two things narrow it a long way past "a null pointer".
+
+**It is not VIP interrupts.** None of these games ever writes INTENB -- and
+neither does Capitan Sevilla 2, which renders. So a VUEngine game does not need
+VIP interrupts, and that whole theory is dead. What separates the pair is that
+CS2 reaches display init (DPCTRL=0x0302, BRT=20/40/20, worlds set up) and CS3D
+never does (DPCTRL=0x0000, BRT=00/00/00).
+
+**Object construction stops partway, and the reference names the objects.**
+Diffing WRAM at frame 200 against hardware, for the object at 0x0500668C:
+
+| field | hardware | ours |
+|---|---|---|
+| +0 | 0x00038D0C | 0x00038D0C |
+| +8 | **0x05007888** | 0 |
+| +16 | **0x05000EFC** | 0 |
+
+The first field matches, so the object is allocated and partly built -- but the
+two objects it should point at are never created. The same holds further up: at
+0x05000F40 hardware has a manager holding a ROM pointer and three allocations
+(0x07108130, 0x050082CC, 0x0500A0D4, 0x0500C654) where we have 32 bytes of
+zeros. Hardware has 2,276 non-zero WRAM bytes at that frame; we have 1,174.
+
+So the question is not "why is this pointer null" but "which allocation stops",
+and the answer is a specific address in a specific frame rather than a class of
+bug. One fix should cover all four games.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
