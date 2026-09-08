@@ -1,0 +1,34 @@
+# Profile-guided entry points for Vertical Force (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F0BD90
+entry 07F009E0
+entry 07F0B48A
+entry 07F1DD4A
+entry 07F0B4AA
+entry 07F10A44
+entry 07F109E4
+entry 07F00B24
+entry 07F01C78
+entry 07F01CA0
+entry 07F048F2
+entry 07F0480A
+entry 07F1D7F4
+entry 07F1CC2A
+entry 07F1EE34
+entry 07F1E6F0
+entry 0040CE22
+entry 07F1CBDE
+entry 07F1E63C
+entry 07F1EB02
+entry 07F1F062
+entry 07F1F07C
+entry 07F1F340
+entry 07F1EF2E
+entry 07F1EE4A
+entry 07F1EF58
+entry 07F1F1F4
+entry 07F207C0
+entry 07F1F1A6
+entry 07F20728
+entry 07F1F1CE

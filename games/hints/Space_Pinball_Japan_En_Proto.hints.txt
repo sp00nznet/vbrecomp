@@ -1,0 +1,6 @@
+# Profile-guided entry points for Space Pinball (Japan) (En) (Proto).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E0008C
+entry 07EA487C
+entry 07EABE2A

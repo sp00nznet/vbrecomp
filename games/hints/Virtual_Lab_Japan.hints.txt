@@ -1,0 +1,15 @@
+# Profile-guided entry points for Virtual Lab (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F08A80
+entry 07F052FC
+entry 07F05B80
+entry 07F05BD8
+entry 07F0A2FE
+entry 07F09450
+entry 07F09842
+entry 07F0401E
+entry 07F070F0
+entry 07F040E6
+entry 07F071E4
+entry 07F0414C

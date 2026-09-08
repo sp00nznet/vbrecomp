@@ -1,0 +1,16 @@
+# Profile-guided entry points for Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E001DC
+entry 07E01D10
+entry 07E01C20
+entry 07E01A30
+entry 07E026C4
+entry 07E0018E
+entry 05001AB8
+entry 05001AA8
+entry 050011B8
+entry 00000170
+entry 05001238
+entry 07E01B68
+entry 0500FEC0

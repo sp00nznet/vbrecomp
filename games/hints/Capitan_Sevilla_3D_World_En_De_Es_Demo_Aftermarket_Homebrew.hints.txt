@@ -1,0 +1,3 @@
+# Profile-guided entry points for Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
