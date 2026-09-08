@@ -257,6 +257,12 @@ static uint16_t reg_read(vb_addr_t offset) {
         return (reg_xpstts & ~0x000Cu) | 0x0072u | busy;
     }
     case VB_VIP_XPCTRL:  return reg_xpctrl;
+    /* VER: the VIP revision, 2 on every retail unit. Returning 0 is not a
+     * harmless default -- Hyper Fighting (Beta) reads this register and
+     * spins until bit 1 is set (`ld.h 0[0x0005F844], r18; andi 0x0002, r18`
+     * then `cmp r0, r18; bnz` out of the loop), so with 0 it copies the same
+     * 4 KB of characters forever and never reaches its world setup. */
+    case VB_VIP_VER:     return 0x0002;
     case VB_VIP_SPT0:    return reg_spt[0];
     case VB_VIP_SPT1:    return reg_spt[1];
     case VB_VIP_SPT2:    return reg_spt[2];
