@@ -65,6 +65,20 @@ static bool on_frame(void) {
     }
     vb_vip_render(framebuffer, 0);
     vb_platform_present(framebuffer);
+    /* VBRECOMP_WRAM_DUMP=<path> with VBRECOMP_WRAM_FRAME=<n>: write the whole
+     * 64 KB of WRAM at frame n, to diff against the same dump taken from real
+     * hardware (scripts/reference/dumpwram.lua). Knowing a game loads tiles by
+     * frame n on hardware says WHEN we diverge; the first differing block says
+     * WHERE. */
+    {
+        const char *wd = getenv("VBRECOMP_WRAM_DUMP");
+        const char *wf = getenv("VBRECOMP_WRAM_FRAME");
+        if (wd && wd[0] && frame_count == (wf ? atoi(wf) : 10)) {
+            FILE *w = fopen(wd, "wb");
+            if (w) { fwrite(vb_wram, 1, VB_WRAM_SIZE, w); fclose(w); }
+        }
+    }
+
     if (shot_every > 0 && shot_path && frame_count % shot_every == 0) {
         char p[512];
         snprintf(p, sizeof(p), "%s.%04d.png", shot_path, frame_count);

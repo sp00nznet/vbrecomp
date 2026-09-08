@@ -48,3 +48,31 @@ So the game loads character data between frames 30 and 60, and vbrecomp does
 not. Both write plenty of zeros; only the reference ever writes tiles. That is
 the window to search, and it is a much smaller question than "why is the screen
 blank".
+
+## Diffing memory state
+
+`dumpwram.lua` writes the reference's whole 64 KB of WRAM at a chosen frame;
+the driver's `VBRECOMP_WRAM_DUMP` / `VBRECOMP_WRAM_FRAME` do the same on our
+side. Diffing the two says *where* a divergence lives, not just when.
+
+```powershell
+$env:VBREF_FRAME="10"; $env:VBREF_OUT="$env:TEMPef.bin"
+& $bh "$rom" --lua="scriptseference\dumpwram.lua"
+$env:VBRECOMP_WRAM_DUMP="$env:TEMP\ours.bin"; $env:VBRECOMP_WRAM_FRAME="10"
+build_all\games\Release\corpus_<slug>.exe "$rom"
+```
+
+**Caveat that matters:** the two frame counts are not calibrated. A reference
+frame is 20 ms of real CPU; ours is `VBRECOMP_FRAME_TICKS` interrupt checks
+(20,000 by default), and the relationship between them has never been measured.
+So "at frame N" is approximate across the two, and a diff shows *a* divergence
+rather than *the first* one. Calibrating that — by finding the tick count where
+a game that works on both sides reaches the same state — would make these diffs
+exact, and is the obvious next improvement.
+
+The domain is live and sparse, not empty: Waterworld, which renders correctly on
+both sides, has 320 non-zero WRAM bytes at reference frame 120. So the near-zero
+WRAM that Jack Bros and Vertical Force show early is real behaviour, not a
+readback artifact. Vertical Force under vbrecomp has 8,932 non-zero WRAM bytes
+at our frame 10 against the reference's 0 — we are doing work the hardware is
+not, which is a different failure from being stuck.
