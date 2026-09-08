@@ -94,32 +94,43 @@ and a variable destination bit position (`r26 = r5`), a glyph's x.
 ### 4. The entry returns instead of looping — 16 games
 
 Clustering the non-drawing set by busiest read address
-(`scripts/diagnose_blanks.ps1`) put sixteen of them on one address,
-`0x0005F800` — but `VBRECOMP_WATCH` showed every one of those reads coming from
-`LR=0`, which is our own `vb_interrupt_check`. They were not polling anything.
-All sixteen print **"Reset returned after 0–9 frames"**: the recompiled entry
-returns, and the driver then spins interrupts with no game code running at all.
-That is why the runtime's own 201 reads per run were the busiest thing in the
-process.
+(`scripts/diagnose_blanks.ps1`) put sixteen of them on `0x0005F800` — but
+`VBRECOMP_WATCH` showed every one of those reads coming from `LR=0`, our own
+`vb_interrupt_check`. They poll nothing. All sixteen print **"Reset returned
+after 0–9 frames"**: the recompiled entry returns and the driver then spins
+interrupts with no game code running.
 
-One contributing truncation is understood and is *not* the whole story. A
-function is emitted as one contiguous `[addr, end_addr)` range whose end only
-grows forwards, so a branch target below the entry is traced by analysis and
-then dropped, and the emitter falls back to a bare `return`. The V810 boot idiom
-lands on it — `jmp` to the loop test with the body just above — so Mario's
-Tennis had `blt 0x07F8013E` compiled to `return` and never cleared WRAM.
+**The root cause is understood: a game's main loop is a control-flow CYCLE, and
+we translate it as call/return.** Mario's Tennis is the clean specimen:
 
-Pulling the entry back over the body fixes that specific case, and was tried:
-it made the branch a `goto`, but across the corpus it unblocked **nothing** and
-cost one game (Mario Clash stopped advancing), so it was removed rather than
-kept on principle. Mario's Tennis still returns after 0 frames with it applied,
-so the early return has at least one other cause — the chain continues through
-`jmp [r11]` at `0x07F80154` into `sub_07F801B2`, which is where to look next.
+```
+sub_07F801B2:  ... 07F80210: jmp [r30]     ; 64-entry jump table, LAST instruction
+sub_07F80216:  jal 07F81940
+               07F8021A: jr 0x07F801F4      ; back to the dispatcher
+```
 
-Two dead ends worth not repeating, both recorded in `analyze.c`: registering
-each backward target as its own function cascades on every loop back edge
-(Elevated Speed went 56 → 17,892 functions, 1s → 187s), and mutating
-`func->addr` during the trace segfaults.
+The emitter calls the handler, the handler's `jr` back to the dispatcher has no
+label and no function to land on so it becomes `return`, the dispatcher falls
+off its own end, and the whole boot unwinds after exactly one state. The
+emitter even prints `WARNING: JR to 0x07F801F4 outside function`.
+
+Neither obvious translation works. Emitting the `jr` as a call is unbounded
+recursion — the loop never returns. Emitting it as a return is what we do now.
+
+**A trampoline was built and reverted.** Tail jumps parked their target in
+`vb_recomp_tail_target` and returned to a loop in `vb_recomp_boot()`, and the
+analyzer registered out-of-function branch targets so the dispatch table could
+reach them (function counts stayed sane: Mario's Tennis 216→222, Wario Land
+3026→3144). It did stop Mario's Tennis returning — and it broke Waterworld and
+Mario Clash, which had been advancing, while fixing nothing. The flaw is
+structural: a tail jump *deep inside a real call chain* unwinds intermediate
+frames that were genuine JAL calls, and those callers then resume after their
+call site having lost the transfer.
+
+So the fix needs to distinguish a frame entered by JAL from one entered by
+jump — i.e. a real dispatch architecture, not a single global slot. That is a
+design change, not a patch, and it is the one thing standing between the corpus
+and these 16 games.
 
 ### 5. Running, but the state machine never advances — 13 games
 
