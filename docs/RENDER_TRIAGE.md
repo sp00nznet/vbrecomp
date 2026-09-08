@@ -19,13 +19,16 @@ what used to make this survey disagree with `build_all.ps1`.
 
 | | Count | What it means |
 |---|---|---|
-| Advancing | 28 | The frame changes between samples: the game is running. |
-| Drawing, then frozen | 13 | One image, byte-identical at 300/600/900. |
-| Nothing on screen | 34 | Every sample blank; no character data ever written. |
+| Advancing | 35 | The frame changes between samples: the game is running. |
+| Drawing, then frozen | 24 | One image, byte-identical at 300/600/900. |
+| Nothing on screen | 18 | Every sample blank. |
+| Dead | 1 | Produced no frame before the timeout (Galactic Pinball). |
 
-"Renders something" is 41/76, but that number is the less useful of the two:
+"Renders something" is 58/76, but that number is the less useful of the two:
 a game frozen on a correctly-drawn warning screen counts as rendering and is
-not running. **Advancing** is the number to drive.
+not running. **Advancing** is the number to drive. Three of the 18 blanks
+(Snowball Wars demos 1-3) draw nothing on real hardware either, so the honest
+denominator is 73.
 
 ## Categories
 
@@ -242,6 +245,80 @@ That is 232 runs in the pacing sweep alone. Only one game was ever recoverable
 this way -- Red Alarm, which renders with no input and goes blank with buttons
 held -- and it is already counted. Everything left is a code-level fault in
 translation or hardware behaviour, not a knob.
+
+## Two games are measurement-flaky, not broken
+
+Bound High and Virtual Bowling alternate between `blank` and
+`advancing`/`frozen` across identical runs. They are slow games, and under
+load they do not reach the first sampled frame before the survey's 45-second
+timeout kills them - so a run that scores them blank is measuring the
+timeout, not the game. Read any single-run delta involving these two with
+that in mind; a corpus count that moves by exactly these two has not moved.
+
+## The 18 that still draw nothing, by signature
+
+Counting CHR and BGMap writes was not enough to tell these apart, because a
+count cannot distinguish a game that fills the WRONG place from one that fills
+none. `vb_vip_dump_write_stats` now also prints the address RANGE the non-zero
+writes landed in, and with that the remaining blanks separate cleanly:
+
+| Game | CHR nonzero/all | CHR range | BGMap range |
+|---|---|---|---|
+| Capitan Sevilla 3D | 0/132,056 | - | 0x30120-0x3CD58 |
+| Formula V (Emulator) | 0/67,504 | - | 0x32000-0x3BB14 |
+| SPONG | 0/66,520 | - | 0x3A000-0x3C9CC |
+| VUEngine Platformer | 0/41,944 | - | 0x3A000-0x3D5C8 |
+| StarFox | 7,350/44,436 | 0x06019-0x1EFFF | 0x2000A-0x20936 |
+| Fishbone | 4,957/22,576 | 0x1E005-0x1FFAF | 0x26000-0x2782F |
+| Mario Combat | 3,248/20,480 | 0x06000-0x1FFFF | 0x20002-0x21FFE |
+| Snatcher | 2,552/12,288 | 0x1F010-0x1FFFF | - |
+| Galactic Pinball | 1,232/1,792 | 0x06010-0x066FE | 0x38000-0x38FFC |
+| Jack Bros x2 | 0/8,192 | - | - |
+| Hyper Fighting x2 | 0/8,192 | - | - |
+| Null Pointer Mockup | 0/16,384 | - | - |
+| Snowball Wars x3 | 0/32,768 | - | - |
+| 3-D Tetris | 0/0 | - | - |
+
+### A. The VUEngine cluster - 4 games, one cause
+
+Capitan Sevilla 3D, Formula V (Emulator), SPONG and VUEngine Platformer are
+the same engine, and they fail identically: tens of thousands of CHR writes
+of which **not one is non-zero**, while BGMap fills the top segments. SPONG
+writes 2,869 non-zero cells into 0x3A000-0x3C9CC and enables exactly one
+world, which points at segment 10 (0x34000) - a segment nothing ever wrote.
+Two of the four run past 0x3C000, which is beyond the last BGMap segment
+(0x3BFFF) and into the region below the world attributes.
+
+These games never read ROM in bulk: SPONG's hot-read list is its own WRAM
+pad slots and the two VIP interrupt registers, nothing else. So the CHR
+traffic is the engine clearing character memory and the charset copy never
+runs at all. Four games move together on whatever gates it.
+
+### B. Tiles are loaded and nothing is drawn - 5 games
+
+StarFox, Fishbone, Mario Combat, Snatcher and Galactic Pinball all write real
+character data now. This is the renderer's problem, not the game's, and it is
+the category to attack next because the games are already running.
+
+Fishbone and Snatcher write tiles ONLY into CHR segment 3 (0x1E000-0x1FFFF).
+Real hardware mirrors CHR 3 onto CHR 1; our write mapping deliberately keeps
+the four segments separate (see `vip_map_addr`), and `chr_get_pixel`
+compensates by falling back to the mirrored segment when a row reads zero.
+That fallback covers the case, so the mirror hack is not the fault here - but
+it is the first thing to re-check if these two move together.
+
+### C. Still nothing at all - 9 games
+
+Jack Bros x2, Hyper Fighting x2, Null Pointer Mockup, 3-D Tetris and the three
+Snowball Wars demos (the last of which are blank on hardware too).
+
+Jack Bros is the interesting one: it configures **11 worlds** with real
+attributes and then writes 8,192 CHR bytes of zeros and no BGMap at all. Its
+main loop was wedged until this session - the VIP handler reached its
+GAMESTART branch, which sets the frame flag the loop spins on, once in 300
+frames instead of every frame - and with that fixed `sub_07F00222` runs and
+the loop is genuinely released. It still loads no tiles, so the tile load sits
+behind a state the game has not reached.
 
 ## What is already ruled out
 
