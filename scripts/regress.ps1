@@ -46,7 +46,9 @@ $panelGames = @(
     "V_Tetris_Japan"                    # frozen
     "Panic_Bomber_USA"                  # frozen
     "Bad_Apple_World_Demo_Hardware_Version_Aftermarket_Homebrew"  # advancing
-    "Red_Alarm_Japan"                   # exercises the jump-table path
+    "Red_Alarm_Japan"                   # renders only with NO input held
+    "Bound_High_Japan_En_Proto"         # drew the warning screen, regressed to blank
+    "SD_Gundam_Dimension_War_Japan"     # the ROM that looked like a recompiler hang
 )
 
 $meta = @{}
@@ -102,7 +104,22 @@ foreach ($slug in $games) {
         -RedirectStandardOutput "$env:TEMP\regress_out.txt"
     if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch {} }
 
+    # Some games render only with NO input held -- Red Alarm draws its title and
+    # goes blank when buttons are pressed -- so a blank result is retried without
+    # input before it counts as blank. Missing this hid a Red Alarm regression
+    # for most of a day.
     $shots = @(Get-ChildItem $d -Filter "f.png.*.png" -EA SilentlyContinue | Sort-Object Name)
+    if ($shots.Count -gt 0 -and ($shots | Where-Object { $_.Length -gt 3800 }).Count -eq 0 -and $Press) {
+        Remove-Item env:VBRECOMP_PRESS -EA SilentlyContinue
+        Remove-Item $d -Recurse -Force -EA SilentlyContinue
+        New-Item -ItemType Directory -Force $d | Out-Null
+        $p2 = Start-Process -FilePath (Join-Path $rel "corpus_$slug.exe") -ArgumentList "`"$rom`"" `
+            -PassThru -WindowStyle Hidden -RedirectStandardError (Join-Path $env:TEMP "regress_err.txt") `
+            -RedirectStandardOutput (Join-Path $env:TEMP "regress_out.txt")
+        if (-not $p2.WaitForExit($TimeoutSec * 1000)) { try { $p2.Kill() } catch {} }
+        $env:VBRECOMP_PRESS = $Press
+        $shots = @(Get-ChildItem $d -Filter "f.png.*.png" -EA SilentlyContinue | Sort-Object Name)
+    }
     $expected = [Math]::Floor($Frames / $ShotEvery)
     $hashes = @($shots | ForEach-Object { (Get-FileHash $_.FullName -Algorithm MD5).Hash })
     $allBlank = ($shots.Count -gt 0) -and (($shots | Where-Object { $_.Length -gt 3800 }).Count -eq 0)
