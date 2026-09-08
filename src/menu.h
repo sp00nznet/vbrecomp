@@ -1,6 +1,8 @@
 /*
  * menu.h — Reusable ImGui menu bar system for SDL2 applications.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Provides:
  *   - Full ImGui lifecycle (init, shutdown, event handling, draw)
  *   - Customizable dark theme

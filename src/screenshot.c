@@ -1,5 +1,7 @@
 /*
  * screenshot.c — SDL2 screenshot capture implementation.
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #include "screenshot.h"

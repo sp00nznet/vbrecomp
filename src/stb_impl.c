@@ -1,3 +1,5 @@
-/* stb implementation file — compile stb_image_write */
+/* stb implementation file — compile stb_image_write.
+ * The vendored header keeps its own upstream licence; this shim is ours.
+ * SPDX-License-Identifier: MIT */
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"

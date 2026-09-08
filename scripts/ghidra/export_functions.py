@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Ghidra post-script: export the functions Ghidra discovered to a TSV file,
 # for cross-validation against v810recomp's function table.
 #

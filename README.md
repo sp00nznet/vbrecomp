@@ -98,7 +98,16 @@ The full corpus sweep:
 ```powershell
 ./scripts/extract_roms.ps1     # extract ROMs -> roms/  (gitignored)
 ./scripts/sweep.ps1            # recompile + syntax-check all -> STATUS.md
+./scripts/render_survey.ps1    # boot every game headless, classify what it drew
 ```
+
+**Instruction conformance** — the one check that needs no ROM, so it runs on a clean checkout:
+
+```powershell
+python tools/conformance.py
+```
+
+Each case is a V810 encoding written down in the tool, assembled into a synthetic ROM, put through the real recompiler and runtime, and compared against the architecture manual. It is what turns "this game stalls" into "this instruction is wrong" — see [`docs/RECOMPILER.md`](docs/RECOMPILER.md#instruction-conformance).
 
 ## Repository layout
 
