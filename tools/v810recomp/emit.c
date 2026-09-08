@@ -47,7 +47,14 @@ static int cmp_u32(const void *a, const void *b) {
 }
 
 static void emit_flags_add(FILE *out, const char *a, const char *b, const char *result) {
-    fprintf(out, "    %s = vb_add(%s, %s);\n", result, a, b);
+    /* result == NULL means an r0 destination: the sum is discarded but the
+     * flags are not. emit_flags_sub has always taken NULL (that is how CMP is
+     * emitted); this one did not, and printed "(null)" into the C. */
+    if (result) {
+        fprintf(out, "    %s = vb_add(%s, %s);\n", result, a, b);
+    } else {
+        fprintf(out, "    { uint32_t _d = vb_add(%s, %s); (void)_d; }\n", a, b);
+    }
 }
 
 static void emit_flags_sub(FILE *out, const char *a, const char *b, const char *result) {
@@ -125,12 +132,16 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
     case 0x01: /* ADD reg1, reg2 */
         if (insn->reg2 != 0) {
             emit_flags_add(out, r2, r1, r2);
+        } else {  /* r0 destination: result discarded, flags still set */
+            emit_flags_add(out, r2, r1, NULL);
         }
         break;
 
     case 0x02: /* SUB reg1, reg2 */
         if (insn->reg2 != 0) {
             emit_flags_sub(out, r2, r1, r2);
+        } else {  /* r0 destination: result discarded, flags still set */
+            emit_flags_sub(out, r2, r1, NULL);
         }
         break;
 
@@ -230,19 +241,41 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         break;
 
     case 0x08: /* MUL reg1, reg2 */
-        fprintf(out, "    %s = vb_mul(%s, %s);\n", r2, r2, r1);
+        if (insn->reg2 != 0) {
+            fprintf(out, "    %s = vb_mul(%s, %s);\n", r2, r2, r1);
+        } else {
+            /* Writing r0 would break the always-zero invariant every
+             * later `movhi imm, r0, rN` depends on -- but the helper
+             * still has to run for its flags and its r30 half. */
+            fprintf(out, "    { uint32_t _d = vb_mul(0u, %s); (void)_d; }\n", r1);
+        }
         break;
 
     case 0x09: /* DIV reg1, reg2 */
-        fprintf(out, "    if (%s != 0) %s = vb_div(%s, %s);\n", r1, r2, r2, r1);
+        if (insn->reg2 != 0) {
+            fprintf(out, "    if (%s != 0) %s = vb_div(%s, %s);\n", r1, r2, r2, r1);
+        } else {  /* keep r0 zero; see MUL */
+            fprintf(out, "    if (%s != 0) { uint32_t _d = vb_div(0u, %s); (void)_d; }\n", r1, r1);
+        }
         break;
 
     case 0x0A: /* MULU reg1, reg2 */
-        fprintf(out, "    %s = vb_mulu(%s, %s);\n", r2, r2, r1);
+        if (insn->reg2 != 0) {
+            fprintf(out, "    %s = vb_mulu(%s, %s);\n", r2, r2, r1);
+        } else {
+            /* Writing r0 would break the always-zero invariant every
+             * later `movhi imm, r0, rN` depends on -- but the helper
+             * still has to run for its flags and its r30 half. */
+            fprintf(out, "    { uint32_t _d = vb_mulu(0u, %s); (void)_d; }\n", r1);
+        }
         break;
 
     case 0x0B: /* DIVU reg1, reg2 */
-        fprintf(out, "    if (%s != 0) %s = vb_divu(%s, %s);\n", r1, r2, r2, r1);
+        if (insn->reg2 != 0) {
+            fprintf(out, "    if (%s != 0) %s = vb_divu(%s, %s);\n", r1, r2, r2, r1);
+        } else {  /* keep r0 zero; see MUL */
+            fprintf(out, "    if (%s != 0) { uint32_t _d = vb_divu(0u, %s); (void)_d; }\n", r1, r1);
+        }
         break;
 
     case 0x0C: /* OR */
