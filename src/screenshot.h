@@ -1,6 +1,8 @@
 /*
  * screenshot.h — Reusable SDL2 screenshot capture with auto-incrementing filenames.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Features:
  *   - Captures the current SDL_Renderer contents to PNG
  *   - Auto-increments: screenshot_0001.png, screenshot_0002.png, ...

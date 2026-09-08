@@ -350,8 +350,16 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
         fprintf(out, "    vb_cpu.sr[5] |= VB_PSW_ID;\n");
         break;
 
-    case 0x1F: /* Bitstring ops */
-        fprintf(out, "    /* TODO: bitstring operation %d */\n", insn->reg1);
+    case 0x1F: /* Bitstring ops: the sub-opcode sits in the imm5 field */
+        if (insn->reg1 >= 0x08) {
+            fprintf(out, "    vb_bitstring(0x%02X);\n", insn->reg1);
+        } else {
+            /* SCH0BSU/SCH1BSU and friends search a bit string rather than
+             * transferring one. No ROM in the corpus uses one, so they stay
+             * unimplemented rather than guessed at -- and stay visible as a
+             * comment if one ever turns up. */
+            fprintf(out, "    /* TODO: bitstring search op %d */\n", insn->reg1);
+        }
         break;
 
     /* --- Format III: Bcond --- */

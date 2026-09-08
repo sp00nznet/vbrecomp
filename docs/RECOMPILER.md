@@ -55,6 +55,25 @@ The recompiler is hardened against the entire ROM library, not just the games in
 
 `sweep.ps1` writes [`../STATUS.md`](../STATUS.md) (a compile matrix: recomp ok? function count? compiles clean? first error) and `corpus/results.json`. It runs sequentially with per-ROM timeouts. A ROM that recompiles but yields a suspiciously low function count (e.g. 0) signals an analysis gap worth chasing — these are the next targets.
 
+## Instruction conformance
+
+The corpus workflow tells you *which ROM* broke; it cannot tell you *which instruction*. `tools/conformance.py` closes that gap, and it is the only check here that runs on a clean checkout — it needs no ROM at all.
+
+```powershell
+python tools/conformance.py             # run every case
+python tools/conformance.py --list      # show what each encoding decodes to
+python tools/conformance.py -k mul      # only cases whose name matches
+```
+
+Each case is a short V810 body written as encodings in the tool itself, assembled into a synthetic 64 KB ROM (real header, real reset vector, real interrupt-vector layout), recompiled by the actual `v810recomp`, compiled by MSVC, and executed against the runtime built from the working tree. So a pass means the whole path — decode, analyse, emit, compile, run — agrees with the V810 manual for that instruction, not just that some model of it does.
+
+Two design points matter:
+
+- **Expectations come from the architecture manual, not from `cpu.h`.** A case that restates what the runtime already does passes forever and pins nothing. Three of the original cases were wrong in exactly that way and were corrected against the manual rather than against our output.
+- **Each body runs under SEH.** A translation that faults on the host — an `idiv` overflow where the V810 completes the instruction — reports itself as a failed case instead of taking the run down and hiding everything after it. That is how `div: INT_MIN / -1` was found.
+
+Cases are grouped by what they pin: flag semantics (`add`/`sub`/`cmp` and the CY-vs-OV distinction), immediate sign- vs zero-extension, shift counts and the carry-out, the 64-bit multiply/divide register pair, every `setf` condition code, load sign-extension, the float unit, and the bit-string block copy.
+
 ## Headless validation
 
 Set `VBRECOMP_HEADLESS=1` (optionally `VBRECOMP_HEADLESS_FRAMES=N`) to run a game with no window/renderer. The recompiled loop still executes and renders into its framebuffer, and games can write PNG screenshots via stb. This is how boot/render behavior is validated on CI or display-less machines.

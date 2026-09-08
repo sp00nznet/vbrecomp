@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Ghidra pre-script: seed the Virtual Boy reset vector + real entry point and
 # enable aggressive code discovery, so Ghidra finds functions independently of
 # v810recomp (for cross-validation).

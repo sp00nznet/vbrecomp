@@ -1,6 +1,8 @@
 /*
  * menu.cpp — Reusable ImGui menu bar system for SDL2 applications.
  *
+ * SPDX-License-Identifier: MIT
+ *
  * Generalized from the 3dSNES menu system. Provides a ready-to-use
  * menu bar with toast notifications, file dialogs, FPS display, and
  * an about window. Extend via the custom_draw callback.

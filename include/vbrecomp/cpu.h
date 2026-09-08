@@ -44,6 +44,17 @@
 #define VB_SREG_ADTRE  25  /* Address trap register */
 #define VB_SREG_COUNT  32  /* Total system register slots */
 
+/* Bit string sub-opcodes (the reg2 field of opcode 0x1F). The "N" forms
+ * invert the source bit before combining it with the destination. */
+#define VB_BSU_OR     0x08
+#define VB_BSU_AND    0x09
+#define VB_BSU_XOR    0x0A
+#define VB_BSU_MOV    0x0B
+#define VB_BSU_ORN    0x0C
+#define VB_BSU_ANDN   0x0D
+#define VB_BSU_XORN   0x0E
+#define VB_BSU_NOT    0x0F
+
 typedef struct {
     uint32_t r[32];                 /* General purpose registers, r[0] = 0 always */
     uint32_t sr[VB_SREG_COUNT];     /* System registers */
@@ -54,6 +65,10 @@ extern vb_cpu_state_t vb_cpu;
 
 /* Initialize CPU state (clears registers, sets PIR) */
 void vb_cpu_init(void);
+
+/* Bit string op (opcode 0x1F): copies r28 bits from bit r30 of [r26] to bit
+ * r29 of [r27], combining with the destination per `op` (VB_BSU_*). */
+void vb_bitstring(int op);
 
 /* Convenience accessors for PSW (sr[5]) */
 static inline uint32_t vb_cpu_get_psw(void) { return vb_cpu.sr[VB_SREG_PSW]; }
@@ -146,44 +161,66 @@ static inline uint32_t vb_sar(uint32_t v, uint32_t sh) {
     return v;
 }
 
-/* MUL: signed 32x32 -> 64; low word returned, high word into r30. */
+/* MUL: signed 32x32 -> 64; low word returned, high word into r30.
+ *
+ * Z and S describe the whole 64-bit product, not the low word: 0x10000 squared
+ * is 0x1_00000000, whose low word is zero, and reading Z off that word alone
+ * tells the game its nonzero product was zero. */
 static inline uint32_t vb_mul(uint32_t a, uint32_t b) {
     int64_t r64 = (int64_t)(int32_t)a * (int64_t)(int32_t)b;
     vb_cpu.r[30] = (uint32_t)((uint64_t)r64 >> 32);
     uint32_t lo = (uint32_t)r64;
     uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
-    if (lo == 0) psw |= VB_PSW_Z;
-    if (r64 & 0x80000000) psw |= VB_PSW_S;
+    if (r64 == 0) psw |= VB_PSW_Z;
+    if (r64 < 0) psw |= VB_PSW_S;
     if (r64 > 0x7FFFFFFF || r64 < -(int64_t)0x80000000) psw |= VB_PSW_OV;
     vb_cpu.sr[VB_SREG_PSW] = psw;
     return lo;
 }
 
-/* MULU: unsigned 32x32 -> 64; low word returned, high word into r30. */
+/* MULU: unsigned 32x32 -> 64; low word returned, high word into r30.
+ * Z and S read the full 64-bit product, as in vb_mul -- S is bit 63, so a
+ * product whose low word merely has bit 31 set is still positive. */
 static inline uint32_t vb_mulu(uint32_t a, uint32_t b) {
     uint64_t r64 = (uint64_t)a * (uint64_t)b;
     vb_cpu.r[30] = (uint32_t)(r64 >> 32);
     uint32_t lo = (uint32_t)r64;
     uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
-    if (lo == 0) psw |= VB_PSW_Z;
-    if (r64 & 0x80000000) psw |= VB_PSW_S;
+    if (r64 == 0) psw |= VB_PSW_Z;
+    if (r64 >> 63) psw |= VB_PSW_S;
     if (r64 > 0xFFFFFFFFu) psw |= VB_PSW_OV;
     vb_cpu.sr[VB_SREG_PSW] = psw;
     return lo;
 }
 
-/* DIV: signed quotient returned, remainder into r30. Caller guards b != 0. */
+/* DIV: signed quotient returned, remainder into r30. Caller guards b != 0.
+ *
+ * INT_MIN / -1 is the one case that must not reach the host divide: the
+ * quotient does not fit in 32 bits, so x86 `idiv` raises and takes the process
+ * down, while the V810 completes the instruction with INT_MIN and OV set. */
 static inline uint32_t vb_div(uint32_t a, uint32_t b) {
-    int32_t q = (int32_t)a / (int32_t)b;
-    vb_cpu.r[30] = (uint32_t)((int32_t)a % (int32_t)b);
-    vb_cpu_set_flags_zs((uint32_t)q);
+    uint32_t psw = vb_cpu.sr[VB_SREG_PSW] & ~(VB_PSW_Z|VB_PSW_S|VB_PSW_OV);
+    int32_t q;
+    if (a == 0x80000000u && b == 0xFFFFFFFFu) {
+        q = (int32_t)0x80000000;
+        vb_cpu.r[30] = 0;
+        psw |= VB_PSW_OV;
+    } else {
+        q = (int32_t)a / (int32_t)b;
+        vb_cpu.r[30] = (uint32_t)((int32_t)a % (int32_t)b);
+    }
+    if (q == 0) psw |= VB_PSW_Z;
+    if (q < 0) psw |= VB_PSW_S;
+    vb_cpu.sr[VB_SREG_PSW] = psw;
     return (uint32_t)q;
 }
 
-/* DIVU: unsigned quotient returned, remainder into r30. Caller guards b != 0. */
+/* DIVU: unsigned quotient returned, remainder into r30. Caller guards b != 0.
+ * An unsigned divide cannot overflow, so OV is always cleared. */
 static inline uint32_t vb_divu(uint32_t a, uint32_t b) {
     vb_cpu.r[30] = a % b;
     uint32_t q = a / b;
+    vb_cpu.sr[VB_SREG_PSW] &= ~VB_PSW_OV;
     vb_cpu_set_flags_zs(q);
     return q;
 }
