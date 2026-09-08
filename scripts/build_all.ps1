@@ -85,7 +85,12 @@ foreach ($slug in $slugs) {
 
     # --- build (one target at a time, single MSBuild process) ---
     $exe = Join-Path $BuildDir "games\Release\corpus_$slug.exe"
-    if (Test-Path $exe) { Remove-Item $exe -Force }
+    # A previous run's game may still be alive and holding this .exe open, in
+    # which case Remove-Item throws and (under ErrorActionPreference=Stop) takes
+    # the whole sweep down partway through. Games are headless and disposable,
+    # so stop any instance of this one first.
+    Get-Process -Name "corpus_$slug" -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
+    if (Test-Path $exe) { Remove-Item $exe -Force -EA SilentlyContinue }
     # Plain single-target build (inherently sequential: one project, cl one
     # file at a time). No parallel flag — passing one mangles cmake's msbuild
     # project resolution under PowerShell.

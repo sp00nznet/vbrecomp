@@ -77,9 +77,13 @@ static void emit_reg(FILE *out, int reg) {
 }
 
 /* Check if a target address is a known function */
+/* Only CONFIRMED functions count here. Callers use this to decide whether to
+ * emit a direct `vb_func_<addr>()` call, and an unconfirmed entry is never
+ * declared, never defined and gets no stub -- so matching one produces a call
+ * to a symbol that does not exist, and the game fails to link. */
 static int find_func_by_addr(v810_ctx_t *ctx, uint32_t addr) {
     for (int i = 0; i < ctx->num_funcs; i++) {
-        if (ctx->funcs[i].addr == addr) return i;
+        if (ctx->funcs[i].addr == addr && ctx->funcs[i].confirmed) return i;
     }
     return -1;
 }
