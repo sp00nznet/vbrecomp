@@ -68,7 +68,7 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
   - **Interrupt-handler discovery** for push-prologue vector stubs, plus a runtime guard so a missing handler can't wedge the CPU with `EP` stuck set.
 - A reusable **`rename` recompiler hint** lets a hand-written `src/main.c` intercept specific functions (HLE), used by the **Red Alarm** and **Mario's Tennis** custom drivers.
 
-Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md). Detailed fix notes: [`docs/RECOMPILER.md`](docs/RECOMPILER.md).
+Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md). What each non-rendering game is actually stuck on, with the screenshot evidence: [`docs/RENDER_TRIAGE.md`](docs/RENDER_TRIAGE.md). Detailed fix notes: [`docs/RECOMPILER.md`](docs/RECOMPILER.md).
 
 ## Building & running
 
