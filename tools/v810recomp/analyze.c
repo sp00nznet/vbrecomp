@@ -23,6 +23,8 @@ void v810_ctx_init(v810_ctx_t *ctx, const uint8_t *rom, uint32_t rom_size) {
     ctx->num_funcs = 0;
 
     ctx->code_map = calloc(rom_size, 1);
+    ctx->visit_stamp = calloc(rom_size, sizeof(uint32_t));
+    ctx->visit_gen = 0;
 
     ctx->max_resolved = 256;
     ctx->resolved_jumps = calloc(ctx->max_resolved, sizeof(ctx->resolved_jumps[0]));
@@ -59,6 +61,7 @@ uint32_t v810_get_skip_bytes(v810_ctx_t *ctx, uint32_t target) {
 void v810_ctx_free(v810_ctx_t *ctx) {
     free(ctx->funcs);
     free(ctx->code_map);
+    free(ctx->visit_stamp);
     free(ctx->resolved_jumps);
     for (int i = 0; i < ctx->num_jump_tables; i++) {
         free(ctx->jump_tables[i].targets);
@@ -144,11 +147,11 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
     return addr - ctx->rom_base;
 }
 
-/* A branch target BELOW the current function's entry is not part of its body.
- * A function is emitted as one contiguous [addr, end_addr) range and the walk
- * only ever extends end_addr FORWARDS, so tracing such a target marks it
- * analysed while the emitter never emits it -- and the branch to it then
- * degrades to a bare `return`, silently truncating the function.
+/* A branch target BELOW a function's entry cannot be emitted: a function is
+ * written out as one contiguous [addr, end_addr) range whose end only ever
+ * grows FORWARDS, so anything before the entry is traced by analysis and then
+ * silently dropped. The emitter finds no label and no function for the branch
+ * and falls back to a bare `return`, truncating the function.
  *
  * The standard V810 boot idiom lands exactly on this, in 16 corpus ROMs:
  *
@@ -157,20 +160,55 @@ static uint32_t addr_to_offset(v810_ctx_t *ctx, uint32_t addr) {
  *   body: st.w r0, 0[r11] ; add 4, r11
  *   test: cmp r1, r11 ; blt body
  *
- * The jmp target (`test`) becomes a function, `body` sits before it, and
- * `blt body` emitted `return` -- so the WRAM clear never ran and the entry
- * gave up after zero frames ("Reset returned after 0 frames").
+ * The resolved jmp target (`test`) becomes the function entry, `body` sits just
+ * before it, and `blt body` emitted `return` -- so Mario's Tennis returned from
+ * its entry before clearing a single word of WRAM.
  *
- * Registering the backwards target as its own entry makes the emitter emit it,
- * and the branch becomes a real call. Returns true if it did so; the caller
- * must then re-acquire its `func` pointer, because adding an entry can
- * reallocate ctx->funcs.
+ * Pulling the entry back over the body is the fix, but it has to happen AFTER
+ * analysis, not during it. Two earlier attempts inside the trace failed:
+ * registering each backward target as its own function cascades on the back
+ * edge of every loop (Elevated Speed went from 56 functions to 17,892 and three
+ * minutes), and mutating func->addr mid-traversal corrupts the walk that is
+ * using it. As a settled post-pass over a stable table it is simply a bounded
+ * scan.
+ *
+ * The reach is short because that is the shape of the idiom -- the body sits
+ * immediately above its test. A distant backward branch is a real
+ * inter-function edge and is left alone.
  */
-static bool split_backward_target(v810_ctx_t *ctx, uint32_t func_addr, uint32_t target) {
-    if (target >= func_addr) return false;
-    int idx = v810_ctx_add_func(ctx, target, false, -1);
-    if (idx >= 0) ctx->funcs[idx].confirmed = true;
-    return true;
+#define BACKWARD_REACH 256
+
+static void extend_funcs_backward(v810_ctx_t *ctx) {
+    for (int i = 0; i < ctx->num_funcs; i++) {
+        v810_func_t *f = &ctx->funcs[i];
+        if (!f->visited) continue;
+        uint32_t off = addr_to_offset(ctx, f->addr);
+        uint32_t end = addr_to_offset(ctx, f->end_addr);
+        if (off >= ctx->rom_size || end > ctx->rom_size || off >= end) continue;
+
+        uint32_t lowest = f->addr;
+        while (off < end && off < ctx->rom_size) {
+            v810_insn_t insn;
+            if (!v810_decode(ctx->rom, off, ctx->rom_size, &insn)) break;
+            insn.addr = ROM_OFF_TO_ADDR(off, ctx->rom_base);
+            bool is_branch = (insn.format == FMT_III && insn.cond != 0x0D)
+                          || insn.opcode == 0x2A;
+            if (is_branch) {
+                uint32_t t = insn.addr + insn.imm;
+                if (is_rom_addr(ctx, t)) {
+                    t = v810_normalize_rom_addr(ctx, t);
+                    if (t < lowest && f->addr - t <= BACKWARD_REACH
+                                   && t >= ctx->rom_base) {
+                        lowest = t;
+                    }
+                }
+            }
+            off += insn.size;
+        }
+        if (lowest < f->addr && find_func(ctx, lowest) < 0) {
+            f->addr = lowest;
+        }
+    }
 }
 
 /* Analyze one function: trace instructions, find calls and branches */
@@ -192,7 +230,11 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
     /* Branch target worklist for intraprocedural branches */
     uint32_t branch_targets[1024];
     int num_targets = 0;
-    bool *visited_offsets = calloc(ctx->rom_size, sizeof(bool));
+    /* One generation per analyse pass; see visit_stamp in v810recomp.h. */
+    uint32_t gen = ++ctx->visit_gen;
+    uint32_t *visited_offsets = ctx->visit_stamp;
+#define VISITED(off)      (visited_offsets[off] == gen)
+#define MARK_VISITED(off) (visited_offsets[off] = gen)
 
     /* Add the entry point */
     branch_targets[num_targets++] = offset;
@@ -206,8 +248,12 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
         reg_val[0] = 0; reg_known[0] = true; /* r0 is always 0 */
 
         while (offset < ctx->rom_size) {
-            if (visited_offsets[offset]) break;  /* Already traced this path */
-            visited_offsets[offset] = true;
+            /* Re-acquire: adding a discovered callee below can realloc
+             * ctx->funcs, which would leave a cached `func` dangling. */
+            func = &ctx->funcs[func_idx];
+
+            if (VISITED(offset)) break;  /* Already traced this path */
+            MARK_VISITED(offset);
 
             if (!v810_decode(ctx->rom, offset, ctx->rom_size, &insn)) break;
 
@@ -362,13 +408,9 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
             case 0x2A: { /* JR disp26 - unconditional jump */
                 uint32_t target = insn.addr + insn.imm;
                 if (is_rom_addr(ctx, target)) {
-                    if (split_backward_target(ctx, func->addr, target)) {
-                        func = &ctx->funcs[func_idx];  /* may have realloc'd */
-                        goto next_path;
-                    }
                     uint32_t target_off = addr_to_offset(ctx, target);
                     /* If target is within function or nearby, it's intraprocedural */
-                    if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
+                    if (target_off < ctx->rom_size && !VISITED(target_off)) {
                         if (num_targets < 1024) {
                             branch_targets[num_targets++] = target_off;
                         }
@@ -384,12 +426,8 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     /* BR (always) - unconditional */
                     uint32_t target = insn.addr + insn.imm;
                     if (is_rom_addr(ctx, target)) {
-                        if (split_backward_target(ctx, func->addr, target)) {
-                            func = &ctx->funcs[func_idx];
-                            goto next_path;
-                        }
                         uint32_t target_off = addr_to_offset(ctx, target);
-                        if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
+                        if (target_off < ctx->rom_size && !VISITED(target_off)) {
                             if (num_targets < 1024) {
                                 branch_targets[num_targets++] = target_off;
                             }
@@ -403,14 +441,10 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
                     /* Conditional: trace both paths */
                     uint32_t target = insn.addr + insn.imm;
                     if (is_rom_addr(ctx, target)) {
-                        if (split_backward_target(ctx, func->addr, target)) {
-                            func = &ctx->funcs[func_idx];
-                        } else {
-                            uint32_t target_off = addr_to_offset(ctx, target);
-                            if (target_off < ctx->rom_size && !visited_offsets[target_off]) {
-                                if (num_targets < 1024) {
-                                    branch_targets[num_targets++] = target_off;
-                                }
+                        uint32_t target_off = addr_to_offset(ctx, target);
+                        if (target_off < ctx->rom_size && !VISITED(target_off)) {
+                            if (num_targets < 1024) {
+                                branch_targets[num_targets++] = target_off;
                             }
                         }
                     }
@@ -438,7 +472,8 @@ static void analyze_func(v810_ctx_t *ctx, int func_idx) {
         }
     }
 
-    free(visited_offsets);
+#undef VISITED
+#undef MARK_VISITED
 }
 
 /* Compare function entries by address for sorting */
@@ -647,6 +682,9 @@ void v810_analyze(v810_ctx_t *ctx) {
             }
         }
     }
+
+    /* Pull entries back over a loop body a short backward branch reaches. */
+    extend_funcs_backward(ctx);
 
     /* Sort functions by address */
     qsort(ctx->funcs, ctx->num_funcs, sizeof(v810_func_t), func_cmp);

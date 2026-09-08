@@ -72,6 +72,14 @@ typedef struct {
     /* Byte classification: which bytes are code vs data */
     uint8_t *code_map;      /* 1 byte per ROM byte: 'C'=code, 'D'=data, 0=unknown */
 
+    /* Per-path "already traced" marks for analyze_func, stamped with a
+     * generation counter instead of being cleared. This used to be a
+     * calloc(rom_size) per function, which made analysis O(functions x ROM
+     * size): once a change raised the function count, the two 4 MB ROMs blew
+     * straight through the sweep's 60s timeout. Bumping a generation is O(1). */
+    uint32_t *visit_stamp;  /* 1 entry per ROM byte */
+    uint32_t visit_gen;
+
     /* Resolved indirect jumps: JMP [reg] where the target is known */
     struct { uint32_t from_addr; uint32_t to_addr; } *resolved_jumps;
     int num_resolved;
