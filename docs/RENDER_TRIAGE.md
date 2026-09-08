@@ -845,6 +845,31 @@ Re-adding `entry 07F000AC` on top of it does NOT work: those dispatches arrive
 when sub_07F00026 is not on the stack, so there is no frame to unwind to and
 the loop runs uninitialised again. The hint stays out.
 
+## Where the last eight actually stop
+
+With the unwinding transfer model in, every remaining game has been walked to a
+specific stall point. Six of the eight stop in the SAME PLACE conceptually:
+they never set up a displayable world.
+
+| game | tiles loaded | display on | worlds set up |
+|---|---|---|---|
+| Null Pointer Mockup | 5,252 CHR, BGMap 108 cells | yes (DPCTRL=0x030A, BRT=20/40/20) | **none** -- only world 31, holding the END marker; worlds 30, 29 and 0 read zero |
+| Capitan Sevilla 3D | 0 non-zero of 132,056 | no (DPCTRL=0) | none |
+| SPONG | 0 non-zero of 66,520 | no (DPCTRL=0) | one, pointing at an empty segment |
+| Formula V (Emulator) | 0 non-zero of 67,504 | no | none |
+| VUEngine Platformer | 0 non-zero of 41,944 | no | none |
+| Jack Bros x2 | 0 non-zero of 8,192 | yes (DPCTRL=0x0202) | 11 worlds with real attributes |
+| Galactic Pinball | 1,232 CHR, 1,024 BGMap | partly (DPCTRL=0x0300, XPCTRL=0) | none |
+
+Null Pointer is the most advanced: it has character data, a filled BGMap
+segment, the display AND the drawing engine enabled, and correct brightness --
+and then writes exactly one world attribute, the terminator. Jack Bros is the
+mirror image: eleven real worlds and no tile data.
+
+So the shared question for most of the remaining set is not the renderer and not
+the CPU: it is that world setup never runs. Two of them (Jack Bros, Null
+Pointer) prove the renderer and the tile path each work in isolation.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
