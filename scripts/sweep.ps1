@@ -91,6 +91,10 @@ foreach ($rom in $roms) {
         compile = "skip"; errors = 0; warnings = 0; firstError = ""
     }
 
+    # A previous timed-out run can leave the recompiler alive, holding the
+    # output file and competing for CPU -- which makes the NEXT ROM look like it
+    # hangs. Chasing that phantom cost this project a long time; clear it first.
+    Get-Process -Name v810recomp -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
     $r = Invoke-WithTimeout -Exe $Tool -ArgList @($rom.FullName, $outDir) -TimeoutSec $RecompTimeout
     if ($r.TimedOut) {
         $rec.recomp = "timeout"
