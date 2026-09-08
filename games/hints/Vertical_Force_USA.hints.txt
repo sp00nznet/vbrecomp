@@ -1,0 +1,37 @@
+# Profile-guided entries for Vertical Force (USA).
+#
+# These four addresses are jump targets the game computes at run time, so static
+# analysis never found them and vb_recomp_call had nothing to dispatch to --
+# 795,657 unimplemented calls in a 600-frame run, three of them in lockstep
+# 265,087 times each, which is a main loop calling all three every iteration.
+# Harvested from the runtime stub counter (VBRECOMP_HEARTBEAT).
+entry 07F009E0
+entry 07F0B47A
+entry 07F0BD80
+entry 07F1DD6E
+entry 07F0B49A
+entry 07F10A1C
+entry 07F109BC
+entry 07F01C80
+entry 07F00B24
+entry 07F01CA8
+entry 07F048E2
+entry 07F047FA
+entry 07F1D818
+entry 07F1CC32
+entry 07F1EE58
+entry 07F1E714
+entry 0040CE22
+entry 07F1CBE6
+entry 07F1E660
+entry 07F1EB26
+entry 07F1F086
+entry 07F1D9D8
+entry 07F1BF64
+entry 07F1E926
+entry 07F1F0A0
+entry 07F1F364
+entry 00DCDBDA
+entry 07F1E8FC
+entry 03D2D1D0
+entry 01290500
