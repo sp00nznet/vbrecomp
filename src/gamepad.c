@@ -31,9 +31,26 @@ void vb_gamepad_init(void) {
 uint8_t vb_gamepad_read8(vb_addr_t addr) {
     switch (addr) {
     case 0x10: /* SDLR - low byte of button data */
-        return (uint8_t)(latched & 0xFF);
     case 0x14: /* SDHR - high byte of button data */
-        return (uint8_t)(latched >> 8);
+        /* Report the CURRENT pad, not a snapshot taken when the game last
+         * wrote SCR_START. The VB can also read the pad on its own (the
+         * hardware-initiated read enabled through SCR), and a game that relies
+         * on that never writes START at all -- so `latched` stayed 0 for the
+         * whole run and every button read returned zero.
+         *
+         * Jack Bros is exactly that game, and it does not merely miss input:
+         * sub_07F00222 composes SDHR<<8 | SDLR into an event word, stores the
+         * RISING EDGES of it as the kernel's dispatch flags at 20[r25], and the
+         * kernel calls the task scheduler only when those flags are set. A pad
+         * frozen at zero has no edges, so the flags were written three times in
+         * a 700-frame run and always as 0, the scheduler ran 3 times, and every
+         * task that loads graphics never got to run at all.
+         *
+         * Latching adds nothing here: `buttons` only changes once per frame, so
+         * the two halves of a read are consistent either way. */
+        latched = buttons;
+        return addr == 0x10 ? (uint8_t)(latched & 0xFF)
+                            : (uint8_t)(latched >> 8);
     case 0x28: /* SCR */
         /* STAT=0 means ready (we latch instantly, so a read is never pending).
          *

@@ -1451,6 +1451,49 @@ hardware, rather than from a count of emitted poll sites. Until then, any
 control-flow change should be measured at more than one tick count before it is
 called a regression.
 
+## The pad only updated when a game asked for it -- Jack Bros never asks
+
+`SDLR`/`SDHR` returned `latched`, and `latched` was only refreshed when a game
+wrote `SCR_START`. The VB can also read the pad on its own through the
+hardware-initiated read, and a game relying on that never writes START -- so
+every button read returned zero for the whole run.
+
+For Jack Bros that is not a missing-input bug, it is the deadlock. `sub_07F00222`
+is the kernel's event composer:
+
+```
+07F00228: movhi 0x0200, r0, r6     ; hardware registers
+07F0022C: ld.h  40[r6], r7         ; SCR -- spin while a read is pending
+07F00236: ld.h  20[r6], r7         ; SDHR
+07F0023C: ld.h  16[r6], r8         ; SDLR
+   ... compose SDHR<<8 | SDLR into an event word in r7 ...
+07F0027A: st.h  r7, 16[r25]        ; current
+07F00280: xor   r7, r8
+07F00282: and   r7, r8             ; r8 = RISING EDGES
+07F00284: st.h  r8, 20[r25]        ; the kernel's dispatch flags
+```
+
+and the kernel calls the task scheduler only when those flags are set
+(`ld.h 20[r25], r7 ; andi 0x0020, r7, r7 ; bnz -> jal 0x07F020A8`). A pad frozen
+at zero has no rising edges, so in a 700-frame run the flags were written three
+times and every time as **0**, the scheduler ran 3 times, and every task that
+loads graphics never ran at all.
+
+Reporting the current pad instead of a snapshot fixes the read: the flags now
+take the value **0xFC**. Corpus unchanged at 66/10 with the identical set, so
+nothing depended on the old latching -- `buttons` only changes once per frame,
+which makes the two halves of a read consistent either way.
+
+This is the same class as the Mario Clash SCR bug already noted in gamepad.c: a
+pad register that is technically defensible and silently starves a game.
+
+### What still blocks Jack Bros
+
+The event word is now real, but `sub_07F00222` is entered **once** in 900
+frames, and so is the kernel `sub_07F00010`. The pad is sampled once instead of
+every frame. So the next question is why the kernel loop does not go round --
+not why the pad reads zero, which it no longer does.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
