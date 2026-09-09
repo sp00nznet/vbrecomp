@@ -39,12 +39,10 @@ $curated = @{
     "Mario Clash (Japan, USA) (En)"      = @{ boots="yes"; renders="wip"; playable="no"; note="Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames" }
 }
 
-# These five draw nothing on real hardware either, re-checked on BizHawk's
+# These three draw nothing on real hardware either, re-checked on BizHawk's
 # Mednafen VB core at 1800 frames with the same buttons held. They are not
 # failures of this project and are excluded from the achievable denominator.
 $hwBlank = @(
-    'Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew)',
-    'Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew)',
     'Snowball Wars (World) (Demo 1) (Aftermarket) (Homebrew)',
     'Snowball Wars (World) (Demo 2) (Aftermarket) (Homebrew)',
     'Snowball Wars (World) (Demo 3) (Aftermarket) (Homebrew)'
@@ -114,9 +112,9 @@ $md += "| ... still reaching new state at frame 900 | **$advCount** |"
 $md += "| ... drew once and froze | **$frozenCount** |"
 $md += "| Blank | **$blankCount** ($($hwBlank.Count) blank on real hardware too, so **$ourBlank** are ours) |"
 $md += ""
-$md += "Five ROMs draw nothing on the reference emulator either -- verified on"
+$md += "Three ROMs draw nothing on the reference emulator either -- verified on"
 $md += "BizHawk's Mednafen VB core at 1800 frames with the same buttons held, where"
-$md += "none reaches the framebuffer and three never load a character byte. So the"
+$md += "they never load a single character byte, let alone draw one. So the"
 $md += "achievable denominator is **$ceiling**, not $($rows.Count)."
 $md += ""
 $md += "Every one of these numbers is regenerated from a run, not hand-maintained:"

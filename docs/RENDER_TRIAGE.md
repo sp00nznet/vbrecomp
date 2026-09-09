@@ -1295,6 +1295,42 @@ provably correct. Reverted, but this is the closest the split problem has come
 to a real answer -- what is missing is making a drained interior entry carry the
 same depth as the call it replaces.
 
+## CORRECTION: the ceiling is 73, and the input never reached the pad
+
+The section below is **wrong** and is kept because the way it was wrong matters.
+
+It concluded that five ROMs are blank on real hardware, from a run that held the
+survey's buttons on BizHawk. Those buttons were never pressed. BizHawk names the
+Virtual Boy pad `P1 A`, `P1 Start`, ... and the lua asked for `A`, `Start` --
+names that match nothing and set nothing, silently. Every "with input held"
+reference run in this file up to that point was an input-free run.
+
+The tell was there and was not read: Bound High sits on its warning screen for
+2400 hardware frames with `Start` supposedly held, while its own screen says
+PUSH START BUTTON. A game that ignores 48 seconds of Start is not a stubborn
+game, it is a disconnected controller.
+
+Re-run with `P1 `-prefixed names:
+
+| game | first draw | CHR at end | framebuffer at end |
+|---|---|---|---|
+| Capitan Sevilla 3D | **frame 880** | 169 | 0 |
+| Null Pointer Mockup | **frame 150** | 351 | **104** |
+| Snowball Wars demo 1 | never | 0 | 0 |
+| Snowball Wars demo 2 | never | 0 | 0 |
+| Snowball Wars demo 3 | never | 0 | 0 |
+
+Capitan Sevilla 3D and Null Pointer Mockup **do draw on hardware**. Only the
+three Snowball Wars demos are genuinely inert -- they never load a character
+byte in 1800 frames, with or without input.
+
+**So 73 of 76 can render, not 71**, and two more blanks are ours to fix rather
+than dismiss. Anything that rested on the old number needs re-reading, including
+the claim that a 72-game target was unreachable. It is reachable.
+
+A comparison against a reference is only as good as the reference's input, and
+an input API that fails silently will let a whole line of enquiry look settled.
+
 ## The ceiling is 71, not 76 -- five games are blank on real hardware
 
 Re-verified on the Mednafen VB core at **1800 frames** (three times the survey's

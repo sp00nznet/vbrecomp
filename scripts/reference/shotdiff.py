@@ -30,7 +30,11 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REF_DIR = os.path.join(ROOT, "corpus", "_ref")
 BIZHAWK = os.environ.get("BIZHAWK", r"G:\recomp\snes\bizhawk\EmuHawk.exe")
-REF_FRAMES = [400, 900]        # one BizHawk launch each; see shot.lua
+REF_FRAMES = [400, 900, 1800, 3600]   # one BizHawk launch each; see shot.lua
+# Four, spread wide, because we usually run AHEAD of hardware: our frame is a
+# budget of interrupt checks, not 1/50s. BLOX is on its title screen at our
+# frame 900 and still on the warning screen at hardware frame 400 -- scored
+# 73.8% different, all of it drift. Give hardware room to catch up.
 OUR_FRAMES = [300, 600, 900]   # what render_survey.ps1 leaves behind
 
 

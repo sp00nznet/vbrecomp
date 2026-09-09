@@ -22,7 +22,11 @@
 local OUT   = os.getenv("VBREF_OUT")   or [[C:\Users\Public\vbref.png]]
 local UNTIL = tonumber(os.getenv("VBREF_FRAME") or "400")
 
-local HELD = { A = true, B = true, Start = true, Select = true, L = true, R = true }
+-- BizHawk names the Virtual Boy pad "P1 A", "P1 Start", ... The bare names
+-- silently match nothing: joypad.set{Start=true} sets no button at all, and
+-- Bound High sat on its warning screen for 2400 frames with Start "held".
+local HELD = { ["P1 A"] = true, ["P1 B"] = true, ["P1 Start"] = true,
+               ["P1 Select"] = true, ["P1 L"] = true, ["P1 R"] = true }
 
 local frame = 0
 event.onframeend(function()

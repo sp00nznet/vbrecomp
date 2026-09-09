@@ -18,8 +18,11 @@ local function nonzero(domain, len, step)
   return n
 end
 
--- 0x303C is A|B|L|R|Start|Select -- the mask the survey injects.
-local HELD = { A = true, B = true, Start = true, Select = true, L = true, R = true }
+-- BizHawk names the Virtual Boy pad "P1 A", "P1 Start", ... The bare names
+-- silently match nothing: joypad.set{Start=true} sets no button at all, and
+-- Bound High sat on its warning screen for 2400 frames with Start "held".
+local HELD = { ["P1 A"] = true, ["P1 B"] = true, ["P1 Start"] = true,
+               ["P1 Select"] = true, ["P1 L"] = true, ["P1 R"] = true }
 
 local frame, firstDraw, firstChr = 0, -1, -1
 event.onframeend(function()
