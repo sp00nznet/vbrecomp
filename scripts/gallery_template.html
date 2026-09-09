@@ -1,0 +1,241 @@
+<title>Virtual Boy Corpus Triage</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{
+  --ground:#F5F2F0; --surface:#FFFFFF; --sunk:#EDE7E4;
+  --ink:#1A1614; --muted:#6E635D; --rule:#E0D7D2;
+  --accent:#C4160C; --accent-soft:#F7E3E1;
+  --live:#2F7D4F; --frozen:#B0791A; --blank:#8A7F79;
+  --shot-bg:#0C0908;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#16110F; --surface:#1F1917; --sunk:#120E0C;
+    --ink:#F3EEEB; --muted:#9E918B; --rule:#302623;
+    --accent:#FF4436; --accent-soft:#3A1A17;
+    --live:#57B87C; --frozen:#E0A83C; --blank:#8A7F79;
+    --shot-bg:#0C0908;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#16110F; --surface:#1F1917; --sunk:#120E0C;
+  --ink:#F3EEEB; --muted:#9E918B; --rule:#302623;
+  --accent:#FF4436; --accent-soft:#3A1A17;
+  --live:#57B87C; --frozen:#E0A83C; --blank:#8A7F79;
+  --shot-bg:#0C0908;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font:400 16px/1.6 "Public Sans","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:48px 28px 96px}
+h1,h2,h3,h4{font-family:"Bricolage Grotesque","Public Sans",system-ui,sans-serif;
+  text-wrap:balance;margin:0}
+code,.count,figcaption{font-family:"JetBrains Mono",ui-monospace,monospace}
+
+.mast{display:grid;gap:20px;padding-bottom:32px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent)}
+.mast h1{font-size:clamp(34px,5.2vw,58px);font-weight:800;line-height:1.02;letter-spacing:-.02em}
+.mast p{max-width:66ch;color:var(--muted);margin:0;font-size:17px}
+
+.dist{margin-top:14px}
+.bar{display:flex;height:14px;border-radius:2px;overflow:hidden;background:var(--sunk)}
+.seg{display:block}
+.s-live{background:var(--live)} .s-frozen{background:var(--frozen)} .s-blank{background:var(--blank)}
+.legend{display:flex;flex-wrap:wrap;gap:26px;margin-top:14px;font-size:13px;color:var(--muted)}
+.legend b{color:var(--ink);font-family:"JetBrains Mono",monospace;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;
+  vertical-align:1px}
+.d-live{background:var(--live)} .d-frozen{background:var(--frozen)} .d-blank{background:var(--blank)}
+
+.findings{margin-top:56px}
+.findings > h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+  font-family:"JetBrains Mono",monospace;font-weight:700;color:var(--muted);margin-bottom:18px}
+.findings ol{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.findings li{padding:20px 0 22px;border-bottom:1px solid var(--rule);
+  display:grid;grid-template-columns:104px 1fr;gap:0 22px;align-items:start}
+.findings h4{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.findings p{margin:6px 0 0;color:var(--muted);max-width:70ch;font-size:15px}
+.tag{grid-row:span 2;font-family:"JetBrains Mono",monospace;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:2px;
+  justify-self:start;margin-top:4px}
+.t-frozen{background:var(--frozen);color:#16110F}
+.t-blank{background:var(--blank);color:#16110F}
+.t-fixed{background:var(--live);color:#16110F}
+.t-glyph,.t-layout{background:var(--accent-soft);color:var(--accent);
+  border:1px solid var(--accent)}
+
+.sec{margin-top:64px}
+.sec-head{display:grid;grid-template-columns:1fr auto;gap:4px 16px;
+  padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.sec-head h2{font-size:26px;font-weight:700;letter-spacing:-.015em}
+.sec-head .count{font-size:26px;font-weight:700;color:var(--accent);
+  font-variant-numeric:tabular-nums;line-height:1.1}
+.sec-head p{grid-column:1/-1;margin:2px 0 0;color:var(--muted);max-width:74ch;font-size:15px}
+
+.games{display:grid}
+.game{display:grid;grid-template-columns:1fr auto;gap:10px 28px;align-items:center;
+  padding:16px 0;border-bottom:1px solid var(--rule)}
+.game header{min-width:0}
+.game h3{font-size:16px;font-weight:600;letter-spacing:-.005em;overflow-wrap:anywhere}
+.game code{display:block;font-size:11px;color:var(--muted);margin-top:3px;
+  overflow-wrap:anywhere}
+.strip{display:flex;gap:10px;justify-self:end}
+.fr{margin:0;display:grid;gap:5px;justify-items:center}
+.fr img{display:block;width:192px;height:112px;background:var(--shot-bg);
+  image-rendering:pixelated;border:1px solid var(--rule);cursor:zoom-in}
+.fr figcaption{font-size:10px;color:var(--muted);letter-spacing:.06em;
+  font-variant-numeric:tabular-nums}
+.game[data-b="blank"] .fr img{opacity:.5}
+
+dialog{border:none;background:transparent;padding:0;max-width:96vw}
+dialog::backdrop{background:rgba(10,7,6,.9)}
+dialog img{width:min(90vw,768px);height:auto;image-rendering:pixelated;
+  background:#0C0908;border:1px solid #302623;display:block}
+dialog figcaption{font-family:"JetBrains Mono",monospace;font-size:12px;
+  color:#F3EEEB;text-align:center;padding-top:12px}
+
+footer{margin-top:72px;padding-top:22px;border-top:1px solid var(--rule);
+  color:var(--muted);font-size:13px;max-width:76ch}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:820px){
+  .game{grid-template-columns:1fr}
+  .strip{justify-self:start;flex-wrap:wrap}
+  .fr img{width:150px;height:87px}
+  .findings li{grid-template-columns:1fr}
+  .tag{grid-row:auto;margin-bottom:8px}
+}
+
+.ceiling{margin:16px 0 0;max-width:74ch;font-size:14px;color:var(--muted);
+  border-left:3px solid var(--accent);padding-left:14px}
+.ceiling strong,.ceiling b{color:var(--ink)}
+.t-measure{background:var(--sunk);color:var(--ink);border:1px solid var(--rule)}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <div class="eyebrow">vbrecomp &middot; generic driver &middot; 900 frames headless &middot; buttons held</div>
+  <h1>What the whole Virtual&nbsp;Boy library actually draws</h1>
+  <p>Every ROM in the corpus, recompiled to C and booted through the shared driver with no
+  game-specific glue, with the action buttons held in bursts so the boot gates open. Each was
+  sampled at frame 300, 600 and 900; the strips show only the <em>distinct</em> frames,
+  labelled with the samples they cover &mdash; so a single image marked 300&ndash;900 is a game
+  that drew once and never changed again.</p>
+
+  <div class="dist">
+    <div class="bar"><span class="seg s-live" style="flex:{{LIVE_N}}"></span><span class="seg s-frozen" style="flex:{{FROZEN_N}}"></span><span class="seg s-blank" style="flex:{{BLANK_N}}"></span></div>
+    <div class="legend">
+      <span><span class="dot d-live"></span>Advancing <b>{{LIVE_N}}</b></span>
+      <span><span class="dot d-frozen"></span>Drawing, then frozen <b>{{FROZEN_N}}</b></span>
+      <span><span class="dot d-blank"></span>Nothing on screen <b>{{BLANK_N}}</b></span>
+      <span>Total <b>{{TOTAL_N}}</b></span>
+    </div>
+    <p class="ceiling"><strong>{{RENDER_N}} of {{TOTAL_N}} put something on screen.</strong> Five of the {{BLANK_N}} that
+    do not are blank on real hardware too &mdash; re-checked on the Mednafen VB core at 1800 frames
+    with these same buttons held, where none of them ever reaches the framebuffer and the three
+    Snowball Wars demos never load a character byte at all. So the honest denominator is
+    <b>71</b>, not {{TOTAL_N}}, and {{OURS_N}} of the blank screens are ours.</p>
+  </div>
+</header>
+
+<section class="findings">
+  <h2>What the strips show</h2>
+  <ol>
+    <li><span class="tag t-fixed">fixed</span><h4>A function made out of a call&rsquo;s arguments</h4>
+    <p>Galactic Pinball wrote tiles and background maps and still drew nothing, because it never wrote
+    a single world attribute. Its <code>jal 0x07F417B8</code> is a long-call helper that reads its
+    arguments <em>inline</em> from the bytes after the call site; those eight argument bytes had a
+    function made out of them and were decoded as code, and the first halfword, <code>0x9800</code>,
+    decodes as <code>bp .</code> &mdash; a branch to itself. The caller fell in and spun there for the
+    whole run. Detecting the idiom from the <code>add N, r31</code> before <code>jmp [r31]</code>, and
+    refusing to split anywhere that is not an instruction boundary, took it from 1,232 to 9,442
+    non-zero character writes and from a blank screen to a picture.</p></li>
+
+    <li><span class="tag t-fixed">fixed</span><h4>The pad only updated when a game asked</h4>
+    <p><code>SDLR</code>/<code>SDHR</code> returned a snapshot refreshed only when a game wrote
+    <code>SCR_START</code>. The VB can also read the pad itself, and a game relying on that never
+    writes START &mdash; so every button read returned zero for the entire run. Jack Bros composes the
+    pad into an event word and stores its <em>rising edges</em> as the kernel&rsquo;s dispatch flags;
+    its scheduler is called only when those flags are set. A pad frozen at zero has no edges, so in a
+    700-frame run the flags were written three times and always as 0, and every task that loads
+    graphics never ran.</p></li>
+
+    <li><span class="tag t-fixed">fixed</span><h4>Epilogues that were emitted nowhere</h4>
+    <p>The long-call idiom &mdash; <code>jal .+4</code>, <code>add N, r31</code>, <code>jmp [rX]</code>
+    &mdash; returns to the address r31 now holds, but the analyzer treated the <code>jmp</code> as the
+    end of the flow, so everything after it was never traced. SPONG&rsquo;s virtual-dispatch thunks each
+    lost their entire epilogue, and every virtual call in the game returned into a hole.</p></li>
+
+    <li><span class="tag t-measure">measurement</span><h4>Half of what looked like regressions was pacing</h4>
+    <p>A frame is a count of <code>vb_interrupt_check()</code> calls, and that is emitted at every
+    function entry &mdash; so any change to how the ROM is carved into functions silently changes the
+    frame rate. One control-flow change looked like it destroyed Elevated Speed (231,461 non-zero
+    character writes down to 7,667) and at a higher tick count produces 221,142. Nothing was
+    miscompiled. Every control-flow measurement here has to be taken at more than one tick count
+    before it is called a regression.</p></li>
+
+    <li><span class="tag t-blank">blank</span><h4>Five of these ROMs cannot render at all</h4>
+    <p>Capitan Sevilla 3D, Null Pointer Mockup and the three Snowball Wars demos draw nothing on the
+    reference emulator either, checked at three times this page&rsquo;s frame budget with the same
+    buttons held. Capitan Sevilla and Null Pointer load character data and never draw it; the Snowball
+    Wars demos never load any. They are inert ROMs, not games being run badly.</p></li>
+
+    <li><span class="tag t-blank">blank</span><h4>The five that are ours, and they are not one bug</h4>
+    <p>SPONG, Formula V and VUEngine Platformer share an engine and a symptom &mdash; thousands of
+    background-map writes and not one non-zero tile &mdash; but not a cause: VUEngine Platformer spins
+    on a single word 1,520,311 times that nothing ever writes, while SPONG drops six virtual calls
+    because the pointer handed to its dispatcher is a background-map address rather than an object.
+    Both Jack Bros builds are a cooperative kernel whose scheduler stops being called. Pacing is not
+    the answer for any of them: swept from 2,000 to 400,000 ticks, SPONG and Formula V return
+    byte-identical numbers at every setting.</p></li>
+
+    <li><span class="tag t-frozen">frozen</span><h4>Frozen is a category, not a bug</h4>
+    <p>{{FROZEN_N}} games draw a real screen and then never change it. The execution trace records every
+    function entry and dumps the last 64 when a boot chain ends, and no two of these end in the same
+    function &mdash; so there is no single fix hiding here. Several fill the trace ring, meaning they
+    execute a great deal and then stop, which is a different problem wearing the same symptom as the
+    ones that give up after ten functions.</p></li>
+
+    <li><span class="tag t-glyph">glyph</span><h4>Character sets that land half-way</h4>
+    <p>Recorded from earlier passes over these strips: Bound High and V-Tetris render their English
+    warning text correctly and the Japanese text below it as wrong tiles; Tron VB draws the top strokes
+    of its logo and loses the bottoms; Hamburgers renders a full bitmap title and corrupts the small
+    text at bottom left. One character set lands and the other does not.</p></li>
+  </ol>
+</section>
+
+<section class="sec" id="live"><div class="sec-head"><h2>Advancing</h2><span class="count">{{LIVE_N}}</span><p>The frame changes between samples. These games are running: the main loop reaches new state across the 900 frames, with the action buttons held in bursts from frame 60.</p></div><div class="games">{{LIVE}}</div></section>
+
+<section class="sec" id="frozen"><div class="sec-head"><h2>Drawing, then frozen</h2><span class="count">{{FROZEN_N}}</span><p>A real screen, identical at all three samples. These got far enough to draw and then stopped advancing &mdash; each for its own reason.</p></div><div class="games">{{FROZEN}}</div></section>
+
+<section class="sec" id="blank"><div class="sec-head"><h2>Nothing on screen</h2><span class="count">{{BLANK_N}}</span><p>An empty 384&times;224 frame at every sample. Five of these are blank on real hardware too; the other {{OURS_N}} are ours.</p></div><div class="games">{{BLANK}}</div></section>
+
+<footer>
+  <p>Generated by <code>scripts/gen_gallery.py</code> from <code>corpus/render_survey.json</code> and the
+  PNGs <code>scripts/render_survey.ps1</code> leaves in <code>corpus/_timeline/</code>, so the counts and
+  the pictures always come from the same run. Classification is taken from the screenshots themselves:
+  blank when the survey found no graphics, frozen when the three samples are byte-identical, advancing
+  otherwise. Frame numbers are the driver&rsquo;s interrupt-check budget, not hardware frames &mdash; one
+  hardware frame is roughly 2.25 of these at the default tick count.</p>
+</footer>
+</div>
+
+<dialog id="zoom"><img alt=""><figcaption></figcaption></dialog>
+<script>
+(function () {
+  var dlg = document.getElementById('zoom');
+  if (!dlg || !dlg.showModal) return;
+  var big = dlg.querySelector('img'), cap = dlg.querySelector('figcaption');
+  document.addEventListener('click', function (e) {
+    var img = e.target.closest ? e.target.closest('.fr img') : null;
+    if (img) { big.src = img.src; big.alt = img.alt; cap.textContent = img.alt; dlg.showModal(); return; }
+    if (e.target === dlg) dlg.close();
+  });
+})();
+</script>
