@@ -1494,6 +1494,41 @@ frames, and so is the kernel `sub_07F00010`. The pad is sampled once instead of
 every frame. So the next question is why the kernel loop does not go round --
 not why the pad reads zero, which it no longer does.
 
+## Two traps that make Jack Bros' diagnosis read wrong
+
+### The kernel back-edge is never REACHED, not dropped
+
+`sub_07F00010` is the reset entry (zero callers, zero jumps -- it sets SP to
+0x0500FFFC, GP to 0x0500ED00 and r25 to the task table). Its last instruction is
+`br 0x07F0019C` at 0x07F00220, the kernel's main-loop back-edge, and the emitter
+turns that into `VB_JUMP(0x07F0019Cu)` because 0x07F0019C is its own function.
+`sub_07F0019C` is entered **0 times**, which looks exactly like a dropped
+transfer -- and `vb_interior_owner(0x07F0019C)` really does return 0x07F00010,
+so the drain's re-entry guard is a plausible culprit.
+
+It is not. The heartbeat now reports any still-parked transfer target, and
+nothing is ever parked. Control simply never reaches 0x07F00220: the reset path
+calls into game code that does not come back. So the back-edge is unreached, not
+refused, and the drain is exonerated.
+
+### Function-entry counts lie wherever ranges overlap
+
+`vb_recomp_pc` sits at 0x07F03EBA and 0x07F03EDA -- labels inside
+`sub_07F03E5A` -- while `VBRECOMP_COUNT_FUNC=07F03E5A` reports **0 entries**.
+Both are true: `sub_07F03E84` (0x07F03E84-0x07F03EF0) is a duplicated suffix of
+`sub_07F03E5A` (0x07F03E5A-0x07F03EF0), so the same code exists twice and
+execution is in the other copy. With 67 overlapping pairs and 279 duplicated
+labels in this game, any conclusion drawn from a function-entry count needs the
+overlap checked first.
+
+What that code is: an insertion sort over object pointers, comparing the key at
+`20[r13]` against `20[r14]` -- the per-frame display sort. The game is doing real
+per-frame work, which is why the "stuck" reading was wrong.
+
+One thing to watch: the gamepad fix changed the tile copier `sub_07F0091C` from
+449 entries to 4. CHR is 0 either way, but that is a large behavioural swing and
+the game is now taking a different path.
+
 ## What is already ruled out
 
 - **Unimplemented calls.** Stub functions, unfound JAL callees and unresolved
