@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- List the core's memory domains, their sizes, and how much of each is
 -- non-zero at a chosen frame.
 --

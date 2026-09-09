@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- Reference probe: what does real hardware do that our recompilation does not?
 --
 -- vbrecomp reports Jack Bros writing 8,192 character bytes all zero, because the

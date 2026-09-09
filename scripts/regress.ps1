@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Fast regression check for a recompiler change.
 #
 # The full loop is sweep + build_all + render_survey: about an hour, and all it

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Extract all Virtual Boy ROMs from the No-Intro archive set into roms/.
 # Each archive holds a single same-named .vb; extraction is flat (no-intro
 # names don't collide). Sequential, no parallelism (resource safety).

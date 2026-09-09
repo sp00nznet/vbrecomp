@@ -4,7 +4,17 @@
 
 Remember the Virtual Boy? Nintendo's red-and-black fever dream from 1995? We're bringing those games back as native executables — no neck strain, no retina damage required.
 
-![Mario's Tennis title screen running via vbrecomp](screenshots/mariotennis_title.png)
+| | | |
+|:--:|:--:|:--:|
+| ![Mario Kart: Virtual Cup](docs/screenshots/mario-kart-virtual-cup.png) | ![Fishbone](docs/screenshots/fishbone.png) | ![Soviet Union 2010](docs/screenshots/soviet-union-2010.png) |
+| Mario Kart: Virtual Cup | Fishbone | Soviet Union 2010 |
+| ![Capitan Sevilla 2](docs/screenshots/capitan-sevilla-2.png) | ![Vertical Force](docs/screenshots/vertical-force.png) | |
+| Capitan Sevilla 2 | Vertical Force | |
+
+<sub>All five recompiled to C and booted through the shared generic driver with no
+game-specific code, captured headless at frame 600-900. Shown to document what the
+recompiler currently produces; games, artwork and trademarks belong to their owners.
+See [THIRD_PARTY.md](THIRD_PARTY.md).</sub>
 
 ## What is this?
 
@@ -24,7 +34,7 @@ The retail Virtual Boy library is only 22 games. That's small enough to recompil
   └──────────────────┘
      │  generated/recomp_funcs.c  (human-readable C, see below)
      ▼
-  ┌──────────────────┐   per-game src/main.c wires up entry point,
+  ┌──────────────────┐   games/driver/main.c wires up the entry point,
   │  vbrecomp runtime│   interrupt handlers, and the frame loop, then
   │  (src/, include/)│   links the generated C against the runtime:
   └──────────────────┘     CPU · VIP · VSU · timers · input · SDL2
@@ -59,8 +69,12 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 ## Status
 
 - **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
-- **66 / 76 games render on screen** and **41 are advancing** (the frame changes between samples, i.e. the game is running) through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Five of the 10 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, plus Capitan Sevilla 3D and Null Pointer Mockup. That was re-verified on the Mednafen VB core at 1800 frames with the survey's own buttons held: none of the five ever puts a pixel in the framebuffer, and the Snowball Wars demos never load a character byte at all. **So the honest denominator is 71, not 76** -- five of these ROMs cannot render on any emulator.
+- **66 / 76 games render on screen** -- **36 still reaching new state** at frame 900 and 30 that drew once and froze -- through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Five of the 10 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, plus Capitan Sevilla 3D and Null Pointer Mockup. That was re-verified on the Mednafen VB core at 1800 frames with the survey's own buttons held: none of the five ever puts a pixel in the framebuffer, and the Snowball Wars demos never load a character byte at all. **So the honest denominator is 71, not 76** -- five of these ROMs cannot render on any emulator.
 - Getting there took repeated passes of the same loop: find a shared correctness bug, fix it once, measure the whole corpus. Recent ones:
+  - **A function was made out of a call's arguments.** The V810 long-call idiom passes arguments *inline*, in the bytes after the `jal`; the callee reads them through `r31` and returns past them. Those argument bytes had a function made out of them and were decoded as code -- and in Galactic Pinball the first halfword, `0x9800`, decodes as `bp .`, a branch to itself that the caller fell into and spun in for the whole run. The idiom is now detected from the `add N, r31` before `jmp [r31]`, and a split point must be a real instruction boundary. Galactic Pinball went from 1,232 to 9,442 non-zero character writes and from blank to drawing.
+  - **The pad only updated when a game asked for it.** `SDLR`/`SDHR` returned a snapshot refreshed only on an `SCR_START` write, but the VB can also read the pad itself -- so a game relying on that saw zero buttons forever. Jack Bros stores the *rising edges* of the pad as its kernel's task-dispatch flags, so a pad frozen at zero has no edges: its scheduler ran 3 times in 700 frames and every task that loads graphics never ran.
+  - **A `jmp` after a PC-capture long call is not the end of the flow.** `jal .+4` / `add N, r31` / `jmp [rX]` returns to the address `r31` now holds, but the trace stopped at the `jmp`, so function epilogues after it were emitted *nowhere* -- every virtual call in SPONG returned into a hole.
+  - **Careful with pacing when measuring control flow.** A frame is a count of `vb_interrupt_check()` calls and that is emitted at every function entry, so a change to how the ROM is carved into functions changes the frame rate. One change looked like it destroyed Elevated Speed (231,461 non-zero character writes down to 7,667) and at a higher tick count produces 221,142 -- nothing was miscompiled. Measure at more than one tick count before calling a regression.
   - **The column table was mapped onto the world attributes.** `0x3DC00-0x3DFFF` is the VIP's per-column brightness ramp, not a mirror of `0x3D800`, so every game that wrote one wiped all 32 worlds with it. StarFox had loaded 7,350 CHR bytes and set up a 380x224 world, then read it back as `GX=254 GY=254` -- 254 being `0x00FE`, the column value landing on top of it.
   - **The VIP's VER register reads back 2, and games test it.** Hyper Fighting (Beta) spun on `andi 0x0002` of `0x0005F844` forever -- 14.4 million CHR writes in 400 frames -- because an unimplemented register returned 0. VIP registers also mirror every 0x80 bytes, which we were not decoding.
   - **`jmp [r31]` after a stack switch is a context resume, not a return.** Ordinary code only adds to `r3`; replacing it wholesale from memory is either a task switch or a save/restore pair, told apart by whether a matching `st.w r3` exists. Jack Bros' cooperative scheduler resumes tasks this way and we were emitting a plain return, so its tasks were created and never ran.
@@ -82,6 +96,9 @@ Full per-game state: [`COMPATIBILITY.md`](COMPATIBILITY.md). What each non-rende
 
 ## Building & running
 
+**Start here: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** walks the whole path from
+"I have a ROM" to reproducing every number in this repository.
+
 Requires CMake, a C/C++ compiler (MSVC on Windows), and SDL2 (via vcpkg).
 
 ```powershell
@@ -94,8 +111,12 @@ cmake -S . -B build -T host=x64 -DSDL2_DIR="C:/vcpkg/installed/x64-windows/share
 # Build the recompiler + runtime + all games
 cmake --build build --config Release
 
-# Run a game (ROMs are not shipped — supply your own .vb)
-./build/games/Release/galacticpinball.exe "path/to/Galactic Pinball.vb"
+# Recompile one ROM and run it through the generic driver
+#   (ROMs are not shipped -- supply your own .vb)
+./build/Release/v810recomp.exe "roms/Vertical Force (USA).vb" corpus/Vertical_Force_USA
+cmake -S . -B build_all -T host=x64 -DVBRECOMP_CORPUS_DIR="$PWD/corpus"
+cmake --build build_all --config Release --target corpus_Vertical_Force_USA
+./build_all/games/Release/corpus_Vertical_Force_USA.exe "roms/Vertical Force (USA).vb"
 ```
 
 Recompile a ROM yourself:
@@ -128,9 +149,12 @@ Each case is a V810 encoding written down in the tool, assembled into a syntheti
 include/vbrecomp/   public runtime API (cpu, mem, vip, vsu, timer, gamepad, ...)
 src/                runtime implementation + SDL2 platform + ImGui menu
 tools/v810recomp/   the static recompiler (decode, analyze, emit)
-games/<name>/       per-game: generated/ C, src/main.c glue, hints, screenshots
-scripts/            extract_roms.ps1, sweep.ps1
-docs/               architecture & recompiler internals
+games/driver/       the generic driver -- boots any recompiled ROM, no game-specific code
+games/hints/        committed per-game profile-guided entry points
+games/<name>/       five older titles with hand-written boot glue (generated C is NOT committed)
+scripts/            corpus sweep, build, survey, regression panel, hardware comparison
+docs/               getting started, architecture, recompiler internals, render triage
+THIRD_PARTY.md      what is vendored, and what is NOT ours to license
 COMPATIBILITY.md    living per-game status
 STATUS.md           auto-generated compile matrix (from sweep.ps1)
 ```
@@ -139,6 +163,8 @@ STATUS.md           auto-generated compile matrix (from sweep.ps1)
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Virtual Boy hardware, memory map, the VIP renderer, validated technical fixes.
 - [`docs/RECOMPILER.md`](docs/RECOMPILER.md) — how `v810recomp` works, the hints format, the readability design, the corpus workflow, and Ghidra cross-validation.
+- [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) — ROM in, recompiled game out, and how to reproduce the corpus numbers.
+- [`docs/RENDER_TRIAGE.md`](docs/RENDER_TRIAGE.md) — every measured finding, including the changes that were reverted and why.
 
 ## Credits & dependencies
 
@@ -150,4 +176,16 @@ STATUS.md           auto-generated compile matrix (from sweep.ps1)
 
 ## License
 
-MIT — do whatever you want with it.
+MIT — see [LICENSE](LICENSE). Every file we wrote carries an SPDX tag.
+
+Two things here are **not** MIT and are covered in [THIRD_PARTY.md](THIRD_PARTY.md):
+
+- **Recompiled ROM code is a derived work of the ROM.** `v810recomp` output is a machine
+  translation of copyrighted game code, so it is never committed — `corpus/` and
+  `games/*/generated/` are gitignored, and both regenerate from a ROM in one command.
+  No ROMs are included either; supply your own dumps of cartridges you own.
+- **Vendored libraries.** Dear ImGui (MIT, © Omar Cornut) and Sean Barrett's stb headers
+  (public domain / MIT). SDL2 is found at build time, not redistributed.
+
+The screenshots in `docs/screenshots/` are there to document the state of the work, not to
+claim ownership of anything in them; all games and trademarks belong to their owners.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Cross-validate v810recomp's function discovery against an independent Ghidra
 # analysis using the V810 processor module (github.com/20Enderdude20/Ghidra_v810_v830).
 #

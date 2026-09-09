@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- Dump the reference's WRAM at a chosen frame, for diffing against ours.
 --
 -- Knowing a game loads character data by frame N on hardware says WHEN we

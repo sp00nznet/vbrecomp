@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- Where is the reference executing, and what has it put in WRAM?
 --
 -- vbrecomp runs Jack Bros in a six-subroutine loop around 0x07F006CA-0x07F0091C

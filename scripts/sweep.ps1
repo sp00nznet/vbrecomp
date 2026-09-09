@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Broad corpus sweep: for every ROM in roms/, run v810recomp to generate C,
 # then syntax-check the generated C with MSVC (/Zs, no link). Produces a
 # STATUS.md matrix and corpus_results.json.

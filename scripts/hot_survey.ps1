@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Survey the hot read addresses across many blank games to find the next common
 # boot blocker. Runs each built corpus exe briefly with the heartbeat/tracer on,
 # extracts the busiest non-WRAM (register) read, and tallies them.
