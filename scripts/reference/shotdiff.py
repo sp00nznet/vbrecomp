@@ -18,8 +18,12 @@ The two emulators tint the display differently -- ours red, BizHawk whatever its
 VB palette is set to -- so colour is ignored. Both quantise to the Virtual Boy's
 four shades, which is what is compared: `shade` is the fraction of pixels on a
 different shade, `lit` the fraction where one is black and the other is not.
-`lit` is the number that finds real defects; a whole-screen brightness
-difference moves `shade` and leaves `lit` alone.
+**Only `lit` is comparable.** The two emulators do not share an intensity
+curve -- BizHawk renders the same shade noticeably brighter -- so `shade` carries
+a constant offset between them and is useful only for spotting a game whose
+shades move relative to its OWN other frames. Chasing it as an absolute number
+leads nowhere: Mario Kart Virtual Cup sits at 40% shade difference against
+hardware while being the same picture.
 
 Reference shots are cached in corpus/_ref/ -- delete one to re-capture.
 """
@@ -30,11 +34,10 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REF_DIR = os.path.join(ROOT, "corpus", "_ref")
 BIZHAWK = os.environ.get("BIZHAWK", r"G:\recomp\snes\bizhawk\EmuHawk.exe")
-REF_FRAMES = [400, 900, 1800, 3600]   # one BizHawk launch each; see shot.lua
-# Four, spread wide, because we usually run AHEAD of hardware: our frame is a
-# budget of interrupt checks, not 1/50s. BLOX is on its title screen at our
-# frame 900 and still on the warning screen at hardware frame 400 -- scored
-# 73.8% different, all of it drift. Give hardware room to catch up.
+REF_FRAMES = [900, 2400]   # one BizHawk launch each; see shot.lua
+# Two points, spread wide. With input actually reaching the pad (see
+# padprobe.lua) hardware advances much as we do, but the clocks still differ:
+# ours is a budget of interrupt checks, not 1/50s.
 OUR_FRAMES = [300, 600, 900]   # what render_survey.ps1 leaves behind
 
 
