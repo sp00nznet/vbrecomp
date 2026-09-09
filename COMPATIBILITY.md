@@ -14,12 +14,12 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Put something on screen | **66 / 76** |
 | ... still reaching new state at frame 900 | **36** |
 | ... drew once and froze | **30** |
-| Blank | **10** (5 blank on real hardware too, so **5** are ours) |
+| Blank | **10** (3 blank on real hardware too, so **7** are ours) |
 
-Five ROMs draw nothing on the reference emulator either -- verified on
+Three ROMs draw nothing on the reference emulator either -- verified on
 BizHawk's Mednafen VB core at 1800 frames with the same buttons held, where
-none reaches the framebuffer and three never load a character byte. So the
-achievable denominator is **71**, not 76.
+they never load a single character byte, let alone draw one. So the
+achievable denominator is **73**, not 76.
 
 Every one of these numbers is regenerated from a run, not hand-maintained:
 `scripts/sweep.ps1` -> `scripts/build_all.ps1` -> `scripts/render_survey.ps1` -> this file.
@@ -80,7 +80,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | BLOX (World) (v1.1) (Aftermarket) (Homebrew) | 1024 | 109 | yes | yes | yes | yes | advancing | - |  |
 | BLOX 2 (World) (En,Fr,De,Es,It,Sv,Fi,Cs,Sl) (Aftermarket) (Homebrew) | 2048 | 137 | yes | yes | yes | yes | frozen | - |  |
 | Capitan Sevilla 2 (World) (Es) (Aftermarket) (Homebrew) | 1024 | 52 | yes | yes | yes | yes | advancing | - |  |
-| Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 238 | yes | yes | - | no | blank (hw) | - | Blank on real hardware too -- not ours |
+| Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 238 | yes | yes | - | no | blank | - |  |
 | Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 66 | yes | yes | yes | yes | advancing | - |  |
 | Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 66 | yes | yes | yes | yes | advancing | - |  |
 | Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 22 | yes | yes | yes | yes | frozen | - |  |
@@ -98,7 +98,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Mario Combat (World) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | yes | yes | frozen | - |  |
 | Mario Kart - Virtual Cup (World) (Aftermarket) (Homebrew) | 1024 | 49 | yes | yes | yes | yes | advancing | - |  |
 | Mario VB (World) (Aftermarket) (Homebrew) | 512 | 538 | yes | yes | yes | yes | advancing | - |  |
-| Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew) | 512 | 1153 | yes | yes | - | no | blank (hw) | - | Blank on real hardware too -- not ours |
+| Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew) | 512 | 1153 | yes | yes | - | no | blank | - |  |
 | Red Square (World) (Aftermarket) (Homebrew) | 512 | 54 | yes | yes | yes | yes | advancing | - |  |
 | Snatcher (World) (Demo) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | yes | yes | frozen | - |  |
 | Snowball Wars (World) (Demo 1) (Aftermarket) (Homebrew) | 256 | 406 | yes | yes | - | no | blank (hw) | - | Blank on real hardware too -- not ours |
