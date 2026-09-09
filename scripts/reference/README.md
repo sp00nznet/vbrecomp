@@ -1,3 +1,39 @@
+## shotdiff.py -- is what we draw RIGHT?
+
+```
+python scripts/reference/shotdiff.py                     # every rendering game
+python scripts/reference/shotdiff.py Bound_High_Japan_En_Proto
+```
+
+Every other check here compares numbers. Once games actually draw, the question
+changes from "did anything appear" to "is it correct", and the only honest
+oracle for that is the reference emulator's own picture. This boots BizHawk to a
+couple of frame points, screenshots each, and compares against the shots
+`render_survey.ps1` already leaves in `corpus/_timeline/`.
+
+Two columns: **lit** is the fraction of pixels where one side is black and the
+other is not, **shade** the fraction on a different one of the VB's four shades.
+`lit` is what finds real defects; a whole-screen brightness difference moves
+`shade` and leaves `lit` alone. Hue is ignored -- we tint red, BizHawk tints
+whatever its VB palette is set to.
+
+### Compare the best pairing, never a fixed frame
+
+The two emulators do not share a clock: a "frame" here is a budget of interrupt
+checks. Bound High is on its title screen at our frame 900 and still on the
+warning screen at hardware frame 400, which scored it **37% different** -- all
+of it drift, none of it rendering. Against the best pairing of both sides'
+frames it is **0.0%**: pixel-perfect. Always read the best match, and treat a
+fixed-frame comparison as measuring timing.
+
+### One screenshot per BizHawk launch
+
+`client.screenshot()` is deferred. Taking several shots in one run writes the
+*final* framebuffer to every path, producing byte-identical files that look
+exactly like a settled screen and are not. `shot.lua` takes one frame per launch
+and `shotdiff.py` launches it once per frame point. Reference shots are cached
+in `corpus/_ref/`; delete one to re-capture.
+
 ## compare.ps1 -- the whole procedure in one command
 
 ```powershell
