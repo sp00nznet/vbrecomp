@@ -486,42 +486,22 @@ static inline uint16_t vram_read16(uint32_t addr) {
  * Each row has 8 pixels × 2 bits = 16 bits.
  */
 static inline uint8_t chr_get_pixel(int chr_index, int px, int py) {
-    /* With CHR write mirrors disabled, 4 separate segments exist.
-     * Try the exact segment for the index. If it's empty (row=0),
-     * try the mirrored segment as fallback. */
+    /* Character memory is four 8 KB segments interleaved with the frame
+     * buffers, 512 characters each, and index 0-2047 runs straight through
+     * them. A row that reads as zero is a BLANK ROW -- that is what an empty
+     * part of a tile looks like, and it is most of any tile set.
+     *
+     * There used to be a fallback here: when a row read 0, re-read the same
+     * index from a different segment and use that instead. It substituted one
+     * game's tiles into another tile's empty space, which is what put the
+     * field of garbage blocks behind Bound High's logo, over Virtual League
+     * Baseball's title art and around Vertical Force's. Blank means blank. */
     uint32_t chr_base;
-    if (chr_index < 0x200) {
-        chr_base = 0x06000 + chr_index * 16;
-    } else if (chr_index < 0x400) {
-        chr_base = 0x0E000 + (chr_index - 0x200) * 16;
-    } else if (chr_index < 0x600) {
-        chr_base = 0x16000 + (chr_index - 0x400) * 16;
-    } else {
-        chr_base = 0x1E000 + (chr_index - 0x600) * 16;
-    }
+    if      (chr_index < 0x200) chr_base = 0x06000 +  chr_index          * 16;
+    else if (chr_index < 0x400) chr_base = 0x0E000 + (chr_index - 0x200) * 16;
+    else if (chr_index < 0x600) chr_base = 0x16000 + (chr_index - 0x400) * 16;
+    else                        chr_base = 0x1E000 + (chr_index - 0x600) * 16;
     uint16_t row_data = vram_read16(chr_base + py * 2);
-    /* If this segment is empty, try the mirrored segment */
-    if (row_data == 0 && chr_index >= 0x400) {
-        uint32_t mirror_base;
-        int mi = chr_index - 0x400; /* 0-1023 in the mirror */
-        if (mi < 0x200) {
-            mirror_base = 0x06000 + mi * 16;
-        } else {
-            mirror_base = 0x0E000 + (mi - 0x200) * 16;
-        }
-        row_data = vram_read16(mirror_base + py * 2);
-    } else if (row_data == 0 && chr_index < 0x400) {
-        /* Try CHR 2/3 as fallback for indices 0-1023 */
-        uint32_t mirror_base;
-        int mi = chr_index + 0x400;
-        if (mi < 0x600) {
-            mirror_base = 0x16000 + (mi - 0x400) * 16;
-        } else {
-            mirror_base = 0x1E000 + (mi - 0x600) * 16;
-        }
-        uint16_t alt = vram_read16(mirror_base + py * 2);
-        if (alt != 0) row_data = alt;
-    }
     return (row_data >> (px * 2)) & 0x03;
 }
 
