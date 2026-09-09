@@ -10,7 +10,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 
 | Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Playable | Notes |
 |------|----|-------|------------|----------|-------|---------|----------|-------|
-| 3-D Tetris (USA) | 1024 | 818 | yes | yes | - | no | - |  |
+| 3-D Tetris (USA) | 1024 | 818 | yes | yes | yes | yes | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 55 | yes | yes | yes | wip | no | First pixels on screen; boots through 4-state dispatch, settles ~frame 527 |
 | Golf (USA) | 2048 | 99 | yes | yes | yes | yes | - |  |
 | Insmouth no Yakata (Japan) | 1024 | 238 | yes | yes | yes | yes | - |  |
@@ -23,7 +23,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Red Alarm (Japan) | 1024 | 382 | yes | yes | yes | yes | - |  |
 | Red Alarm (USA) | 1024 | 382 | yes | yes | yes | wip | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 324 | yes | yes | yes | yes | - |  |
-| Space Invaders - Virtual Collection (Japan) | 512 | 71 | yes | yes | - | no | - |  |
+| Space Invaders - Virtual Collection (Japan) | 512 | 71 | yes | yes | yes | yes | - |  |
 | Space Squash (Japan) | 512 | 185 | yes | yes | yes | yes | - |  |
 | T&E Virtual Golf (Japan) | 2048 | 100 | yes | yes | yes | yes | - |  |
 | Teleroboxer (Japan, USA) (En) | 1024 | 748 | yes | yes | yes | yes | - |  |
@@ -64,24 +64,24 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 238 | yes | yes | - | no | - |  |
 | Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 66 | yes | yes | yes | yes | - |  |
 | Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 66 | yes | yes | yes | yes | - |  |
-| Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 22 | yes | yes | - | no | - |  |
+| Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 22 | yes | yes | yes | yes | - |  |
 | Fishbone (World) (Demo 1) (Aftermarket) (Homebrew) | 2048 | 48 | yes | yes | yes | yes | - |  |
 | Fishbone (World) (Demo 2) (Aftermarket) (Homebrew) | 2048 | 111 | yes | yes | yes | yes | - |  |
 | Fishbone (World) (Demo 3) (Aftermarket) (Homebrew) | 2048 | 120 | yes | yes | yes | yes | - |  |
 | Formula V (World) (Demo) (Emulator Version) (Aftermarket) (Homebrew) | 4096 | 183 | yes | yes | - | no | - |  |
-| Formula V (World) (Demo) (Hardware Version) (Aftermarket) (Homebrew) | 4096 | 252 | yes | yes | - | no | - |  |
+| Formula V (World) (Demo) (Hardware Version) (Aftermarket) (Homebrew) | 4096 | 252 | yes | yes | yes | yes | - |  |
 | Hamburgers En Route to Switzerland (World) (Aftermarket) (Homebrew) | 512 | 48 | yes | yes | yes | yes | - |  |
 | Hamburgers En Route to Switzerland (World) (Demo 1) (Aftermarket) (Homebrew) | 256 | 28 | yes | yes | yes | yes | - |  |
 | Hamburgers En Route to Switzerland (World) (Demo 2) (Aftermarket) (Homebrew) | 512 | 36 | yes | yes | yes | yes | - |  |
-| Hyper Fighting (World) (Aftermarket) (Homebrew) | 4096 | 16 | yes | yes | - | no | - |  |
-| Hyper Fighting (World) (Beta) (Aftermarket) (Homebrew) | 2048 | 17 | yes | yes | - | no | - |  |
+| Hyper Fighting (World) (Aftermarket) (Homebrew) | 4096 | 16 | yes | yes | yes | yes | - |  |
+| Hyper Fighting (World) (Beta) (Aftermarket) (Homebrew) | 2048 | 17 | yes | yes | yes | yes | - |  |
 | Insecticide (World) (Aftermarket) (Homebrew) | 2048 | 68 | yes | yes | yes | yes | - |  |
-| Mario Combat (World) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | - | no | - |  |
+| Mario Combat (World) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | yes | yes | - |  |
 | Mario Kart - Virtual Cup (World) (Aftermarket) (Homebrew) | 1024 | 49 | yes | yes | yes | yes | - |  |
 | Mario VB (World) (Aftermarket) (Homebrew) | 512 | 538 | yes | yes | yes | yes | - |  |
 | Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew) | 512 | 1153 | yes | yes | - | no | - |  |
 | Red Square (World) (Aftermarket) (Homebrew) | 512 | 54 | yes | yes | yes | yes | - |  |
-| Snatcher (World) (Demo) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | - | no | - |  |
+| Snatcher (World) (Demo) (Aftermarket) (Homebrew) | 2048 | 19 | yes | yes | yes | yes | - |  |
 | Snowball Wars (World) (Demo 1) (Aftermarket) (Homebrew) | 256 | 406 | yes | yes | - | no | - |  |
 | Snowball Wars (World) (Demo 2) (Aftermarket) (Homebrew) | 1024 | 443 | yes | yes | - | no | - |  |
 | Snowball Wars (World) (Demo 3) (Aftermarket) (Homebrew) | 1024 | 447 | yes | yes | - | no | - |  |
@@ -93,7 +93,7 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Soviet Union 2011 (World) (v1.1) (Aftermarket) (Homebrew) | 2048 | 123 | yes | yes | yes | yes | - |  |
 | Soviet Union 2011 (World) (v1.2) (Aftermarket) (Homebrew) | 2048 | 131 | yes | yes | yes | yes | - |  |
 | SPONG (World) (En,Fr,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 173 | yes | yes | - | no | - |  |
-| StarFox (World) (Demo) (Aftermarket) (Homebrew) | 128 | 17 | yes | yes | - | no | - |  |
+| StarFox (World) (Demo) (Aftermarket) (Homebrew) | 128 | 17 | yes | yes | yes | yes | - |  |
 | Tron VB (World) (Demo) (Aftermarket) (Homebrew) | 64 | 33 | yes | yes | yes | yes | - |  |
 | VUEngine Platformer (World) (En,Fr,De,Es-ES) (Demo) (Aftermarket) (Homebrew) | 2048 | 200 | yes | yes | - | no | - |  |
 
