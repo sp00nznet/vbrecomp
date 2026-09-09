@@ -35,7 +35,14 @@ static inline int is_chr_off(uint32_t o) {
     return (o >= 0x06000 && o < 0x08000) || (o >= 0x0E000 && o < 0x10000) ||
            (o >= 0x16000 && o < 0x18000) || (o >= 0x1E000 && o < 0x20000);
 }
+/* Which of the two frame buffers the game most recently wrote. Double
+ * buffering means the one being DRAWN is not the one being DISPLAYED, so this
+ * says which to leave alone. */
+static int g_fb_drawing = -1;
+
 static inline void track_vram_write(uint32_t mapped, uint32_t val) {
+    if (mapped < 0x20000 && !is_chr_off(mapped))
+        g_fb_drawing = (mapped & 0x08000) ? 1 : 0;
     if (is_chr_off(mapped)) {
         g_chr_any++;
         if (val) { g_chr_writes++;
@@ -607,7 +614,22 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             if (vram_read16(fb0_base + i)) fb0_count++;
             if (vram_read16(fb1_base + i)) fb1_count++;
         }
+        /* Show the buffer the game most recently WROTE.
+         *
+         * This used to pick whichever held more data, which is backwards for
+         * the common case: a game that clears a buffer to solid and then carves
+         * geometry out of it looks FULLEST exactly while it is half-drawn. That
+         * is why Ballface's perspective corridor rendered as one solid block --
+         * we were displaying its scratch buffer. Falls back to the old count
+         * heuristic until the game has written a frame buffer at all.
+         *
+         * VBRECOMP_FB=0|1 forces the choice, for checking exactly this. */
         uint32_t fb_base = (fb1_count > fb0_count) ? fb1_base : fb0_base;
+        if (g_fb_drawing >= 0) fb_base = g_fb_drawing ? fb1_base : fb0_base;
+        { static int force = -2;
+          if (force == -2) { const char *e = getenv("VBRECOMP_FB"); force = e ? atoi(e) : -1; }
+          if (force == 0) fb_base = fb0_base;
+          else if (force == 1) fb_base = fb1_base; }
         /* Intensity LUT: 2-bit pixel → 8-bit red intensity */
         static const uint8_t fb_lut[4] = {0, 85, 170, 255};
 
@@ -616,13 +638,15 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             for (int row_grp = 0; row_grp < 28; row_grp++) {
                 uint16_t hw = vram_read16(col_base + row_grp * 2);
                 if (hw == 0) continue; /* skip empty */
-                /* VB framebuffer is planar:
-                 * Low byte (bits 0-7): bit 0 of pixels 0-7
-                 * High byte (bits 8-15): bit 1 of pixels 0-7 */
-                uint8_t lo = hw & 0xFF;
-                uint8_t hi = (hw >> 8) & 0xFF;
+                /* The frame buffer is PACKED 2bpp, not planar: one halfword is
+                 * 8 vertical pixels, each two adjacent bits, exactly like a
+                 * character row -- and chr_get_pixel() in this same file has
+                 * always decoded it that way. Reading it as bit planes (low
+                 * byte = bit 0 of eight pixels, high byte = bit 1) scatters
+                 * every pixel of a directly-drawn screen: Galactic Pinball's
+                 * warning text came out as vertical strips of confetti. */
                 for (int bit = 0; bit < 8; bit++) {
-                    int pixel = ((hi >> bit) & 1) << 1 | ((lo >> bit) & 1);
+                    int pixel = (hw >> (bit * 2)) & 0x03;
                     if (pixel == 0) continue; /* transparent */
                     int row = row_grp * 8 + bit;
                     if (row < 224) {
