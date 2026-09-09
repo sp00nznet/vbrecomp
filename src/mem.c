@@ -88,7 +88,7 @@ static int wwatch_on = -1;
 static uint32_t wwatch_lr[256], wwatch_lr_cnt[256];
 static uint32_t wwatch_hits;
 
-static inline void wwatch_track(uint32_t addr) {
+static inline void wwatch_track_v(uint32_t addr, uint32_t val) {
     if (wwatch_on < 0) {
         const char *w = getenv("VBRECOMP_WWATCH");
         wwatch_on = (w && w[0]);
@@ -96,6 +96,11 @@ static inline void wwatch_track(uint32_t addr) {
     }
     if (!wwatch_on || addr != wwatch_addr) return;
     wwatch_hits++;
+    /* The LR tally says WHO writes; for a slot that ends up wrong the VALUE
+     * and the order matter just as much, so show the first few. */
+    if (wwatch_hits <= 8)
+        fprintf(stderr, "  wwatch %08X = %08X from LR=%08X (#%u)\n",
+                addr, val, vb_cpu.r[31], wwatch_hits);
     uint32_t lr = vb_cpu.r[31];
     uint32_t h = (lr * 2654435761u) & 255u;
     for (uint32_t i = 0; i < 256; i++) {
@@ -295,7 +300,7 @@ uint32_t vb_mem_read32(vb_addr_t addr) {
 }
 
 void vb_mem_write8(vb_addr_t addr, uint8_t val) {
-    wwatch_track(addr);
+    wwatch_track_v(addr, (uint32_t)val);
     switch (REGION(addr)) {
     case 0: vb_vip_write8(addr & 0x00FFFFFF, val); break;
     case 1: vb_vsu_write8(addr & 0x00FFFFFF, val); break;
@@ -307,7 +312,7 @@ void vb_mem_write8(vb_addr_t addr, uint8_t val) {
 }
 
 void vb_mem_write16(vb_addr_t addr, uint16_t val) {
-    wwatch_track(addr);
+    wwatch_track_v(addr, (uint32_t)val);
     switch (REGION(addr)) {
     case 0: vb_vip_write16(addr & 0x00FFFFFF, val); break;
     case 5: {
@@ -330,7 +335,7 @@ void vb_mem_write16(vb_addr_t addr, uint16_t val) {
 }
 
 void vb_mem_write32(vb_addr_t addr, uint32_t val) {
-    wwatch_track(addr);
+    wwatch_track_v(addr, (uint32_t)val);
     switch (REGION(addr)) {
     case 0: vb_vip_write32(addr & 0x00FFFFFF, val); break;
     case 5: {
