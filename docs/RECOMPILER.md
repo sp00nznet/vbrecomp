@@ -11,13 +11,61 @@
 
 ## Control-flow translation
 
-- **JAL** → `vb_cpu.r[31] = <return>; vb_func_<target>();`
-- **JR / Bcond** within the function → `goto label_<addr>;`
-- **JR / Bcond** to another function → tail call `vb_func_<target>(); return;`
-- **JMP [reg]** resolved to a known function → tail call.
-- **JMP [reg]** resolved to an intra-function label → `goto`.
+A guest routine becomes one C function, but guest control flow is not a call
+tree: a main loop is a **cycle**, and a state handler ends by jumping back to
+its dispatcher. Translating that as a call is unbounded recursion; translating
+it as a return drops the loop after one state. So the model splits in two:
+
+- **`jal` is the only call.** `VB_CALL(vb_func_<target>, <addr>)` — records the
+  frame, runs the callee, then drains (below).
+- **Everything else is a transfer.** `VB_JUMP(<addr>)` parks the target in
+  `vb_recomp_tail_target` and returns; the parked target is dispatched by the
+  **drain** at every call site, so a chain of transfers runs iteratively at a
+  flat C stack depth instead of nesting. A drained target is dispatched without
+  raising the call depth, because it was jumped to, not called — otherwise its
+  own `jmp [r31]` reads as a return and the chain unwinds early.
+
+Within those two:
+
+- **JR / Bcond** inside the function → `goto label_<addr>;`
+- **JR / Bcond** out of the function → `VB_JUMP(<addr>);`
+- **`jmp [reg]`** resolved by constant propagation → `goto` for a local label,
+  `VB_JUMP` otherwise.
+- **`jmp [r31]`** → `VB_RET()`, which is a return only while a `jal` frame is
+  open; a function entered by a transfer has no caller, so at depth 0 its r31
+  holds a continuation and the instruction is a jump.
 - **Jump tables** → `switch` over the register, one `case` per entry.
-- **Unresolved `jmp [reg]`** → dispatched at run time through a generated function table (`vb_recomp_call(addr)`): a sorted `addr -> vb_func_*` array at the bottom of `recomp_funcs.c`, looked up by the register's value. This makes indirect jumps/dispatch work for any target that was emitted as a function, without needing static resolution (the N64Recomp model). Targets not in the table are a no-op (the routine to emit them is the coverage frontier).
+- **Unresolved `jmp [reg]`** → dispatched at run time through a sorted
+  `addr -> vb_func_*` table at the bottom of `recomp_funcs.c`.
+
+### Transfers into the middle of a function
+
+An exact table match only finds function *heads*, and most of what a game
+computes at run time is an address inside one. Those used to be dropped — Mario
+Clash discards 128,699 of them in a 600-frame run, all four hot targets interior
+to a known function. On a table miss the dispatcher now parks the address in
+`vb_recomp_entry` and calls the enclosing function, whose **entry dispatch** (a
+`switch` at the bottom over the labels it actually declared) turns it into a
+`goto`. The switch is the range check: an address that is not one of its labels
+still falls through to being counted, exactly as before.
+
+Two things this must not do, both learned by breaking them:
+
+- The parked entry is consumed **before** `vb_interrupt_check()`, which can run
+  a whole interrupt handler whose functions would otherwise see and discard it.
+- It never routes while `PSW.EP` is set. Diverting a handler mid-flight abandons
+  its C frame, so it never reaches `RETI` and `EP` then blocks every later
+  interrupt.
+
+### Function boundaries
+
+A branch into the middle of an existing function **splits** it, so the target
+can be its own entry. A split point must be a real instruction boundary: the
+analyzer walks the function to check, stepping over inline call arguments on the
+way. Cutting inside those arguments makes a function out of data — in Galactic
+Pinball the first halfword of one such argument block, `0x9800`, decodes as
+`bp .`, a branch to itself that the preceding function fell into and spun in for
+the whole run.
 
 ### Resolved-jump targets become functions
 
@@ -42,7 +90,13 @@ Some control flow can't be resolved statically (function pointers stored in WRAM
 | `entry <addr>` | Add a function entry point the static analyzer can't reach. |
 | `skip <target> <bytes>` | `<target>` is an "inline-data-after-JAL" helper that consumes `<bytes>` of data immediately following each call site; don't decode those bytes as code. |
 
-Example (Galactic Pinball): `vb_func_07F417B8` is a graphics decompressor whose JAL is followed by 8 bytes (src + dst pointers) at 31 call sites — handled with `skip 07F417B8 8`.
+**`skip` is now detected automatically** and rarely needs writing down. The
+long-call idiom reads its arguments inline through r31 and returns past them,
+so the `add N, r31` immediately before `jmp [r31]` names the argument size
+exactly; a scan over `jal` targets registers them before analysis, because the
+trace needs the amount while walking the *callers*. Galactic Pinball's
+`vb_func_07F417B8` — 8 bytes of source/destination pointers after each call —
+was the case that motivated the hint and is now found without one.
 
 ## The corpus workflow
 

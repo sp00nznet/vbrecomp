@@ -2,7 +2,6 @@
 
 **Static recompilation of Galactic Pinball (Virtual Boy, 1995)**
 
-![First pixels](screenshots/first_pixels.png)
 
 A launch title pinball game with four themed tables, scrolling space backdrops, and one of the better soundtracks on the system. Galactic Pinball leans heavily on the Virtual Boy's parallax depth, affine background transforms, and the VSU (sound unit) — a different stress profile than the project's other targets.
 
@@ -87,3 +86,8 @@ You'll need the original ROM file (`Galactic Pinball (Japan, USA).vb`) — not r
 ## License
 
 MIT
+
+> Screenshots for this game were removed: they were images of copyrighted game
+> output kept from an earlier stage of the work. A current, deliberately small
+> set lives in [`docs/screenshots/`](../../docs/screenshots) — see
+> [THIRD_PARTY.md](../../THIRD_PARTY.md).

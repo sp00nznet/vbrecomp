@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Generate COMPATIBILITY.md from the sweep's corpus/results.json plus a curated
 # runtime-status map (boots/renders/playable notes live here, in version
 # control, so the file is deterministic and re-generatable without losing
@@ -34,8 +35,37 @@ if (Test-Path $Survey) {
 $curated = @{
     "Mario's Tennis (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="wip"; note="Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering)" }
     "Red Alarm (USA)"                  = @{ boots="yes"; renders="wip"; playable="no";  note="Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate" }
-    "Galactic Pinball (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="no"; note="First pixels on screen; boots through 4-state dispatch, settles ~frame 527" }
+    "Galactic Pinball (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="no"; note="Renders since the inline-call-argument fix; world attributes now written, image still garbled" }
     "Mario Clash (Japan, USA) (En)"      = @{ boots="yes"; renders="wip"; playable="no"; note="Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames" }
+}
+
+# These five draw nothing on real hardware either, re-checked on BizHawk's
+# Mednafen VB core at 1800 frames with the same buttons held. They are not
+# failures of this project and are excluded from the achievable denominator.
+$hwBlank = @(
+    'Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew)',
+    'Null Pointer Mockup (World) (Demo) (Aftermarket) (Homebrew)',
+    'Snowball Wars (World) (Demo 1) (Aftermarket) (Homebrew)',
+    'Snowball Wars (World) (Demo 2) (Aftermarket) (Homebrew)',
+    'Snowball Wars (World) (Demo 3) (Aftermarket) (Homebrew)'
+)
+
+# Motion comes from the screenshots render_survey.ps1 leaves in
+# corpus/_timeline/<slug>/: identical samples mean the game drew once and
+# stopped, differing samples mean it is still reaching new state.
+$timeline = Join-Path (Split-Path $Results) '_timeline'
+function Motion($slug, $cat) {
+    if ($cat -ne 'RENDERS') { return 'blank' }
+    $dir = Join-Path $timeline $slug
+    if (-not (Test-Path $dir)) { return '-' }
+    $h = @{}
+    foreach ($n in 300,600,900) {
+        $f = Join-Path $dir ('f.png.{0:d4}.png' -f $n)
+        if (Test-Path $f) { $h[(Get-FileHash $f -Algorithm MD5).Hash] = $true }
+    }
+    if ($h.Count -eq 0) { return '-' }
+    if ($h.Count -eq 1) { return 'frozen' }
+    return 'advancing'
 }
 
 $rows = Get-Content $Results -Raw | ConvertFrom-Json
@@ -50,14 +80,48 @@ $order = @("Retail", "Proto / Demo", "Homebrew")
 $md = @()
 $md += "# Compatibility"
 $md += ""
-$md += "Living status of every ROM in the library. **Recompiles** = v810recomp emits C; **Compiles** = that C builds clean (MSVC ``/Zs``) - both columns come from ``scripts/sweep.ps1`` (see [STATUS.md](STATUS.md)). **Boots / Renders / Playable** are hand-tracked runtime status."
+$md += "Living status of every ROM in the library. **Recompiles** = v810recomp emits C; **Compiles** = that C builds clean (MSVC ``/Zs``) - both columns come from ``scripts/sweep.ps1`` (see [STATUS.md](STATUS.md)). **Boots / Renders / Motion** come from the headless survey (``scripts/render_survey.ps1``); **Playable** and the notes are hand-tracked. **Motion** is ``advancing`` when the frame still changes between samples at 300/600/900, ``frozen`` when the game drew once and stopped."
 $md += ""
 $md += "Status values: ``yes`` | ``wip`` (partial) | ``no`` | ``-`` (untested)."
 $md += ""
 
 $recOk = ($rows | Where-Object { $_.recomp -eq "ok" }).Count
 $ccOk  = ($rows | Where-Object { $_.compile -eq "ok" }).Count
-$md += "**$($rows.Count) ROMs - $recOk recompile, $ccOk compile clean.**"
+$renderCount = 0; $advCount = 0; $frozenCount = 0; $blankCount = 0
+foreach ($r in $rows) {
+    $sv = $surveyMap[$r.name]
+    $cat = "-"; if ($sv) { $cat = $sv.cat }
+    $slug = $r.slug
+    $m = Motion $slug $cat
+    switch ($m) {
+        "advancing" { $advCount++;    $renderCount++ }
+        "frozen"    { $frozenCount++; $renderCount++ }
+        "blank"     { $blankCount++ }
+    }
+}
+$ourBlank = $blankCount - $hwBlank.Count
+$ceiling  = $rows.Count - $hwBlank.Count
+
+$md += "## Where this has got to"
+$md += ""
+$md += "| | |"
+$md += "|---|---|"
+$md += "| ROMs in the library | **$($rows.Count)** |"
+$md += "| Recompile to C | **$recOk / $($rows.Count)** |"
+$md += "| That C compiles clean | **$ccOk / $($rows.Count)** |"
+$md += "| Put something on screen | **$renderCount / $($rows.Count)** |"
+$md += "| ... still reaching new state at frame 900 | **$advCount** |"
+$md += "| ... drew once and froze | **$frozenCount** |"
+$md += "| Blank | **$blankCount** ($($hwBlank.Count) blank on real hardware too, so **$ourBlank** are ours) |"
+$md += ""
+$md += "Five ROMs draw nothing on the reference emulator either -- verified on"
+$md += "BizHawk's Mednafen VB core at 1800 frames with the same buttons held, where"
+$md += "none reaches the framebuffer and three never load a character byte. So the"
+$md += "achievable denominator is **$ceiling**, not $($rows.Count)."
+$md += ""
+$md += "Every one of these numbers is regenerated from a run, not hand-maintained:"
+$md += "``scripts/sweep.ps1`` -> ``scripts/build_all.ps1`` -> ``scripts/render_survey.ps1`` -> this file."
+$md += "See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it."
 $md += ""
 
 foreach ($cat in $order) {
@@ -65,8 +129,8 @@ foreach ($cat in $order) {
     if ($catRows.Count -eq 0) { continue }
     $md += "## $cat ($($catRows.Count))"
     $md += ""
-    $md += "| Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Playable | Notes |"
-    $md += "|------|----|-------|------------|----------|-------|---------|----------|-------|"
+    $md += "| Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Motion | Playable | Notes |"
+    $md += "|------|----|-------|------------|----------|-------|---------|--------|----------|-------|"
     foreach ($r in $catRows) {
         $c = $curated[$r.name]
         # Auto-derive Boots/Renders from the headless render survey; curated
@@ -87,7 +151,12 @@ foreach ($cat in $order) {
         $note     = if ($c) { $c.note }     else { "" }
         $rec = if ($r.recomp -eq "ok")  { "yes" } else { "no" }
         $cc  = if ($r.compile -eq "ok") { "yes" } else { "no" }
-        $md += "| $($r.name) | $([int]($r.size/1024)) | $($r.funcs) | $rec | $cc | $boots | $renders | $playable | $note |"
+        $motion = Motion $r.slug $(if ($sv) { $sv.cat } else { "-" })
+        if ($hwBlank -contains $r.name) {
+            $motion = "blank (hw)"
+            if (-not $note) { $note = "Blank on real hardware too -- not ours" }
+        }
+        $md += "| $($r.name) | $([int]($r.size/1024)) | $($r.funcs) | $rec | $cc | $boots | $renders | $motion | $playable | $note |"
     }
     $md += ""
 }

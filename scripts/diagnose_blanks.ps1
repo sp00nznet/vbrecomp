@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Diagnose every game that draws nothing, and CLUSTER them by what they poll.
 #
 # Chasing these one at a time is archaeology; the point of doing all of them in

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- drawcheck.lua, but holding buttons the way the corpus survey does.
 --
 -- Two games (Capitan Sevilla 3D, Null Pointer Mockup) load character data on

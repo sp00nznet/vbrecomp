@@ -4,7 +4,6 @@
 
 The pack-in title that shipped with every Virtual Boy. Mario plays tennis. In red. In 3D. It was actually pretty fun — and it's the reason we're building [vbrecomp](https://github.com/sp00nznet/vbrecomp) in the first place.
 
-![Mario's Tennis title screen — SINGLES / DOUBLES menu](screenshots/title_screen.png)
 
 ## About the Game
 
@@ -23,9 +22,7 @@ The recompiled game boots and runs through multiple states:
 | Demo mode | AI plays a match after ~70s timeout | Runs — court and sprites visible |
 | Gameplay | Active match | Enters state, rendering WIP |
 
-![Tennis court with 3D perspective, net, and service lines](screenshots/court_perspective.png)
 
-![Mario character sprite on the court](screenshots/mario_on_court.png)
 
 ### What's Working
 
@@ -80,3 +77,8 @@ You'll need the original ROM file (`Mario's Tennis (Japan, USA).vb`) for the rec
 ## License
 
 MIT
+
+> Screenshots for this game were removed: they were images of copyrighted game
+> output kept from an earlier stage of the work. A current, deliberately small
+> set lives in [`docs/screenshots/`](../../docs/screenshots) — see
+> [THIRD_PARTY.md](../../THIRD_PARTY.md).

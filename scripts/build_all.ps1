@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Build EVERY recompiled ROM via the generic driver, boot each headless, and
 # capture where it gets to (+ a screenshot). Writes corpus/_shots/ and a report.
 #

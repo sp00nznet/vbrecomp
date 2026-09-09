@@ -1,4 +1,5 @@
-﻿# Survey every built corpus game's RENDER state, to find the next shared renderer
+﻿# SPDX-License-Identifier: MIT
+# Survey every built corpus game's RENDER state, to find the next shared renderer
 # bugs. For each game (heartbeat + periodic shots on), capture:
 #   - CHR loaded?           (VRAM-write stats: nonzero CHR writes)
 #   - worlds with content?  (render-chain: an enabled L/R world whose BGMap has cells)

@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- Does this game draw anything on REAL hardware in the window we sample?
 --
 -- vbrecomp calls 29 games blank. Some of that is ours to fix; some may be games

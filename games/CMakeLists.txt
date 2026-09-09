@@ -21,8 +21,21 @@ endfunction()
 # ROMs are not committed; pass the .vb path as argv[1] at run time, e.g.
 #   ./galacticpinball "../../roms/Galactic Pinball (Japan, USA) (En).vb"
 
+# NOTE: generated/recomp_funcs.c is NOT committed. It is a machine translation
+# of a copyrighted ROM -- a derived work of that ROM, not of this project, and
+# not ours to redistribute. Regenerate it before building these targets:
+#
+#   build/Release/v810recomp.exe "roms/<Game>.vb" games/<dir>/generated
+#
+# Each target below is skipped when its generated file is absent, so a fresh
+# clone configures and builds the library and tools without it.
 # vb_add_game(<target> <dir>) — register one game executable.
 function(vb_add_game target dir)
+    set(gen ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated/recomp_funcs.c)
+    if(NOT EXISTS ${gen})
+        message(STATUS "skipping ${target}: ${gen} not generated yet")
+        return()
+    endif()
     add_executable(${target}
         ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/src/main.c
         ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated/recomp_funcs.c
@@ -43,6 +56,11 @@ endfunction()
 # generic driver (games/driver/main.c) instead of a hand-written src/main.c.
 # Works for any game whose reset path enters an infinite main loop.
 function(vb_add_game_generic target dir)
+    set(gen ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated/recomp_funcs.c)
+    if(NOT EXISTS ${gen})
+        message(STATUS "skipping ${target}: ${gen} not generated yet")
+        return()
+    endif()
     add_executable(${target}
         ${CMAKE_CURRENT_SOURCE_DIR}/driver/main.c
         ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated/recomp_funcs.c

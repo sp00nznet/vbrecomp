@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Profile-guided function discovery.
 #
 # Static analysis cannot find a jump target the game computes at run time, so

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Diff a game's WRAM against real hardware, and say where it first diverges.
 #
 # This is the procedure that located Jack Bros' task table (its scheduler never

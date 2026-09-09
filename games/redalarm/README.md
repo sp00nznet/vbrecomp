@@ -6,9 +6,7 @@ A wireframe space combat game — Star Fox meets Battlezone, rendered entirely i
 
 This project uses [vbrecomp](https://github.com/sp00nznet/vbrecomp) to statically recompile Red Alarm into a native executable.
 
-![Red Alarm title screen](screenshots/title_screen.png)
 
-![Game view rendering](screenshots/game_view.png)
 
 ## Why Red Alarm?
 
@@ -76,3 +74,8 @@ You'll need the original ROM file (`Red Alarm (USA).vb`).
 ## License
 
 MIT
+
+> Screenshots for this game were removed: they were images of copyrighted game
+> output kept from an earlier stage of the work. A current, deliberately small
+> set lives in [`docs/screenshots/`](../../docs/screenshots) — see
+> [THIRD_PARTY.md](../../THIRD_PARTY.md).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Run-only probe: boot each already-built corpus exe at a higher frame budget
 # and record which ones draw visible output. Reuses build_all/ exes (no rebuild).
 param(

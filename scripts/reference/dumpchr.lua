@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 -- Dump the reference's CHR RAM at a chosen frame.
 --
 -- Knowing a game loads character data on hardware but not under vbrecomp says
