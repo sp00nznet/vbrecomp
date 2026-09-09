@@ -1295,6 +1295,99 @@ provably correct. Reverted, but this is the closest the split problem has come
 to a real answer -- what is missing is making a drained interior entry carry the
 same depth as the call it replaces.
 
+## Measured against hardware: where every rendering game actually stands
+
+`scripts/reference/shotdiff.py`, with input reaching the pad on both sides.
+**lit** is the fraction of pixels where one side is black and the other is not;
+that is the only column comparable across the two emulators (see the script's
+header for why `shade` is not). **pairing** is which hardware frame matched
+which of ours -- and it is the diagnosis as much as the number is:
+
+- a high `lit` paired with **our earliest** frame means hardware moved on and we
+  did not. That is a PROGRESSION problem, not a rendering one.
+- a high `lit` at a matched moment is a real rendering defect.
+
+| game | lit | shade | best pairing |
+|---|---|---|---|
+| T_E_Virtual_Golf_Japan | 81.5% | 86.8% | 900 vs 0300 |
+| Soviet_Union_2011_World_v1_2_Aftermarket_Homeb | 80.1% | 84.5% | 2400 vs 0600 |
+| Hyper_Fighting_World_Beta_Aftermarket_Homebrew | 75.6% | 78.2% | 900 vs 0300 |
+| Fishbone_World_Aftermarket_Homebrew | 69.4% | 70.2% | 900 vs 0300 |
+| Insecticide_World_Aftermarket_Homebrew | 60.9% | 70.1% | 2400 vs 0600 |
+| Niko_chan_Battle_Japan_Proto | 57.2% | 59.1% | 900 vs 0300 |
+| Hamburgers_En_Route_to_Switzerland_World_After | 53.4% | 54.0% | 2400 vs 0600 |
+| BLOX_World_v1_1_Aftermarket_Homebrew | 50.3% | 76.5% | 2400 vs 0300 |
+| Mario_Combat_World_Aftermarket_Homebrew | 45.3% | 46.0% | 2400 vs 0300 |
+| Insmouth_no_Yakata_Japan | 41.9% | 41.9% | 900 vs 0300 |
+| Golf_USA | 39.7% | 46.5% | 900 vs 0300 |
+| Snatcher_World_Demo_Aftermarket_Homebrew | 39.3% | 39.7% | 2400 vs 0300 |
+| BLOX_2_World_En_Fr_De_Es_It_Sv_Fi_Cs_Sl_Afterm | 38.9% | 40.5% | 2400 vs 0300 |
+| Hyper_Fighting_World_Aftermarket_Homebrew | 36.0% | 36.6% | 900 vs 0300 |
+| Tobidase_Panibon_Japan | 32.0% | 32.8% | 900 vs 0300 |
+| Formula_V_World_Demo_Hardware_Version_Aftermar | 28.4% | 28.4% | 900 vs 0300 |
+| Virtual_League_Baseball_USA | 27.1% | 27.3% | 2400 vs 0600 |
+| Virtual_Pro_Yakyuu_95_Japan | 25.1% | 25.2% | 2400 vs 0300 |
+| Virtual_Lab_Japan | 22.5% | 23.4% | 2400 vs 0300 |
+| Elevated_Speed_World_Low_Resolution_Version_Af | 14.7% | 61.9% | 900 vs 0600 |
+| Elevated_Speed_World_High_Resolution_Version_A | 14.7% | 61.9% | 900 vs 0600 |
+| Fishbone_World_Demo_3_Aftermarket_Homebrew | 14.6% | 32.2% | 900 vs 0900 |
+| Fishbone_World_Demo_2_Aftermarket_Homebrew | 14.6% | 32.2% | 900 vs 0900 |
+| Space_Squash_Japan | 12.8% | 13.3% | 900 vs 0300 |
+| Mario_VB_World_Aftermarket_Homebrew | 11.8% | 11.8% | 2400 vs 0300 |
+| Red_Square_World_Aftermarket_Homebrew | 10.2% | 18.3% | 900 vs 0900 |
+| Red_Alarm_USA | 8.8% | 8.8% | 2400 vs 0300 |
+| 3D_Crosswords_World_Hardware_Version_Aftermark | 8.5% | 8.5% | 2400 vs 0300 |
+| 3D_Crosswords_World_Emulator_Version_Aftermark | 8.5% | 8.5% | 2400 vs 0300 |
+| StarFox_World_Demo_Aftermarket_Homebrew | 8.1% | 8.1% | 2400 vs 0300 |
+| 3_D_BattleSnake_World_Aftermarket_Homebrew | 7.0% | 9.8% | 2400 vs 0300 |
+| BLOX_World_v1_0_Aftermarket_Homebrew | 6.6% | 18.1% | 2400 vs 0900 |
+| Red_Alarm_Japan | 6.3% | 6.3% | 2400 vs 0300 |
+| V_Tetris_Japan | 5.7% | 5.8% | 2400 vs 0300 |
+| Vertical_Force_Japan | 5.5% | 5.6% | 2400 vs 0600 |
+| Ballface_World_Demo_Aftermarket_Homebrew | 5.5% | 29.6% | 900 vs 0300 |
+| SD_Gundam_Dimension_War_Japan | 4.5% | 4.5% | 900 vs 0300 |
+| Panic_Bomber_USA | 4.0% | 4.1% | 900 vs 0300 |
+| Galactic_Pinball_Japan_USA_En | 4.0% | 4.0% | 2400 vs 0300 |
+| Soviet_Union_2010_World_v1_2_Aftermarket_Homeb | 3.8% | 3.8% | 900 vs 0900 |
+| Vertical_Force_USA | 3.6% | 3.7% | 900 vs 0300 |
+| Space_Invaders_Virtual_Collection_Japan | 3.4% | 3.4% | 2400 vs 0300 |
+| Fishbone_World_Demo_1_Aftermarket_Homebrew | 3.0% | 14.5% | 900 vs 0600 |
+| Tron_VB_World_Demo_Aftermarket_Homebrew | 2.9% | 4.0% | 2400 vs 0300 |
+| Soviet_Union_2010_World_v1_0_Aftermarket_Homeb | 2.7% | 2.7% | 900 vs 0600 |
+| Mario_Kart_Virtual_Cup_World_Aftermarket_Homeb | 2.7% | 40.1% | 2400 vs 0300 |
+| Bad_Apple_World_Demo_Hardware_Version_Aftermar | 2.4% | 3.4% | 900 vs 0900 |
+| Bad_Apple_World_Demo_Emulator_Version_Aftermar | 2.4% | 3.4% | 900 vs 0900 |
+| Soviet_Union_2011_World_v1_0_Aftermarket_Homeb | 1.9% | 1.9% | 900 vs 0300 |
+| Soviet_Union_2011_World_Beta_2_Aftermarket_Hom | 1.9% | 1.9% | 900 vs 0300 |
+| Soviet_Union_2011_World_Beta_1_Aftermarket_Hom | 1.9% | 1.9% | 900 vs 0300 |
+| Hamburgers_En_Route_to_Switzerland_World_Demo_ | 1.6% | 39.2% | 900 vs 0900 |
+| Space_Pinball_Japan_En_Proto | 1.4% | 1.6% | 2400 vs 0300 |
+| Soviet_Union_2011_World_v1_1_Aftermarket_Homeb | 1.3% | 1.3% | 900 vs 0900 |
+| Mario_Clash_Japan_USA_En | 0.6% | 1.1% | 900 vs 0600 |
+| Hamburgers_En_Route_to_Switzerland_World_Demo_ | 0.2% | 20.8% | 2400 vs 0600 |
+| Waterworld_USA | 0.0% | 0.1% | 2400 vs 0600 |
+| Virtual_Fishing_Japan | 0.0% | 0.0% | 2400 vs 0300 |
+| Virtual_Boy_Wario_Land_Japan_USA_En | 0.0% | 0.0% | 2400 vs 0300 |
+| Virtual_Bowling_Japan | 0.0% | 0.0% | 2400 vs 0300 |
+| Teleroboxer_Japan_USA_En | 0.0% | 0.0% | 2400 vs 0300 |
+| Nester_s_Funky_Bowling_USA | 0.0% | 0.0% | 2400 vs 0300 |
+| Mario_s_Tennis_Japan_USA_En | 0.0% | 0.0% | 2400 vs 0600 |
+| Capitan_Sevilla_2_World_Es_Aftermarket_Homebre | 0.0% | 2.8% | 900 vs 0600 |
+| Bound_High_Japan_En_Proto | 0.0% | 0.0% | 900 vs 0300 |
+| 3_D_Tetris_USA | 0.0% | 3.0% | 2400 vs 0300 |
+
+Ten games are at **0.0%** -- Bound High, Wario Land, Waterworld, 3-D Tetris,
+Teleroboxer, Virtual Bowling, Virtual Fishing, Nester's Funky Bowling, Mario's
+Tennis and Capitan Sevilla 2 all draw exactly what hardware draws at a matched
+moment.
+
+The top of the table is almost entirely progression. T&E Virtual Golf scores
+81.5% because hardware is on its **player-select menu** at frame 900 while we are
+still on the warning screen; Mario Kart Virtual Cup's 2.7% is the menu box
+hardware has drawn over its title screen and we have not reached. Those are the
+attract-to-gameplay problem with a hardware target picture attached to each one,
+which is what the next phase needs.
+
 ## CORRECTION: the ceiling is 73, and the input never reached the pad
 
 The section below is **wrong** and is kept because the way it was wrong matters.
