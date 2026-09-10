@@ -250,11 +250,18 @@ translation or hardware behaviour, not a knob.
 ## Two games are measurement-flaky, not broken
 
 Bound High and Virtual Bowling alternate between `blank` and
-`advancing`/`frozen` across identical runs. They are slow games, and under
-load they do not reach the first sampled frame before the survey's 45-second
-timeout kills them - so a run that scores them blank is measuring the
-timeout, not the game. Read any single-run delta involving these two with
-that in mind; a corpus count that moves by exactly these two has not moved.
+`advancing`/`frozen` across identical runs. They are slow games, and the original
+reading was that they miss the first sampled frame before the survey's
+45-second timeout. **That explanation is now known to be incomplete.** Re-run at
+a 150-second timeout they are still blank, and run directly three times each
+they are blank *identically* -- 0 and 49 lit pixels, no variation. So within a
+session they are deterministic, not racing a timeout; it is across sessions that
+they flip. Checked against the pre-fix `vip.c` as well, in case the world-clipping
+change was responsible: blank there too, so it is not the renderer.
+
+What has not changed is the advice: a corpus count that moves by exactly these
+two has not moved, and any single-run delta involving them should be re-measured
+before it is believed. What is still unexplained is the cross-session flip.
 
 ## The 18 that still draw nothing, by signature
 

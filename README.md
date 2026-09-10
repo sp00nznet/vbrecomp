@@ -4,17 +4,17 @@
 
 Remember the Virtual Boy? Nintendo's red-and-black fever dream from 1995? We're bringing those games back as native executables — no neck strain, no retina damage required.
 
-| | | |
-|:--:|:--:|:--:|
-| ![Mario Kart: Virtual Cup](docs/screenshots/mario-kart-virtual-cup.png) | ![Fishbone](docs/screenshots/fishbone.png) | ![Soviet Union 2010](docs/screenshots/soviet-union-2010.png) |
-| Mario Kart: Virtual Cup | Fishbone | Soviet Union 2010 |
-| ![Capitan Sevilla 2](docs/screenshots/capitan-sevilla-2.png) | ![Vertical Force](docs/screenshots/vertical-force.png) | |
-| Capitan Sevilla 2 | Vertical Force | |
+| | | | |
+|:--:|:--:|:--:|:--:|
+| ![Mario Kart: Virtual Cup](docs/screenshots/mario-kart-virtual-cup.png) | ![Fishbone](docs/screenshots/fishbone.png) | ![Soviet Union 2011](docs/screenshots/soviet-union-2011.png) | ![Hamburgers en Route to Switzerland](docs/screenshots/hamburgers.png) |
+| Mario Kart: Virtual Cup | Fishbone | Soviet Union 2011 | Hamburgers en Route to Switzerland |
+| ![BLOX](docs/screenshots/blox.png) | ![Capitan Sevilla 2](docs/screenshots/capitan-sevilla-2.png) | ![Vertical Force](docs/screenshots/vertical-force.png) | |
+| BLOX | Capitan Sevilla 2 | Vertical Force | |
 
-<sub>All five recompiled to C and booted through the shared generic driver with no
-game-specific code, captured headless at frame 600-900. Shown to document what the
-recompiler currently produces; games, artwork and trademarks belong to their owners.
-See [THIRD_PARTY.md](THIRD_PARTY.md).</sub>
+<sub>All seven recompiled to C and booted through the shared generic driver with no
+game-specific code, captured headless at frame 600-900 from the current build. Shown to
+document what the recompiler currently produces; games, artwork and trademarks belong to
+their owners. See [THIRD_PARTY.md](THIRD_PARTY.md).</sub>
 
 ## What is this?
 
@@ -69,8 +69,9 @@ Progress is tracked in [`COMPATIBILITY.md`](COMPATIBILITY.md), updated as we go.
 ## Status
 
 - **76 / 76 ROMs** (retail + protos + homebrew) recompile and compile clean.
-- **66 / 76 games render on screen** -- **36 still reaching new state** at frame 900 and 30 that drew once and froze -- through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Three of the 10 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, which never load a single character byte on the Mednafen VB core in 1800 frames. **So the honest denominator is 73, not 76.** Capitan Sevilla 3D and Null Pointer Mockup were on that list until the reference capture was found to be holding buttons that never reached the emulated pad (BizHawk names them `P1 Start`, not `Start`); with input actually applied they both draw on hardware, so they are ours to fix.
+- **64 / 76 games render on screen** on the current build -- **35 still reaching new state** at frame 900, and 29 that drew once and froze. That frozen half is not one thing: measured against hardware (`scripts/reference/motion.py`), **16 are gated** -- our picture is identical at frames 300, 600 and 900 while hardware advances -- and **13 are parked on both sides**, where neither emulator leaves the boot screen and a matching score proves nothing. The count reads 64 rather than the 66 measured in an earlier session because Bound High and Virtual Bowling draw nothing in this one; they are blank against the previous `vip.c` too, so it is not the renderer, and the cross-session flip is still unexplained. All of it runs through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Three of the 12 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, which never load a single character byte on the Mednafen VB core in 1800 frames. **So the honest denominator is 73, not 76.** Capitan Sevilla 3D and Null Pointer Mockup were on that list until the reference capture was found to be holding buttons that never reached the emulated pad (BizHawk names them `P1 Start`, not `Start`); with input actually applied they both draw on hardware, so they are ours to fix.
 - Getting there took repeated passes of the same loop: find a shared correctness bug, fix it once, measure the whole corpus. Recent ones:
+  - **A world is clipped by the screen, not skipped by it.** The same mistake twice, in opposite directions, both in the VIP's world loop. Worlds with `W` or `H` over 512 were dropped outright -- but a world may be far wider than the display and hardware just clips it, so Insecticide's `W=704` background never drew and the game rendered its objects and HUD on black. And `sy < VB_SCREEN_HEIGHT` bounds a *world*-space index by a *screen*-space limit, which only holds when the origin is non-negative: Soviet Union 2011 parks its background at `GY=-212, H=447` so world rows 224-447 land on screen, and the bound stopped at 223, truncating exactly the visible part. That world went from 0 to 69,426 pixels and the game from 5.5% of the screen lit to 80.9%, matching hardware's own frame-to-frame motion (80.4% against 80.3%).
   - **A function was made out of a call's arguments.** The V810 long-call idiom passes arguments *inline*, in the bytes after the `jal`; the callee reads them through `r31` and returns past them. Those argument bytes had a function made out of them and were decoded as code -- and in Galactic Pinball the first halfword, `0x9800`, decodes as `bp .`, a branch to itself that the caller fell into and spun in for the whole run. The idiom is now detected from the `add N, r31` before `jmp [r31]`, and a split point must be a real instruction boundary. Galactic Pinball went from 1,232 to 9,442 non-zero character writes and from blank to drawing.
   - **The pad only updated when a game asked for it.** `SDLR`/`SDHR` returned a snapshot refreshed only on an `SCR_START` write, but the VB can also read the pad itself -- so a game relying on that saw zero buttons forever. Jack Bros stores the *rising edges* of the pad as its kernel's task-dispatch flags, so a pad frozen at zero has no edges: its scheduler ran 3 times in 700 frames and every task that loads graphics never ran.
   - **A `jmp` after a PC-capture long call is not the end of the flow.** `jal .+4` / `add N, r31` / `jmp [rX]` returns to the address `r31` now holds, but the trace stopped at the `jmp`, so function epilogues after it were emitted *nowhere* -- every virtual call in SPONG returned into a hole.

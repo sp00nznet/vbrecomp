@@ -11,10 +11,10 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | ROMs in the library | **76** |
 | Recompile to C | **76 / 76** |
 | That C compiles clean | **76 / 76** |
-| Put something on screen | **66 / 76** |
-| ... still reaching new state at frame 900 | **36** |
-| ... drew once and froze | **30** |
-| Blank | **10** (3 blank on real hardware too, so **7** are ours) |
+| Put something on screen | **64 / 76** |
+| ... still reaching new state at frame 900 | **35** |
+| ... drew once and froze | **29** |
+| Blank | **12** (3 blank on real hardware too, so **9** are ours) |
 
 Three ROMs draw nothing on the reference emulator either -- verified on
 BizHawk's Mednafen VB core at 1800 frames with the same buttons held, where
@@ -49,7 +49,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Tobidase! Panibon (Japan) | 512 | 216 | yes | yes | yes | yes | frozen | - |  |
 | Vertical Force (Japan) | 1024 | 125 | yes | yes | yes | yes | advancing | - |  |
 | Vertical Force (USA) | 1024 | 125 | yes | yes | yes | yes | advancing | - |  |
-| Virtual Bowling (Japan) | 1024 | 337 | yes | yes | yes | yes | frozen | - |  |
+| Virtual Bowling (Japan) | 1024 | 337 | yes | yes | - | no | blank | - |  |
 | Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3151 | yes | yes | yes | yes | frozen | - |  |
 | Virtual Fishing (Japan) | 1024 | 92 | yes | yes | yes | yes | frozen | - |  |
 | Virtual Lab (Japan) | 1024 | 238 | yes | yes | yes | yes | advancing | - |  |
@@ -62,7 +62,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 
 | Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Motion | Playable | Notes |
 |------|----|-------|------------|----------|-------|---------|--------|----------|-------|
-| Bound High (Japan) (En) (Proto) | 2048 | 471 | yes | yes | yes | yes | advancing | - |  |
+| Bound High (Japan) (En) (Proto) | 2048 | 471 | yes | yes | - | no | blank | - |  |
 | Niko-chan Battle (Japan) (Proto) | 1024 | 395 | yes | yes | yes | yes | frozen | - |  |
 | Space Pinball (Japan) (En) (Proto) | 2048 | 58 | yes | yes | yes | yes | frozen | - |  |
 
