@@ -709,6 +709,12 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         int16_t gx = (int16_t)((vram_read16(wa + 2) << 6)) >> 6;
         int16_t gp = (int16_t)((vram_read16(wa + 4) << 6)) >> 6;
         int16_t gy = (int16_t)vram_read16(wa + 6);
+        /* GX/GY may be negative: a game scrolls a map taller or wider than the
+         * display by parking its origin off-screen -- Soviet Union 2011 draws its
+         * background with GY=-224, H=447, so only world rows 224-447 are visible.
+         * The draw loops below must therefore terminate on the SCREEN coordinate
+         * (gy + sy), not on sy: bounding sy itself truncates exactly the visible
+         * part of such a world and the layer never appears. */
         int16_t mx = (int16_t)vram_read16(wa + 8);
         int16_t my = (int16_t)vram_read16(wa + 12);
 
@@ -719,8 +725,13 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
         /* BGMap base segment comes from HEAD bits 3:0 (NOT param bits 3:0) */
         int bgmap_base = (head & 0x0F) * 0x2000;
 
-        /* Skip worlds with clearly invalid dimensions */
-        if (w_width > 512 || w_height > 512) continue;
+        /* No dimension check here, deliberately. A world may be far wider than
+         * the display -- Insecticide's background is W=704 -- and hardware simply
+         * clips it. Every draw loop below already bounds sx/sy to the screen, masks
+         * map coordinates to the map, and masks VRAM addresses, so an out-of-range
+         * W/H costs nothing. Rejecting the world instead drops the whole layer:
+         * `w_width > 512` alone was the missing background in Insecticide and
+         * Soviet Union 2011 v1.2. */
 
         /* DEBUG: isolate specific worlds to diagnose rendering
          * Set to -1 to render all, or a world number to render only that world */
@@ -880,7 +891,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             /* Parameter table offset = param_base * 2 within BGMap/param memory */
             uint32_t param_table = 0x20000 + (uint32_t)param * 2;
 
-            for (int sy = 0; sy <= (int)w_height && sy < VB_SCREEN_HEIGHT; sy++) {
+            for (int sy = 0; sy <= (int)w_height && gy + sy < VB_SCREEN_HEIGHT; sy++) {
                 int screen_y = gy + sy;
                 if (screen_y < 0 || screen_y >= VB_SCREEN_HEIGHT) continue;
 
@@ -897,7 +908,7 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
                 int32_t fx = (int32_t)src_mx << 6;
                 int32_t fy = (int32_t)src_my << 6;
 
-                for (int sx = 0; sx <= (int)w_width && sx < VB_SCREEN_WIDTH; sx++) {
+                for (int sx = 0; sx <= (int)w_width && gx + sx < VB_SCREEN_WIDTH; sx++) {
                     int screen_x = gx + sx;
                     if (screen_x < 0 || screen_x >= VB_SCREEN_WIDTH) { fx += src_dx; continue; }
 
@@ -986,11 +997,11 @@ void vb_vip_render(uint32_t *out_rgba, int eye) {
             int scx = 1 << (((head >> 10) & 0x03) + 6);
             int scy = 1 << (((head >> 8) & 0x03) + 6);
 
-            for (int sy = 0; sy <= (int)w_height && sy < VB_SCREEN_HEIGHT; sy++) {
+            for (int sy = 0; sy <= (int)w_height && gy + sy < VB_SCREEN_HEIGHT; sy++) {
                 int screen_y = gy + sy;
                 if (screen_y < 0 || screen_y >= VB_SCREEN_HEIGHT) continue;
 
-                for (int sx = 0; sx <= (int)w_width && sx < VB_SCREEN_WIDTH; sx++) {
+                for (int sx = 0; sx <= (int)w_width && gx + sx < VB_SCREEN_WIDTH; sx++) {
                     int screen_x = gx + sx;
                     if (screen_x < 0 || screen_x >= VB_SCREEN_WIDTH) continue;
 
