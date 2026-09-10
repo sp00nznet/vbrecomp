@@ -1388,6 +1388,124 @@ hardware has drawn over its title screen and we have not reached. Those are the
 attract-to-gameplay problem with a hardware target picture attached to each one,
 which is what the next phase needs.
 
+## What that table cannot see: half the corpus never moves
+
+`scripts/reference/motion.py` asks the question `shotdiff.py` structurally
+cannot -- not "how far is our picture from hardware's" but "does our picture
+change at all". It compares each side against **itself** across its own frame
+window, from the shots already cached.
+
+**30 of the 66 rendering games draw the same picture at frame 300, 600 and 900.**
+Not similar -- the same. Split by whether hardware moves over its own window:
+
+| | count | what it means |
+|---|---|---|
+| gated | **16** | we are frozen while hardware advances |
+| parked | **14** | neither side moves; a matching score here proves nothing |
+| advancing | 36 | the picture changes, so a gap is rendering or pacing |
+
+### The ten 0.0% games are mostly a false pass
+
+The section above called ten games pixel-exact against hardware. Six of them are
+in the parked group, and the reason they match is that **both emulators are
+sitting on the same boot screen**:
+
+- Teleroboxer: ours and hardware are both the IMPORTANT / READ INSTRUCTION AND
+  PRECAUTION BOOKLETS screen. Identical, and it means nothing.
+- Mario's Tennis: `onscreen` is **0.0%** on our side. Two black screens score 0.0%
+  difference.
+
+Their `onscreen` numbers give it away -- Teleroboxer, Virtual Bowling, Virtual
+Fishing and Wario Land all light **2.0%** of the display, which is a few lines of
+text. A scoring column that cannot distinguish "identical because correct" from
+"identical because both parked" needs the motion column beside it, always.
+
+### Hardware has no target to offer for those six
+
+Teleroboxer was captured in BizHawk at frames 3600 and 6000 -- two minutes of
+emulated time -- and never leaves the precaution screen. The no-input build of
+`shot.lua` produces a byte-identical shot, so this is not the input bug fixed in
+f8cb62a: `padprobe.lua` confirms `P1 Start` reads back true after a set. The
+reference emulator simply does not get past that screen under this harness
+either, so for those games there is currently **no hardware target picture at
+all**, and their 0.0% should be read as "not measured".
+
+### The 16 that are gated
+
+Frozen on our side while hardware advances. This is the render-gate list, and it
+is what the next phase is actually about:
+
+| game | refmove | bestlit | onscreen |
+|---|---|---|---|
+| Golf_USA | 58.1% | 39.7% | 8.8% |
+| Insmouth_no_Yakata_Japan | 55.8% | 41.9% | 2.1% |
+| Space_Squash_Japan | 47.8% | 12.8% | 5.7% |
+| Space_Invaders_Virtual_Collection_Japan | 45.2% | 3.4% | 3.2% |
+| Hyper_Fighting_World_Beta_Aftermarket_Homebrew | 24.1% | 75.6% | 5.4% |
+| T_E_Virtual_Golf_Japan | 18.7% | 81.5% | 6.3% |
+| Niko_chan_Battle_Japan_Proto | 16.9% | 57.2% | 3.2% |
+| Ballface_World_Demo_Aftermarket_Homebrew | 14.7% | 5.5% | 44.6% |
+| Fishbone_World_Aftermarket_Homebrew | 8.4% | 69.4% | 3.7% |
+| SD_Gundam_Dimension_War_Japan | 6.3% | 4.5% | 3.6% |
+| Tobidase_Panibon_Japan | 6.2% | 32.0% | 2.0% |
+| BLOX_2_World_En_Fr_De_Es_It_Sv_Fi_Cs_Sl_Afterm | 6.1% | 38.9% | 5.1% |
+| StarFox_World_Demo_Aftermarket_Homebrew | 4.4% | 8.1% | 7.0% |
+| Panic_Bomber_USA | 4.2% | 4.0% | 1.2% |
+| Mario_Combat_World_Aftermarket_Homebrew | 3.8% | 45.3% | 3.7% |
+| Formula_V_World_Demo_Hardware_Version_Aftermar | 0.7% | 28.4% | 0.1% |
+
+Thirteen of the sixteen light under 8% of the display, which is the shape of a
+title or warning screen held forever. Ballface is the exception at 44.6%: it
+draws a real screen and then stops.
+
+## The six defect candidates, split
+
+Eyeballed against their `corpus/_ref/` targets. Three are real rendering bugs and
+three are not.
+
+### Rendering: a background layer is missing
+
+Two games draw their objects and their text and nothing behind them.
+
+- **Insecticide** (60.9%): our frame has the two health bars, the ant sprite and
+  the diagonal INSECTICIDE banners, all correct and correctly placed -- on solid
+  black. Hardware draws the same three things over a full terrain background.
+- **Soviet Union 2011 v1.2** (80.1%): we draw the words `EASY` and `ON` on black.
+  That is a menu's text with the menu missing.
+
+Same signature, and it is a narrow one: OBJ and whatever draws that text are
+working while a BGMap layer never lands. `onscreen` of 10.0% and 0.2% against a
+hardware screen that is mostly lit.
+
+### Rendering: Elevated Speed is drawing garbage
+
+Ours is a solid red field crossed by horizontal black bands with sparse noise in
+two corners. Hardware is a city racing scene. **It scores 14.7%** -- near the
+bottom of the whole table -- because `lit` asks only whether a pixel is black on
+one side and not the other, and when both screens are nearly fully lit that
+question has almost no discrimination left. `lit` is blind at the top of its
+range, and Elevated Speed is the proof; its 100% `onscreen` is the tell.
+
+### Not rendering: progression and pacing
+
+- **Fishbone Demo 2/3** (14.6%): same scene, same terrain, same HUD. We show ten
+  fish where hardware shows one. That is a different moment in the animation,
+  drawn correctly.
+- **Red Square** (10.2%): the same picture -- rose border, hand and horse
+  artwork, matching everywhere. The residue is dither and shade, not content.
+- **Hamburgers (full)** (53.4%): we are parked on `enable auto pause after 15
+  minutes? yes / no`. A prompt we never answer, not a screen we draw wrong.
+
+### The injected mask pauses games on both sides
+
+Insecticide's reference shot has **PAUSED** in its HUD and Elevated Speed's has a
+**PAUSE** menu box over the scene. Both sides mash `0x303C` (A|B|L|R|Start|Select)
+for 40 frames out of every 120 -- `games/driver/main.c:66` and `shot.lua` use the
+identical burst -- and Start toggles pause. The two emulators do not share a
+clock, so the pause state at any captured frame is uncorrelated between them.
+Every number in the table above carries that noise. Dropping Start and Select
+from the mask once a game is past its title gate is the obvious next move.
+
 ## CORRECTION: the ceiling is 73, and the input never reached the pad
 
 The section below is **wrong** and is kept because the way it was wrong matters.
