@@ -1388,6 +1388,55 @@ hardware has drawn over its title screen and we have not reached. Those are the
 attract-to-gameplay problem with a hardware target picture attached to each one,
 which is what the next phase needs.
 
+## Measured: what the two clipping fixes actually did
+
+Full rebuild, `render_survey`, then `shotdiff.py` and `motion.py` again.
+
+**Soviet Union 2011 Beta 1 and Beta 2 went from a near-blank screen to a full
+playfield.** This was the negative-origin fix, and the commit that shipped it
+said no corpus game visibly changed -- that was wrong, and wrong because the
+game tested (v1.2) is blocked earlier than rendering while its Beta siblings are
+not:
+
+| | onscreen | ourmove | refmove |
+|---|---|---|---|
+| Beta 1, before | 5.5% | 6.1% | 80.3% |
+| Beta 1, after | **80.9%** | **80.4%** | 80.3% |
+
+`ourmove` now sits on top of `refmove`: the game moves as much as hardware moves.
+Its world 31 is `GY=-212 H=447` -- exactly the geometry the old bound truncated
+-- and it draws **69,426 pixels** where it drew zero.
+
+**Insecticide's background draws, and its score does not move at all.** `onscreen`
+10.0% -> 16.8%, the `SELECT OPPONENT` title and opponent frame appear, and `lit`
+stays at 60.9%. The pairing moved from `0600` to `0900`, which is the only place
+the improvement shows: we progressed relative to hardware, and what is left is
+that hardware is in the GI-ANT/BEHE-MOTH match while we are still on the menu.
+The rendering bug became a progression gap, and `lit` cannot tell those apart.
+
+Fishbone Demo 2/3 improved 14.6% -> 12.6%. Nothing else in the corpus moved by a
+point, and nothing regressed -- the RENDERS count reads 64 against 66, which is
+exactly Bound High and Virtual Bowling timing out, the two games this file
+already documents as measurement-flaky.
+
+### `lit` is unreliable at BOTH ends, and now we know why
+
+Two failure modes, from opposite directions:
+
+- **Both screens mostly lit** -- Elevated Speed scores 14.7% comparing solid-red
+  garbage against a city scene, because "black on one side, not the other" has
+  no discrimination left when almost nothing is black.
+- **Both screens mostly dark** -- `shotdiff.py` takes the `min` over all pairings,
+  so a game that starts blank and later draws is scored on its blank frame
+  against hardware's darkest frame. Soviet Union 2011 Beta 1 reports **1.9%,
+  pairing our frame 300 against hardware's 900**, and reported the same 1.9%
+  before the fix that took it from 5.5% to 80.9% lit. The number is identical
+  across the single largest rendering improvement measured in this file.
+
+`min` over pairings rewards matching blankness. `motion.py`'s `onscreen` and
+`ourmove` columns caught both games; `lit` caught neither. Read them together or
+not at all.
+
 ## What that table cannot see: half the corpus never moves
 
 `scripts/reference/motion.py` asks the question `shotdiff.py` structurally
@@ -1463,7 +1512,7 @@ draws a real screen and then stops.
 Eyeballed against their `corpus/_ref/` targets. Three are real rendering bugs and
 three are not.
 
-### Rendering: a background layer is missing
+### Rendering: a background layer is missing -- one bug, not two
 
 Two games draw their objects and their text and nothing behind them.
 
@@ -1473,9 +1522,18 @@ Two games draw their objects and their text and nothing behind them.
 - **Soviet Union 2011 v1.2** (80.1%): we draw the words `EASY` and `ON` on black.
   That is a menu's text with the menu missing.
 
-Same signature, and it is a narrow one: OBJ and whatever draws that text are
-working while a BGMap layer never lands. `onscreen` of 10.0% and 0.2% against a
-hardware screen that is mostly lit.
+**They look like one signature and are not** -- that reading was taken from the
+picture, and the picture was misleading. Insecticide was a renderer bug and is
+fixed (`ed85922`, below). The identical fix leaves Soviet Union 2011 v1.2 exactly
+as it was: at frame 800 its background world W31 is reached and draws zero
+pixels because its BGMap segment is still empty, and its OBJ world W29 draws
+nothing either. Nothing is being clipped or dropped -- there is nothing there to
+draw. It is blocked before rendering and needs its own diagnosis.
+
+The lesson is worth more than the two games: "objects draw, background does not"
+is a description of a screen, not a diagnosis. The per-world tile counts
+(`VBRECOMP_RDBG=1`) separate the three causes -- world skipped, world drawn
+empty, world never set up -- and they disagreed here.
 
 ### Rendering: Elevated Speed is drawing garbage
 
