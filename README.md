@@ -10,16 +10,16 @@ Part of the sp00nznet recomp family ([snesrecomp](https://github.com/sp00nznet/s
 
 ## Status
 
-**Alpha, unversioned.** One commercial title, Space Squash, gets into gameplay headless (a scored rally and the continue screen). The work is getting the rest past their boot and warning screens.
+**Alpha, unversioned.** Four commercial titles get into gameplay headless with nothing but Start and A pressed: Space Squash, Insmouth no Yakata, T&E Virtual Golf and the Bound High prototype. The work is getting the rest past their boot, warning and menu screens.
 
 | | |
 |---|---|
 | Instruction conformance (`tools/conformance.py`, runs in CI) | **77 / 77** |
 | ROMs in the corpus | 76 (28 retail, 3 proto, 45 homebrew) |
 | Recompile and compile clean | **76 / 76** |
-| Put something on screen | **66 / 76** (43 advancing, 23 drew once and froze) |
+| Put something on screen | **66 / 76** (44 advancing, 22 drew once and froze) |
 | Blank | 10, of which 3 are blank on hardware too |
-| In game | **1** (Space Squash) |
+| In game | **4** (Space Squash, Insmouth no Yakata, T&E Virtual Golf, Bound High) |
 
 The frozen half is not one thing: measured against hardware (`scripts/reference/motion.py`), **16 are gated** -- our picture is identical at frames 300, 600 and 900 while hardware advances -- and **13 are parked on both sides**, where neither emulator leaves the boot screen and a matching score proves nothing. The count reads 64 rather than the 66 measured in an earlier session because Bound High and Virtual Bowling draw nothing in this one; they are blank against the previous `vip.c` too, so it is not the renderer, and the cross-session flip is still unexplained. All of it runs through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Three of the 12 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, which never load a single character byte on the Mednafen VB core in 1800 frames. **So the honest denominator is 73, not 76.** Capitan Sevilla 3D and Null Pointer Mockup were on that list until the reference capture was found to be holding buttons that never reached the emulated pad (BizHawk names them `P1 Start`, not `Start`); with input actually applied they both draw on hardware, so they are ours to fix.
 

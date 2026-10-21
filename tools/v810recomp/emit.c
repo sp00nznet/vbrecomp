@@ -828,21 +828,21 @@ static uint32_t resolve_addr(v810_ctx_t *ctx, uint32_t addr) {
 }
 
 /* Emit one function */
-static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
+static bool emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
     v810_func_t *func = &ctx->funcs[func_idx];
 
     /* Bounds check */
-    if (func->addr < ctx->rom_base || func->addr >= ROM_REGION_END) return;
-    if (func->end_addr < ctx->rom_base || func->end_addr > ROM_REGION_END) return;
+    if (func->addr < ctx->rom_base || func->addr >= ROM_REGION_END) return false;
+    if (func->end_addr < ctx->rom_base || func->end_addr > ROM_REGION_END) return false;
 
     uint32_t start_off = resolve_addr(ctx, func->addr);
     uint32_t end_off = resolve_addr(ctx, func->end_addr);
 
-    if (start_off >= ctx->rom_size || end_off > ctx->rom_size) return;
-    if (start_off >= end_off) return;
+    if (start_off >= ctx->rom_size || end_off > ctx->rom_size) return false;
+    if (start_off >= end_off) return false;
 
     /* Only emit functions confirmed reachable from known entry points */
-    if (!func->confirmed) return;
+    if (!func->confirmed) return false;
 
     /* Cap function size to avoid pathological cases from false JAL targets */
     uint32_t func_size = end_off - start_off;
@@ -1024,6 +1024,7 @@ static void emit_function(v810_ctx_t *ctx, FILE *out, int func_idx) {
 fprintf(out, "}\n");
     free(labels.addrs);
     free(declared.addrs);
+    return true;
 }
 
 void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
@@ -1194,10 +1195,11 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
                 valid = true;
         }
 
-        emit_function(ctx, out, i);
-
-        /* Check if emit_function actually wrote something */
-        if (valid && ctx->funcs[i].visited) {
+        /* Mark it emitted only if a body was actually written: a confirmed
+         * function emit_function declines (Waterworld's harvested 07FFFFFE,
+         * the last halfword of ROM) must still get a stub, or it is declared
+         * and tabled but never defined and the link fails. */
+        if (emit_function(ctx, out, i) && valid && ctx->funcs[i].visited) {
             was_emitted[i] = true;
             emitted++;
         }

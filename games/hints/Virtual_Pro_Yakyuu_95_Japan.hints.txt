@@ -1,0 +1,26 @@
+# Profile-guided entry points for Virtual Pro Yakyuu '95 (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F0017A
+entry 07F019CE
+entry 07F00D6E
+entry 07F01A50
+entry 07FE2574
+entry 07FF329C
+entry 07FE2592
+entry 07FE50E2
+entry 07FF92FC
+entry 07FFAB06
+entry 07FFAB10
+entry 07FF9314
+entry 07FF93A8
+entry 07FFABE4
+entry 07FF9320
+entry 07FFAB54
+entry 07FF93B4
+entry 07FFAC08
+entry 07FF9352
+entry 07FFAB80
+entry 07FFAB8C
+entry 07FF935E
+entry 07FE5206
