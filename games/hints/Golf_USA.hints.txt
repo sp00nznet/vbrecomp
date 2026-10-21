@@ -35,3 +35,5 @@ entry 07E0A310
 entry 07E01CF6
 entry 00000064
 entry 07E0273A
+entry 07E19560
+entry 07E0D2B0

@@ -31,7 +31,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 |------|----|-------|------------|----------|-------|---------|--------|----------|-------|
 | 3-D Tetris (USA) | 1024 | 895 | yes | yes | yes | yes | advancing | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 109 | yes | yes | yes | wip | frozen | no | Renders since the inline-call-argument fix; world attributes now written, image still garbled |
-| Golf (USA) | 2048 | 505 | yes | yes | yes | wip | advancing | no | Past the warning and auto-pause screens to the Nintendo and T&E SOFT logos; later screens are striped garbage |
+| Golf (USA) | 2048 | 505 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): hole overview, then on the course taking shots |
 | Insmouth no Yakata (Japan) | 1024 | 274 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): first-person corridor with HUD, level timer counting down, Start/A input only |
 | Jack Bros. (USA) | 1024 | 273 | yes | yes | - | no | blank | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 262 | yes | yes | - | no | blank | - |  |
