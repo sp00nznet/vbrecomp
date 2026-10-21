@@ -90,24 +90,26 @@ static void test_rom_write_ignored(void) {
     PASS();
 }
 
+/* Offsets are hardware ones from 0x02000000: TLR 0x18, THR 0x1C, TCR 0x20,
+ * SDLR 0x10, SDHR 0x14, SCR 0x28. */
 static void test_timer_basic(void) {
     TEST("timer countdown");
 
     vb_timer_init();
 
     /* Set reload to 1, slow mode (~100us = 2000 cycles per tick) */
-    vb_timer_write8(0x14, 0x01);  /* TLR = 1 */
-    vb_timer_write8(0x18, 0x00);  /* THR = 0 */
+    vb_timer_write8(0x18, 0x01);  /* TLR = 1 */
+    vb_timer_write8(0x1C, 0x00);  /* THR = 0 */
     /* Enable with interrupt */
-    vb_timer_write8(0x10, 0x09);  /* TCR: enable + int */
+    vb_timer_write8(0x20, 0x09);  /* TCR: enable + int */
 
     /* Counter should start at reload value (1) */
-    ASSERT_EQ(vb_timer_read8(0x14), 0x01, "counter should be 1 after start");
+    ASSERT_EQ(vb_timer_read8(0x18), 0x01, "counter should be 1 after start");
 
     /* Tick 2000 cycles: counter should go 1->0 */
     bool fired = vb_timer_tick(2000);
     ASSERT_EQ(fired, false, "should not fire yet (counter=0, not underflow)");
-    ASSERT_EQ(vb_timer_read8(0x14), 0x00, "counter should be 0");
+    ASSERT_EQ(vb_timer_read8(0x18), 0x00, "counter should be 0");
 
     /* Tick another 2000: counter should underflow, reload, and fire */
     fired = vb_timer_tick(2000);
@@ -126,8 +128,8 @@ static void test_gamepad(void) {
     vb_gamepad_write8(0x28, 0x04); /* SCR: START */
 
     /* Read back button data */
-    uint16_t lo = vb_gamepad_read8(0x2C);
-    uint16_t hi = vb_gamepad_read8(0x30);
+    uint16_t lo = vb_gamepad_read8(0x10);
+    uint16_t hi = vb_gamepad_read8(0x14);
     uint16_t buttons = lo | (hi << 8);
     ASSERT_EQ(buttons, VB_BTN_A | VB_BTN_STA, "button latch mismatch");
 

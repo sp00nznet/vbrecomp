@@ -34,3 +34,8 @@ BOOTSTATUS.md
 
 # Python bytecode from scripts/reference
 __pycache__/
+
+# Quick start (Setup.cmd) leaves these behind
+setup.log
+Play *.cmd
+build-farm/

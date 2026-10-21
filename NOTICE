@@ -1,0 +1,12 @@
+vbrecomp
+Copyright (c) 2026 sp00nznet. MIT, see LICENSE.
+
+This repository carries the third-party code below. Each file keeps its own
+header; the licence texts are in LICENSES/.
+
+Path                        Upstream                              Version      Licence
+src/imgui/                  https://github.com/ocornut/imgui      1.92.7 WIP   MIT (LICENSES/imgui-MIT.txt)
+src/stb_image_write.h       https://github.com/nothings/stb       1.16         MIT or Unlicense (LICENSES/stb-MIT-or-Unlicense.txt)
+src/imgui/imstb_*.h         https://github.com/nothings/stb       (with imgui) MIT or Unlicense (LICENSES/stb-MIT-or-Unlicense.txt)
+
+Linked at build time, not redistributed: SDL2 (zlib).

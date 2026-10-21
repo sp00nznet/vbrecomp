@@ -1,7 +1,7 @@
 # Third-party code and licensing
 
 This project is MIT (see [LICENSE](LICENSE)). Every file we wrote carries
-`SPDX-License-Identifier: MIT`. Three things in and around this repository are
+`SPDX-License-Identifier: MIT`. The things below are
 **not** ours and are not covered by that licence.
 
 ## 1. Recompiled ROM code is a derived work of the ROM
@@ -19,15 +19,8 @@ dumps of cartridges you own.
 
 ### Screenshots
 
-`docs/screenshots/` holds five images of recompiled games, kept deliberately
-small and few. They are there **only to show the state of the work** — this is
-what the recompiler currently produces — and are not a claim of ownership over
-anything in them. Four of the five are homebrew/aftermarket titles; all games,
-artwork and trademarks shown belong to their respective owners. These images are
-not MIT-licensed, and nothing else about the games ships here.
-
-If you own any of this material and would rather it were not shown, open an
-issue and it will be removed.
+`docs/screenshots/` holds progress shots of what the recompiler currently
+produces. They are image files we captured, not extracted game assets.
 
 > **Note on history:** these generated files were committed earlier in this
 > repository's life and remain in the git history even though they are no longer
@@ -64,6 +57,9 @@ stb_image_write, and is MIT.
 SDL2 is not vendored — it is found via vcpkg at build time. SDL2 is
 [zlib-licensed](https://www.libsdl.org/license.php) and is not redistributed
 here.
+
+The vendored code is also listed in [NOTICE](NOTICE), with licence texts in
+[LICENSES/](LICENSES/).
 
 ## Checking this yourself
 

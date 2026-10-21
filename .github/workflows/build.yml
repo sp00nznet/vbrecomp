@@ -1,0 +1,37 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SDL2 via vcpkg
+        run: vcpkg install sdl2:x64-windows
+
+      # No ROMs in CI, so every game target is skipped at configure time
+      # ("not generated yet"). This builds the runtime, the recompiler and tests.
+      - name: Configure
+        run: cmake -S . -B build -T host=x64 -DSDL2_DIR="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/share/sdl2"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: test_mem
+        run: build/Release/test_mem.exe
+
+      # The conformance harness: fixed V810 encodings, no ROM needed. It exits
+      # non-zero on any failing case, so a regression fails the build.
+      - name: Instruction conformance
+        run: python tools/conformance.py
+
+      # The corpus checks (sweep, render_survey, regress) need user-supplied
+      # ROMs and run locally or on netlab; see docs/GETTING_STARTED.md.
+      - name: Corpus
+        run: echo "SKIP corpus checks - they need ROMs. Run scripts/regress.ps1 locally."

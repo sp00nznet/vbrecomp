@@ -18,7 +18,6 @@ add_library(vbrecomp STATIC
     src/gamepad.c
     src/interrupt.c
     src/platform_sdl2.c
-    src/screenshot.c
     src/stb_impl.c
 )
 
@@ -29,6 +28,7 @@ target_include_directories(vbrecomp PUBLIC include)
 # SDL2 is optional - define VBRECOMP_NO_SDL to build without it
 find_package(SDL2 QUIET)
 if(SDL2_FOUND)
+    target_sources(vbrecomp PRIVATE src/screenshot.c)   # SDL renderer readback
     target_link_libraries(vbrecomp PUBLIC SDL2::SDL2)
     message(STATUS "SDL2 found: platform backend enabled")
 
