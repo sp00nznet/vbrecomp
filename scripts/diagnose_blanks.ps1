@@ -15,7 +15,7 @@ param(
     [string]$Corpus   = (Join-Path $PSScriptRoot "..\corpus"),
     [int]$Frames      = 400,
     [int]$TimeoutSec  = 40,
-    [string]$Press    = "303C",
+    [string]$Press    = "1000,0004",
     [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll"
 )
 $ErrorActionPreference = "Stop"
@@ -34,7 +34,6 @@ $targets = @($survey | Where-Object { $_.cat -ne "RENDERS" } | ForEach-Object { 
 Write-Host "$($targets.Count) games draw nothing; diagnosing."
 
 $rel = Join-Path $BuildDir "games\Release"
-Copy-Item $SDL2Dll $rel -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 $env:VBRECOMP_HEADLESS = "1"; $env:VBRECOMP_HEADLESS_FRAMES = "$Frames"
 $env:VBRECOMP_HEARTBEAT = "1"; $env:VBRECOMP_PRESS = $Press

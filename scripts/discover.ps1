@@ -23,7 +23,7 @@ param(
     [int]$Rounds     = 8,
     [int]$Frames     = 600,
     [int]$TimeoutSec = 70,
-    [string]$Press   = "303C",
+    [string]$Press   = "1000,0004",
     [string]$Root    = "",
     [string]$SDL2Dll = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll"
 )
@@ -54,7 +54,6 @@ if (-not (Test-Path $hints)) {
 }
 
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
-Copy-Item $SDL2Dll (Join-Path $buildAll "games\Release") -Force -EA SilentlyContinue
 
 $known = @{}
 foreach ($l in Get-Content $hints) {

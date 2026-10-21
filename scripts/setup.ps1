@@ -98,7 +98,6 @@ if (-not ($sdlDir -and (Test-Path $sdlDir))) {
     Run "installing SDL2" "`"$vcpkg\vcpkg.exe`" install sdl2:x64-windows" "vcpkg could not install SDL2."
     $sdlDir = Join-Path $vcpkg "installed\x64-windows\share\sdl2"
 }
-$sdlDll = Join-Path $vcpkg "installed\x64-windows\bin\SDL2.dll"
 Write-Host "ok  SDL2: $sdlDir"
 
 # --- The ROM: the one thing only you have -------------------------------------
@@ -148,9 +147,6 @@ Run "5. building the game" `
     ("cmake -S . -B build_all -T host=x64 -DSDL2_DIR=`"$sdlDir`" -DVBRECOMP_CORPUS_DIR=`"$Root\corpus`" -DVBRECOMP_BUILD_TESTS=OFF" +
      " && cmake --build build_all --config Release --target corpus_$slug") `
     "The recompiled game did not build."
-
-$exe = Join-Path $Root "build_all\games\Release\corpus_$slug.exe"
-if (Test-Path $sdlDll) { Copy-Item $sdlDll (Split-Path $exe) -Force }
 
 $launcher = Join-Path $Root ("Play " + $romFile.BaseName + ".cmd")
 "@`"%~dp0build_all\games\Release\corpus_$slug.exe`" `"%~dp0roms\$($romFile.Name)`"" | Out-File $launcher -Encoding ascii

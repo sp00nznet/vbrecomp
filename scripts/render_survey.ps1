@@ -31,14 +31,14 @@ param(
     # count. Keeping them is what lets a graphical fault be SEEN and sorted into
     # a category, instead of inferred from a number.
     [string]$ShotDir  = (Join-Path $PSScriptRoot "..\corpus\_timeline"),
-    # Buttons to hold in periodic bursts (driver: VBRECOMP_PRESS, hex mask of
-    # VB_BTN_*). 0x303C is A|B|L|R|Start|Select -- the mask Waterworld's boot
-    # code itself tests, and the same "any action button" gate the whole retail
-    # set puts in front of its health-warning screen. Without it a headless run
-    # sits on that screen forever and every game behind it reads as frozen,
-    # which is not a recompiler fault: the game is correctly waiting for a
-    # player. Pass "" to survey with no input at all.
-    [string]$Press    = "303C",
+    # Buttons to press in periodic bursts (driver: VBRECOMP_PRESS, hex masks of
+    # VB_BTN_*, one per burst in turn). Games gate their health-warning screen
+    # on `pad & 0x303C` (any of A|B|L|R|Start|Select), so ONE of those is
+    # enough, and holding all six together is a soft-reset combo: until
+    # 2026-10-21 the default was 303C and 3-D Tetris and Teleroboxer restarted
+    # on every burst. Start then A answers the warning, the auto-pause prompt and
+    # most title screens. Pass "" to survey with no input at all.
+    [string]$Press    = "1000,0004",
     [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll",
     # Turn on the runtime heartbeat: CHR writes, render chain, hot reads and
     # unimplemented calls, at roughly a tenth of the speed. Use it on the games
@@ -51,7 +51,6 @@ New-Item -ItemType Directory -Force $ShotDir | Out-Null
 $meta = @{}
 foreach ($r in (Get-Content (Join-Path $Corpus "results.json") -Raw | ConvertFrom-Json)) { $meta[$r.slug] = $r.name }
 $rel = Join-Path $BuildDir "games\Release"
-Copy-Item $SDL2Dll $rel -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 $env:VBRECOMP_HEADLESS = "1"; $env:VBRECOMP_HEADLESS_FRAMES = "$Frames"
 $env:VBRECOMP_SHOT_EVERY = "$ShotEvery"

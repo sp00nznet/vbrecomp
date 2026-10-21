@@ -19,3 +19,6 @@ entry 07F5CB46
 entry 07FDEBB6
 entry 07FDEDC0
 entry 07FDEBFA
+entry 07F0000A
+entry 07FDEF0A
+entry 000249F0
