@@ -1074,8 +1074,15 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * after one state. So a jump parks its target and returns, and every CALL\n");
     fprintf(out, " * SITE drains the chain -- which runs it to completion BEFORE the caller\n");
     fprintf(out, " * resumes, keeping ordering right and the stack flat. */\n");
-    fprintf(out, "void vb_recomp_drain(void) {\n");
+    /* vb_recomp_drain_to(ra): drain on behalf of the call whose return
+     * address is ra. A transfer chain that ends by jumping to ra is that call
+     * RETURNING -- stop and let the caller resume inline. Dispatched as an
+     * entry instead, the caller's epilogue runs twice: 3-D Tetris's timer
+     * stub `jal` returns this way and lost 8 bytes of SP per interrupt until
+     * SP left WRAM. */
+    fprintf(out, "void vb_recomp_drain_to(uint32_t ra) {\n");
     fprintf(out, "    while (vb_recomp_tail_target) {\n");
+    fprintf(out, "        if (ra && vb_recomp_tail_target == ra) { vb_recomp_tail_target = 0; return; }\n");
     fprintf(out, "        /* Too deep to keep going here: leave the target PARKED and\n");
     fprintf(out, "         * return. Every VB_CALL drains, so an outer, shallower drain\n");
     fprintf(out, "         * picks it up and the cycle continues iteratively instead of\n");
@@ -1100,13 +1107,14 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "        vb_recomp_call_inner(t);\n");
     fprintf(out, "    }\n");
     fprintf(out, "}\n");
+    fprintf(out, "void vb_recomp_drain(void) { vb_recomp_drain_to(0); }\n");
     fprintf(out, "/* `jmp [r31]` is a RETURN only when a jal frame is open. A function\n");
     fprintf(out, " * entered by a TRANSFER has no caller, so its r31 holds a continuation\n");
     fprintf(out, " * and the instruction is a jump -- emitting a plain return there drops\n");
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
-    fprintf(out, "#define VB_CALL(f,a) do { vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain(); } while (0)\n");
-    fprintf(out, "#define VB_CALLI(a) do { uint32_t _c_ = (a); vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = _c_; if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep(_c_, vb_call_depth); vb_recomp_call_inner(_c_); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_CALL(f,a) do { uint32_t _ra_ = vb_cpu.r[31]; vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
+    fprintf(out, "#define VB_CALLI(a) do { uint32_t _ra_ = vb_cpu.r[31]; uint32_t _c_ = (a); vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = _c_; if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep(_c_, vb_call_depth); vb_recomp_call_inner(_c_); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");
