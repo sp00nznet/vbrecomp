@@ -18,6 +18,7 @@
 #include <vbrecomp/vbrecomp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -50,6 +51,42 @@ static void dump_png(const char *path) {
     stbi_write_png(path, VB_SCREEN_WIDTH, VB_SCREEN_HEIGHT, 4, px, VB_SCREEN_WIDTH * 4);
 }
 
+/* --record: raw frames piped to ffmpeg. Our RGBA8888 words are 0xRRGGBBAA, so
+ * in little-endian memory the bytes are A,B,G,R -- ffmpeg's "abgr". */
+static FILE *rec_pipe;
+
+static void close_record(void) {
+    if (!rec_pipe) return;
+#ifdef _WIN32
+    _pclose(rec_pipe);
+#else
+    pclose(rec_pipe);
+#endif
+    rec_pipe = NULL;
+}
+
+static void open_record(const char *path) {
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "ffmpeg -y -loglevel error -f rawvideo -pix_fmt abgr -s %dx%d -r 50.27 -i - "
+        "-c:v libx264 -pix_fmt yuv420p \"%s\"", VB_SCREEN_WIDTH, VB_SCREEN_HEIGHT, path);
+#ifdef _WIN32
+    rec_pipe = _popen(cmd, "wb");
+#else
+    rec_pipe = popen(cmd, "w");
+#endif
+    if (!rec_pipe) { fprintf(stderr, "could not start ffmpeg for --record (is it on PATH?)\n"); return; }
+    atexit(close_record);   /* the frame budget ends the run through exit() */
+}
+
+static void set_env(const char *k, const char *v) {
+#ifdef _WIN32
+    _putenv_s(k, v);
+#else
+    setenv(k, v, 1);
+#endif
+}
+
 static void finish(void) {
     if (shot_path) dump_png(shot_path);
     exit(0);
@@ -68,6 +105,7 @@ static bool on_frame(void) {
     }
     vb_vip_render(framebuffer, 0);
     vb_platform_present(framebuffer);
+    if (rec_pipe) fwrite(framebuffer, sizeof(framebuffer), 1, rec_pipe);
     /* VBRECOMP_WRAM_DUMP=<path> with VBRECOMP_WRAM_FRAME=<n>: write the whole
      * 64 KB of WRAM at frame n, to diff against the same dump taken from real
      * hardware (scripts/reference/dumpwram.lua). Knowing a game loads tiles by
@@ -108,10 +146,22 @@ static uint8_t *load_rom(const char *path, uint32_t *out_size) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: %s <rom.vb>\n", argv[0]); return 1; }
+    /* House-style flags (same names as snesrecomp). They only set the env knobs
+     * the rest of the runtime already reads, so the two can't disagree. */
+    const char *rom_path = NULL, *record = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--headless")) set_env("VBRECOMP_HEADLESS", "1");
+        else if (!strcmp(argv[i], "--record") && i + 1 < argc) { record = argv[++i]; set_env("VBRECOMP_HEADLESS", "1"); }
+        else if (!strcmp(argv[i], "--frames") && i + 1 < argc) set_env("VBRECOMP_HEADLESS_FRAMES", argv[++i]);
+        else rom_path = argv[i];
+    }
+    if (!rom_path) {
+        fprintf(stderr, "usage: %s [--headless] [--record out.mp4] [--frames N] <rom.vb>\n", argv[0]);
+        return 1;
+    }
 
     uint32_t rom_size;
-    uint8_t *rom = load_rom(argv[1], &rom_size);
+    uint8_t *rom = load_rom(rom_path, &rom_size);
     if (!rom) return 1;
     printf("vbrecomp generic driver - ROM: %u bytes\n", rom_size);
 
@@ -142,6 +192,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to init platform\n");
         free(rom); return 1;
     }
+    if (record) open_record(record);
 
     /* Boot. If the game loops forever (the common case), on_frame drives
      * rendering until the user quits / the frame budget is hit (via exit()).

@@ -12,6 +12,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define MKDIR(p) mkdir(p, 0755)
+#endif
 
 /* Read entire file into malloc'd buffer */
 static uint8_t *read_file(const char *path, uint32_t *out_size) {
@@ -402,6 +409,16 @@ int main(int argc, char **argv) {
 
     /* Emit C code */
     char path[512];
+
+    /* Create out_dir and its parents: on a clean checkout corpus/ does not
+     * exist yet. mkdir of an existing directory just fails, harmlessly. */
+    snprintf(path, sizeof(path), "%s/", out_dir);
+    for (char *p = path + 1; *p; p++) {
+        if (*p != '/' && *p != '\\') continue;
+        char c = *p; *p = 0;
+        MKDIR(path);
+        *p = c;
+    }
 
     snprintf(path, sizeof(path), "%s/recomp_funcs.c", out_dir);
     FILE *fc = fopen(path, "w");
