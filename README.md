@@ -10,7 +10,7 @@ Part of the sp00nznet recomp family ([snesrecomp](https://github.com/sp00nznet/s
 
 ## Status
 
-**Alpha, unversioned.** Six commercial titles get into gameplay headless with nothing but Start and A pressed: Space Squash, Insmouth no Yakata, Golf, T&E Virtual Golf, Virtual Lab and the Bound High prototype; Mario's Tennis plays a match that may be its attract demo. The work is getting the rest past their boot, warning and menu screens.
+**Alpha, unversioned.** Seven commercial titles get into gameplay headless with nothing but Start and A pressed: Space Squash, Insmouth no Yakata, Golf, T&E Virtual Golf, Virtual Lab, Waterworld and the Bound High prototype; Mario's Tennis plays a match that may be its attract demo. The work is getting the rest past their boot, warning and menu screens.
 
 | | |
 |---|---|
@@ -19,7 +19,7 @@ Part of the sp00nznet recomp family ([snesrecomp](https://github.com/sp00nznet/s
 | Recompile and compile clean | **76 / 76** |
 | Put something on screen | **66 / 76** (44 advancing, 22 drew once and froze) |
 | Blank | 10, of which 3 are blank on hardware too |
-| In game | **6** (Space Squash, Insmouth no Yakata, Golf, T&E Virtual Golf, Virtual Lab, Bound High) |
+| In game | **7** (Space Squash, Insmouth no Yakata, Golf, T&E Virtual Golf, Virtual Lab, Waterworld, Bound High) |
 
 The frozen half is not one thing: measured against hardware (`scripts/reference/motion.py`), **16 are gated** -- our picture is identical at frames 300, 600 and 900 while hardware advances -- and **13 are parked on both sides**, where neither emulator leaves the boot screen and a matching score proves nothing. The count reads 64 rather than the 66 measured in an earlier session because Bound High and Virtual Bowling draw nothing in this one; they are blank against the previous `vip.c` too, so it is not the renderer, and the cross-session flip is still unexplained. All of it runs through the **generic driver** (`games/driver/main.c`) -- no game-specific glue: the recompiler emits the discovered interrupt handlers + reset vector, and the driver wires them up. Three of the 12 that draw nothing are blank on real hardware too -- the three Snowball Wars demos, which never load a single character byte on the Mednafen VB core in 1800 frames. **So the honest denominator is 73, not 76.** Capitan Sevilla 3D and Null Pointer Mockup were on that list until the reference capture was found to be holding buttons that never reached the emulated pad (BizHawk names them `P1 Start`, not `Start`); with input actually applied they both draw on hardware, so they are ours to fix.
 

@@ -2085,3 +2085,31 @@ Force (USA) get further. Panic Bomber itself still stops at the prompt: with
 the floor in place its timer handler leaks 12 bytes and the VIP interrupt
 nests inside it (the heartbeat now dumps the trail at the first leak), so the
 nesting is the next thing to look at there.
+
+### Where this stopped (2026-10-21, evening)
+
+Greedy discovery's second pass reached Niko-chan Battle before it was stopped.
+Kept from it: Waterworld (now in game: Round 1, the trimaran, HUD), Virtual
+League Baseball, Virtual Bowling. Not yet re-run on the new runtime: Niko-chan,
+Space Pinball, Galactic Pinball, 3-D Tetris, Panic Bomber, Panibon, Mario
+Clash, Wario Land, Vertical Force, Teleroboxer, Red Alarm, Mario's Tennis
+(`scripts/greedy_discover.py <slug>` for each).
+
+**Next, and probably the biggest single lever: VIP interrupt timing.**
+Nester's Funky Bowling (and, by signature, SD Gundam and V-Tetris, which are
+frozen with no missing code) waits on a frame counter its VIP handler only
+advances on GAMESTART. The handler serves XPEND first, as an else-if, and
+`vb_vip_frame_advance` raises every source at once -- and XPEND is raised again
+the moment the game restarts drawing (vip.c, XPCTRL write). So XPEND is always
+pending and GAMESTART never gets its turn: the counter is written once in 1,500
+frames. On hardware GAMESTART/FRAMESTART arrive at the start of a frame and
+XPEND when drawing finishes, later. Raising the two groups in two phases of the
+frame tick is the fix to try, measured with the full loop since it changes
+timing for every game.
+
+Other open threads: Virtual League Baseball stops on its batting-order screen
+(no cursor visible; Down changes teams but never reaches EXIT); Virtual Fishing
+and Panic Bomber stop on the automatic-pause prompt with input read every
+frame; Space Invaders draws diagonal dot trails after its warning screen.
+BizHawk references need recapturing with the new input, through offstage at
+the console (it could not attach a monitor this session).

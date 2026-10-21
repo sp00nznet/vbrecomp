@@ -20,3 +20,7 @@ entry 07F02476
 entry 07FFFFFE
 entry 07F250EA
 entry 07F24F7E
+entry 07F2982C
+# entry 07F28C24: rejected by greedy_discover.py (score 2 < 3)
+entry 07F29852
+# entry 07F28D32: rejected by greedy_discover.py (score 2 < 3)
