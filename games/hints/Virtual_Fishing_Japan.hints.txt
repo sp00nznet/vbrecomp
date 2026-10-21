@@ -3,3 +3,5 @@
 # from the runtime's unimplemented-call counter. Regenerate with --hints.
 entry 07F02298
 entry 07F02350
+entry 07F023B6
+# entry 07F0242C: rejected by greedy discovery (score -20 < 2)

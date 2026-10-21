@@ -1,0 +1,13 @@
+# Profile-guided entry points for Red Alarm (Japan).
+entry 07F00CFC
+entry 07F00D04
+entry 07F00DBE
+entry 07F00B48
+entry 07F00CA0
+entry 07F00E1A
+entry 07F00D18
+entry 07F01062
+entry 07F01172
+entry 07F00D0E
+# entry 07F00D52: rejected by greedy discovery (score 5 < 12)
+# entry 07F00F18: rejected by greedy discovery (score 5 < 12)

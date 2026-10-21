@@ -1,0 +1,2 @@
+# Profile-guided entry points for Nester's Funky Bowling (USA).
+entry 07E001E6

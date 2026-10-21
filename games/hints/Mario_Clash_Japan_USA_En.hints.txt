@@ -1,0 +1,16 @@
+# Profile-guided entry points for Mario Clash (Japan, USA) (En).
+# entry 07F000B2: rejected by greedy discovery (score -23 < -20)
+entry 07F00A3E
+entry 07F00CAC
+entry 07F00CE8
+entry 07F00DCC
+entry 07F01444
+entry 07FE6B80
+entry 07F000AC
+entry 07F000D8
+# entry 07F00A00: rejected by greedy discovery (score -4 < -2)
+entry 07FE6ADA
+# entry 07F000D0: rejected by greedy discovery (score -23 < -2)
+# entry 07FC5E2C: rejected by greedy discovery (score -17 < -2)
+entry 07FCCDFC
+# entry 07FC236C: rejected by greedy discovery (score -4 < -2)

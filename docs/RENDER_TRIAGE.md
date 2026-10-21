@@ -2067,3 +2067,21 @@ Also: **greedy discovery**. Applying a whole harvest at once blanks some games;
 adding harvested entries one at a time and keeping each only if the screens do
 not get worse took Wario Land from its warning screen to its title screen (one
 of 26 candidates, `07FE40B0`, blanks it on its own).
+
+### An interrupt handler must not unwind through the code it interrupted
+
+Panic Bomber sat on its automatic-pause prompt with PSW showing EP=1, ID=1,
+IL=2: the main loop's frame wait (`07F81FE2`, waiting on a flag the VIP handler
+sets) was running *inside* the timer interrupt. The handler had unwound through
+the interrupted main loop's C frames -- the drain's "transfer into an active
+frame" check scanned every frame, including the ones below the handler -- and
+never reached its RETI. The interrupt dispatcher now raises
+`vb_recomp_frame_floor` to the interrupted depth for the duration of a handler,
+and both the active-frame scan and unwinding stop there.
+
+Full loop: no title worse. Virtual Lab reaches Level 01 (in game), Mario Clash
+shows its airship scene instead of black, Red Alarm, Teleroboxer and Vertical
+Force (USA) get further. Panic Bomber itself still stops at the prompt: with
+the floor in place its timer handler leaks 12 bytes and the VIP interrupt
+nests inside it (the heartbeat now dumps the trail at the first leak), so the
+nesting is the next thing to look at there.

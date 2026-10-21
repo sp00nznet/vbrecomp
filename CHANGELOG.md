@@ -8,6 +8,8 @@ history before this file was started (2026-10-21) is summarised, not itemised.
 ## [Unreleased]
 
 ### Added
+- `scripts/greedy_discover.py`: discovery that keeps a harvested entry only if
+  the game's screens do not get worse, and writes rejected ones commented out.
 - Heartbeat diagnostic: the first time SP leaves WRAM, print it with the
   recent function trail (3-D Tetris climbs past `0x05010000`).
 - `--headless`, `--record out.mp4` and `--frames N` on the generic driver, the
@@ -33,6 +35,12 @@ history before this file was started (2026-10-21) is summarised, not itemised.
   vcpkg's own deploy step needs PowerShell 7).
 
 ### Fixed
+- Interrupt handlers cannot unwind through the code they interrupted: the
+  dispatcher raises a frame floor (`vb_recomp_frame_floor`) to the interrupted
+  depth while a handler runs. Panic Bomber's timer handler unwound through the
+  main loop, never reached RETI, and left the game running with EP set.
+  Virtual Lab reaches Level 01; Mario Clash, Red Alarm, Teleroboxer and
+  Vertical Force (USA) get further. No title got worse.
 - A call whose callee ends in a tail-transfer chain that jumps back to the
   call's own return address now RETURNS (`vb_recomp_drain_to`). It used to be
   dispatched as a new entry, so the caller's epilogue ran twice: 3-D Tetris's
