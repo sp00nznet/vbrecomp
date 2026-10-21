@@ -20,7 +20,25 @@ history before this file was started (2026-10-21) is summarised, not itemised.
   builder, QA runs `test_mem` on a test VM.
 - `NOTICE`, `LICENSES/`, `CHANGELOG.md`, `ROADMAP.md`, `CONTRIBUTING.md`.
 
+### Changed
+- `VBRECOMP_PRESS` takes a comma-separated list of masks, pressed one per burst
+  in turn, and every script now defaults to `1000,0004` (Start, then A) instead
+  of `303C`. Holding A+B+L+R+Start+Select together is a soft-reset combo: 3-D
+  Tetris and Teleroboxer restarted to their warning screen on every burst.
+  `scripts/reference/shot.lua` presses the same buttons.
+- Game targets copy `SDL2.dll` beside the executable after linking, so the
+  scripts no longer copy it (the copy failed while any game was running, and
+  vcpkg's own deploy step needs PowerShell 7).
+
 ### Fixed
+- `DPSTTS` bit 6 is SCANRDY and now stays set; FCLK (bit 7) pulses instead. Golf
+  and T&E Virtual Golf waited for bit 6 to hold for 20,000 timer ticks and never
+  left their warning screen.
+- `movea ..., r31` + `jmp [rN]` with r31 = the next instruction is emitted as an
+  indirect call (`VB_CALLI`), not a table transfer. Golf's state dispatcher
+  nested a C frame per state change and overflowed the stack.
+- `scripts/sweep.ps1` passes each game's committed `--hints` file and uses the
+  Release recompiler; a full sweep used to drop every discovered entry point.
 - `v810recomp` creates its output directory (and parents). On a clean checkout
   `corpus/` does not exist, so GETTING_STARTED step 4 failed with
   `cannot open '.../recomp_funcs.c' for writing`.

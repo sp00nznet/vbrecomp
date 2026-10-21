@@ -14,7 +14,6 @@ $ErrorActionPreference = "Stop"
 $meta = @{}
 foreach ($r in (Get-Content (Join-Path $Corpus "results.json") -Raw | ConvertFrom-Json)) { $meta[$r.slug] = $r.name }
 $rel = Join-Path $BuildDir "games\Release"
-Copy-Item $SDL2Dll $rel -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 $env:VBRECOMP_HEADLESS = "1"; $env:VBRECOMP_HEADLESS_FRAMES = "$Frames"; $env:VBRECOMP_HEARTBEAT = "1"
 

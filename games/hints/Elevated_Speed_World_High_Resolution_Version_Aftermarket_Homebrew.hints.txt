@@ -4,7 +4,7 @@
 entry 07C001DC
 entry 07C01D10
 entry 07C01C20
-entry 07C01A30
+# entry 07C01A30: removed 2026-10-21 -- as an entry it blanks the game (alone, of the 7 ROM entries); see RENDER_TRIAGE
 entry 07C026C4
 entry 07C0018E
 entry 05001AB8

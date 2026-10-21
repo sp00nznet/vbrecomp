@@ -1,0 +1,37 @@
+# Profile-guided entry points for Golf (USA).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E07DCC
+entry 07E19406
+entry 07E19360
+entry 07E017F8
+entry 07E19328
+entry 07E01CFE
+entry 07E01862
+entry 07E027EE
+entry 07E000DA
+entry 07E197BA
+entry 07E1934C
+entry 07E19344
+entry 07E19192
+entry 07E192EA
+entry 000000DA
+entry 00000006
+entry 00000002
+entry 0423D852
+entry 07E19462
+entry 07E196AA
+entry 07E1939A
+entry 07E12C0A
+entry 0000003A
+entry 0000000C
+entry 00000004
+entry 07E01D14
+entry 06CCCCCC
+entry 07E0180E
+entry 07E0178A
+entry 07E19356
+entry 07E0A310
+entry 07E01CF6
+entry 00000064
+entry 07E0273A

@@ -132,14 +132,16 @@ finer control:
 ```powershell
 $env:VBRECOMP_HEADLESS      = "1"
 $env:VBRECOMP_HEADLESS_FRAMES = "900"
-$env:VBRECOMP_PRESS         = "303C"   # hold A/B/L/R/Start/Select in bursts
+$env:VBRECOMP_PRESS         = "1000,0004"   # Start, then A, one per burst
 $env:VBRECOMP_SHOT_PATH     = "shot"
 $env:VBRECOMP_SHOT_EVERY    = "300"    # also dump every 300 frames
 build_all/games/Release/corpus_Vertical_Force_USA.exe "roms/Vertical Force (USA).vb"
 ```
 
 `VBRECOMP_PRESS` matters more than it looks: most of the retail set gates its
-health-warning screen on a button press and waits forever without one.
+health-warning screen on a button press and waits forever without one. Press one
+button per burst: holding A, B, L, R, Start and Select together is a soft-reset
+combo, and the game restarts to its warning screen every time.
 
 A "frame" here is `VBRECOMP_FRAME_TICKS` interrupt checks (20,000 by default),
 not a hardware frame — roughly 2.25 of these to one hardware frame. See the
@@ -152,7 +154,7 @@ from a change that alters function granularity.
 |---|---|
 | `VBRECOMP_HEADLESS`, `VBRECOMP_HEADLESS_FRAMES` | run without a window, for N frames |
 | `VBRECOMP_SHOT_PATH`, `VBRECOMP_SHOT_EVERY` | write PNG screenshots |
-| `VBRECOMP_PRESS` | hex button mask to auto-press in bursts |
+| `VBRECOMP_PRESS` | hex button masks, comma-separated, auto-pressed one per burst in turn |
 | `VBRECOMP_HEARTBEAT` | periodic VIP/CPU state, hot reads, VRAM write counts, parked transfer targets |
 | `VBRECOMP_FRAME_TICKS` | interrupt checks per rendered frame |
 | `VBRECOMP_COUNT_FUNC=<hex>` | count entries to one function, cumulative |

@@ -16,8 +16,10 @@
 -- path -- four byte-identical files that look like a settled screen and are
 -- not. shotdiff.py launches this once per frame point instead.
 --
--- Holds the same 0x303C mask the driver injects (A|B|L|R|Start|Select), in the
--- same bursts, so a game gated on a button press gets past it here too.
+-- Presses the same buttons the driver injects (VBRECOMP_PRESS "1000,0004":
+-- Start, then A, one per burst), so a game gated on a button press gets past it
+-- here too. One button at a time: holding A|B|L|R|Start|Select together is a
+-- soft-reset combo, which is why Teleroboxer never left its warning screen here.
 
 local OUT   = os.getenv("VBREF_OUT")   or [[C:\Users\Public\vbref.png]]
 local UNTIL = tonumber(os.getenv("VBREF_FRAME") or "400")
@@ -25,14 +27,15 @@ local UNTIL = tonumber(os.getenv("VBREF_FRAME") or "400")
 -- BizHawk names the Virtual Boy pad "P1 A", "P1 Start", ... The bare names
 -- silently match nothing: joypad.set{Start=true} sets no button at all, and
 -- Bound High sat on its warning screen for 2400 frames with Start "held".
-local HELD = { ["P1 A"] = true, ["P1 B"] = true, ["P1 Start"] = true,
-               ["P1 Select"] = true, ["P1 L"] = true, ["P1 R"] = true }
+local CYCLE = { { ["P1 Start"] = true }, { ["P1 A"] = true } }
 
 local frame = 0
 event.onframeend(function()
   frame = frame + 1
   -- press in bursts, exactly as games/driver/main.c does
-  if frame > 60 and (frame % 120) < 40 then joypad.set(HELD) end
+  if frame > 60 and (frame % 120) < 40 then
+    joypad.set(CYCLE[(frame // 120) % #CYCLE + 1])
+  end
   if frame >= UNTIL then
     client.screenshot(OUT)
     client.exit()

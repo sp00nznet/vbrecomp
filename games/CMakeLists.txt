@@ -6,9 +6,17 @@
 # call depth stayed under 40 -- it is frame SIZE, not runaway recursion. Both
 # run to completion with this. On x64 the value is reserved address space and
 # is committed only as it is touched, so it costs nothing until used.
-function(vb_set_stack target)
+function(vb_game_setup target)
     if(MSVC)
         target_link_options(${target} PRIVATE "/STACK:1073741824")
+    endif()
+    # Put SDL2.dll beside the exe, so it runs from where it was built. vcpkg's
+    # MSBuild applocal step needs pwsh (PowerShell 7) and fails without it; it
+    # was also seen leaving the output folder with no SDL2.dll at all.
+    if(TARGET SDL2::SDL2)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:${target}>)
     endif()
 endfunction()
 
@@ -42,7 +50,7 @@ function(vb_add_game target dir)
     )
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${dir})
     target_link_libraries(${target} PRIVATE vbrecomp)
-    vb_set_stack(${target})
+    vb_game_setup(${target})
     # Generated code is intentionally noisy; silence it.
     if(MSVC)
         target_compile_options(${target} PRIVATE /W1 /wd4244 /wd4146)
@@ -67,7 +75,7 @@ function(vb_add_game_generic target dir)
     )
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/generated)
     target_link_libraries(${target} PRIVATE vbrecomp)
-    vb_set_stack(${target})
+    vb_game_setup(${target})
     if(MSVC)
         target_compile_options(${target} PRIVATE /W1 /wd4244 /wd4146)
     else()
@@ -96,7 +104,7 @@ if(DEFINED VBRECOMP_CORPUS_DIR)
                 ${CMAKE_CURRENT_SOURCE_DIR}/driver/main.c ${gen})
             target_include_directories(corpus_${slug} PRIVATE ${VBRECOMP_CORPUS_DIR}/${slug})
             target_link_libraries(corpus_${slug} PRIVATE vbrecomp)
-            vb_set_stack(corpus_${slug})
+            vb_game_setup(corpus_${slug})
             if(MSVC)
                 # /Od: these generated files are huge and only boot-tested,
                 # so skip optimization to keep the 76-target build tractable.

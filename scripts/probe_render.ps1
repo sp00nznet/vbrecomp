@@ -18,7 +18,6 @@ New-Item -ItemType Directory -Force $ShotDir | Out-Null
 $meta = @{}
 foreach ($r in (Get-Content (Join-Path $Corpus "results.json") -Raw | ConvertFrom-Json)) { $meta[$r.slug] = $r.name }
 $relDir = Join-Path $BuildDir "games\Release"
-Copy-Item $SDL2Dll $relDir -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 
 $exes = Get-ChildItem (Join-Path $relDir "corpus_*.exe") | Sort-Object Name
