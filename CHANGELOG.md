@@ -24,7 +24,6 @@ history before this file was started (2026-10-21) is summarised, not itemised.
 - `v810recomp` creates its output directory (and parents). On a clean checkout
   `corpus/` does not exist, so GETTING_STARTED step 4 failed with
   `cannot open '.../recomp_funcs.c' for writing`.
-
 - `test_mem` used register offsets from the original skeleton (TLR at 0x14,
   SDLR at 0x2C); the runtime uses the hardware ones (TLR 0x18, THR 0x1C,
   TCR 0x20, SDLR 0x10, SDHR 0x14), so two of its seven tests always failed.
