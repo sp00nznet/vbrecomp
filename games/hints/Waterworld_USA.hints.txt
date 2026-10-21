@@ -1,0 +1,5 @@
+# Profile-guided entry points for Waterworld (USA).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E089F8
+entry 07FFFFFE

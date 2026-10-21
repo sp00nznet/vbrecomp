@@ -1,0 +1,20 @@
+# Profile-guided entry points for Insmouth no Yakata (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F0824E
+entry 07F082D8
+entry 07F197BE
+entry 07F190F4
+entry 07F11F76
+entry 07F082C8
+entry 07F11F7A
+entry 07F0824A
+entry 07F0830E
+entry 07F192D6
+entry 07F11F7E
+entry 07F0D6DE
+entry 07F0D57C
+entry 07F0D56E
+entry 07F0D592
+entry 07F0DA00
+entry 07F1202A

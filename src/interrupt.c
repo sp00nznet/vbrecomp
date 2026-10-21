@@ -78,6 +78,19 @@ void vb_interrupt_check(void) {
         static int hb_on = -1;
         static uint64_t hb = 0;
         if (hb_on < 0) { const char *e = getenv("VBRECOMP_HEARTBEAT"); hb_on = (e && e[0] && e[0] != '0'); }
+        /* The first time SP leaves WRAM, say so and name the functions that
+         * got it there: something popped more than it pushed (an epilogue run
+         * twice), and by the next heartbeat the trail is long gone. 3-D Tetris
+         * ends up at SP=0x05010350 and then reads garbage pointers. */
+        if (hb_on) {
+            static int sp_out;
+            uint32_t sp = vb_cpu.r[3];
+            if (!sp_out && sp && (sp < 0x05000000u || sp > 0x05010000u)) {
+                sp_out = 1;
+                fprintf(stderr, "SP LEFT WRAM: SP=%08X r31=%08X block=%08X\n", sp, vb_cpu.r[31], vb_recomp_pc);
+                vb_recomp_dump_trace();
+            }
+        }
         if (hb_on && (++hb % 4000000ull == 0)) {
             fprintf(stderr, "HB: INTPND=%04X INTENB=%04X DPSTTS=%04X XPSTTS=%04X SCR=%02X TCR=%02X SP=%08X GP=%08X\n",
                     vb_mem_read16(0x0005F800), vb_mem_read16(0x0005F802),

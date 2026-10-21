@@ -39,3 +39,4 @@ __pycache__/
 setup.log
 Play *.cmd
 build-farm/
+build_diag/
