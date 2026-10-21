@@ -118,6 +118,17 @@ vector, and renders whatever the game puts in VRAM.
 
 ### Headless, with screenshots
 
+The quick way, with the same flag names as the other recomp toolkits:
+
+```powershell
+build_all/games/Release/corpus_Vertical_Force_USA.exe --headless --frames 900 "roms/Vertical Force (USA).vb"
+build_all/games/Release/corpus_Vertical_Force_USA.exe --record vf.mp4 --frames 600 "roms/Vertical Force (USA).vb"
+```
+
+`--record` implies `--headless` and needs `ffmpeg` on `PATH`; it writes 384x224
+at 50.27 fps. The flags just set the environment variables below, which give
+finer control:
+
 ```powershell
 $env:VBRECOMP_HEADLESS      = "1"
 $env:VBRECOMP_HEADLESS_FRAMES = "900"
