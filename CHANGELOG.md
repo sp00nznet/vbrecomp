@@ -72,6 +72,8 @@ history before this file was started (2026-10-21) is summarised, not itemised.
   compiled unconditionally. It is now built only with SDL2, as the docs say.
 
 ### Removed
+- Recompiled ROM code (`games/*/generated/`) from the entire git history
+  (`git filter-repo`, force-pushed 2026-10-21). Existing clones must be re-cloned.
 - `.claude/settings.local.json` from the index (local tool settings, never meant
   to be committed).
 

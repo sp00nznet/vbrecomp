@@ -22,11 +22,8 @@ dumps of cartridges you own.
 `docs/screenshots/` holds progress shots of what the recompiler currently
 produces. They are image files we captured, not extracted game assets.
 
-> **Note on history:** these generated files were committed earlier in this
-> repository's life and remain in the git history even though they are no longer
-> in the working tree. Removing them from history requires a rewrite
-> (`git filter-repo` and a force-push), which is a destructive, coordination-
-> requiring operation and has deliberately not been done automatically.
+> **History:** recompiled code that was committed early on (`games/*/generated/`) was
+> removed from the whole git history on 2026-10-21 (`git filter-repo` and a force-push).
 
 ## 2. Dear ImGui — MIT
 
