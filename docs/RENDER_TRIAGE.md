@@ -2033,8 +2033,9 @@ Next, in rough order of reach:
 1. **Why a harvested entry blanks a game** (Mario Clash, Mario's Tennis, Panic
    Bomber, Red Alarm, Panibon, Wario Land, Vertical Force). Each of those has
    the targets it needs already listed; applying them is what fails.
-2. **Golf (USA)** shares T&E Virtual Golf's engine, and T&E gets onto the course;
-   Golf draws striped screens instead. Diffing the two is cheap.
+2. ~~Golf (USA) draws striped screens~~ -- its hints were harvested under the
+   older recompiler. Rediscovered: two new entries, and Golf reaches Hole 1 and
+   plays (in game, 2026-10-21).
 3. **3-D Tetris**: SP climbs past WRAM in its timer-interrupt path (the new
    `SP LEFT WRAM` heartbeat line names the trail).
 4. **Menu navigation**: the baseball games and Waterworld need more than
