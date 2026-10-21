@@ -2040,3 +2040,30 @@ Next, in rough order of reach:
    `SP LEFT WRAM` heartbeat line names the trail).
 4. **Menu navigation**: the baseball games and Waterworld need more than
    Start/A (a direction, or a confirm that is not Start) to leave their menus.
+
+### A tail chain that jumps to the call's return address is a return
+
+`VBRECOMP_HEARTBEAT` showed 3-D Tetris's timer interrupt leaking SP by +8 per
+dispatch and StarFox's by +116 (its 0x70-byte register save, plus 4). Both
+interrupt stubs `jal` a handler whose last act is a transfer chain ending in
+`jmp [r31]` with r31 = that `jal`'s return address. The drain at the call site
+runs the chain at the caller's depth, so when that depth is 0 the `jmp [r31]`
+reads as a transfer and the return address is dispatched as an *entry* -- the
+caller's epilogue runs there, and again inline when the call returns.
+
+Giving interrupts their own depth context was tried first and is the wrong
+knob: depth 0 in the handler reproduces the double epilogue, and depth >= 1
+breaks StarFox, which needs the interrupted depth. The rule that holds is
+local: `VB_CALL`/`VB_CALLI` remember r31 at the call, and the drain stops when
+the parked target equals it (`vb_recomp_drain_to`). No leaks in either game.
+
+Full loop: 66/76 draw. Commercial, against the previous run: Mario's Tennis
+plays a match ("1 SET MATCH, MARIO VS DONKEY Jr.", score changing -- possibly
+its attract demo), Space Invaders and Wario Land advance; Mario Clash went black
+(it now calls `07F000B2`, `07F00DCC`, `07F00A3E`, which have no entry).
+StarFox's old "picture" was its intro text drawn from that broken state.
+
+Also: **greedy discovery**. Applying a whole harvest at once blanks some games;
+adding harvested entries one at a time and keeping each only if the screens do
+not get worse took Wario Land from its warning screen to its title screen (one
+of 26 candidates, `07FE40B0`, blanks it on its own).
