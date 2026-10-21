@@ -33,6 +33,12 @@ history before this file was started (2026-10-21) is summarised, not itemised.
   vcpkg's own deploy step needs PowerShell 7).
 
 ### Fixed
+- A call whose callee ends in a tail-transfer chain that jumps back to the
+  call's own return address now RETURNS (`vb_recomp_drain_to`). It used to be
+  dispatched as a new entry, so the caller's epilogue ran twice: 3-D Tetris's
+  timer stub lost 8 bytes of SP per interrupt until SP left WRAM, StarFox's
+  116. Mario's Tennis now plays a match and Space Invaders advances; Mario
+  Clash regressed (it calls interior targets with no entry, now visible).
 - The emitter writes a stub for a declared function it declined to emit.
   Waterworld's harvested `07FFFFFE` (the last halfword of ROM) was declared
   and put in the function table but never defined, and the link failed.
