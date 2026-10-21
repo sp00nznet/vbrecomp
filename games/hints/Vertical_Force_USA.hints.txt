@@ -35,3 +35,11 @@ entry 00DCDBDA
 entry 07F1E8FC
 entry 03D2D1D0
 entry 01290500
+entry 07F01826
+entry 07F1EF52
+entry 07F43128
+entry 07F1E6BC
+# entry 07F1EF7C: rejected by greedy discovery (score 2 < 3)
+entry 07F2078C
+entry 07F1E72C
+entry 07F205A0

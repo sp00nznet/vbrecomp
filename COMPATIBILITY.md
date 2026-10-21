@@ -12,8 +12,8 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Recompile to C | **76 / 76** |
 | That C compiles clean | **76 / 76** |
 | Put something on screen | **66 / 76** |
-| ... still reaching new state at frame 900 | **44** |
-| ... drew once and froze | **22** |
+| ... still reaching new state at frame 900 | **48** |
+| ... drew once and froze | **18** |
 | Blank | **10** (3 blank on real hardware too, so **7** are ours) |
 
 Three ROMs draw nothing on the reference emulator either -- verified on
@@ -31,30 +31,30 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 |------|----|-------|------------|----------|-------|---------|--------|----------|-------|
 | 3-D Tetris (USA) | 1024 | 895 | yes | yes | yes | yes | advancing | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 109 | yes | yes | yes | wip | frozen | no | Renders since the inline-call-argument fix; world attributes now written, image still garbled |
-| Golf (USA) | 2048 | 505 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): hole overview, then on the course taking shots |
+| Golf (USA) | 2048 | 510 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): hole overview, then on the course taking shots |
 | Insmouth no Yakata (Japan) | 1024 | 274 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): first-person corridor with HUD, level timer counting down, Start/A input only |
 | Jack Bros. (USA) | 1024 | 273 | yes | yes | - | no | blank | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 262 | yes | yes | - | no | blank | - |  |
-| Mario Clash (Japan, USA) (En) | 1024 | 846 | yes | yes | yes | wip | advancing | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
-| Mario's Tennis (Japan, USA) (En) | 512 | 254 | yes | yes | yes | wip | advancing | wip | Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering) |
+| Mario Clash (Japan, USA) (En) | 1024 | 1145 | yes | yes | yes | wip | advancing | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
+| Mario's Tennis (Japan, USA) (En) | 512 | 257 | yes | yes | yes | yes | advancing | wip | Plays a 1-set match, Mario vs Donkey Jr., score changing (2026-10-21); may be the attract demo |
 | Nester's Funky Bowling (USA) | 2048 | 341 | yes | yes | yes | yes | frozen | - |  |
-| Panic Bomber (USA) | 512 | 226 | yes | yes | yes | yes | frozen | - |  |
-| Red Alarm (Japan) | 1024 | 392 | yes | yes | yes | yes | advancing | - |  |
-| Red Alarm (USA) | 1024 | 392 | yes | yes | yes | wip | advancing | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
+| Panic Bomber (USA) | 512 | 298 | yes | yes | yes | yes | advancing | - |  |
+| Red Alarm (Japan) | 1024 | 405 | yes | yes | yes | yes | advancing | - |  |
+| Red Alarm (USA) | 1024 | 405 | yes | yes | yes | wip | advancing | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 335 | yes | yes | yes | yes | frozen | - |  |
-| Space Invaders - Virtual Collection (Japan) | 512 | 145 | yes | yes | yes | yes | frozen | - |  |
+| Space Invaders - Virtual Collection (Japan) | 512 | 145 | yes | yes | yes | yes | advancing | - |  |
 | Space Squash (Japan) | 512 | 521 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only |
 | T&E Virtual Golf (Japan) | 2048 | 495 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): on the course mid-hole, club select and swing meter, shots taken |
-| Teleroboxer (Japan, USA) (En) | 1024 | 757 | yes | yes | yes | yes | advancing | - |  |
-| Tobidase! Panibon (Japan) | 512 | 224 | yes | yes | yes | yes | frozen | - |  |
-| Vertical Force (Japan) | 1024 | 350 | yes | yes | yes | yes | advancing | - |  |
-| Vertical Force (USA) | 1024 | 347 | yes | yes | yes | yes | advancing | - |  |
-| Virtual Bowling (Japan) | 1024 | 352 | yes | yes | yes | yes | frozen | - |  |
-| Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3238 | yes | yes | yes | yes | frozen | - |  |
-| Virtual Fishing (Japan) | 1024 | 232 | yes | yes | yes | yes | frozen | - |  |
-| Virtual Lab (Japan) | 1024 | 327 | yes | yes | yes | yes | advancing | - |  |
+| Teleroboxer (Japan, USA) (En) | 1024 | 762 | yes | yes | yes | yes | frozen | - |  |
+| Tobidase! Panibon (Japan) | 512 | 289 | yes | yes | yes | yes | advancing | - |  |
+| Vertical Force (Japan) | 1024 | 360 | yes | yes | yes | yes | advancing | - |  |
+| Vertical Force (USA) | 1024 | 357 | yes | yes | yes | yes | advancing | - |  |
+| Virtual Bowling (Japan) | 1024 | 352 | yes | yes | yes | yes | advancing | - |  |
+| Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3411 | yes | yes | yes | yes | advancing | - |  |
+| Virtual Fishing (Japan) | 1024 | 233 | yes | yes | yes | yes | advancing | - |  |
+| Virtual Lab (Japan) | 1024 | 352 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): Level 01 with score and counters |
 | Virtual League Baseball (USA) | 1024 | 1998 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
-| Virtual Pro Yakyuu '95 (Japan) | 1024 | 421 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
+| Virtual Pro Yakyuu '95 (Japan) | 1024 | 427 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
 | V-Tetris (Japan) | 512 | 372 | yes | yes | yes | yes | frozen | - |  |
 | Waterworld (USA) | 2048 | 138 | yes | yes | yes | yes | advancing | - |  |
 
@@ -81,8 +81,8 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | BLOX 2 (World) (En,Fr,De,Es,It,Sv,Fi,Cs,Sl) (Aftermarket) (Homebrew) | 2048 | 137 | yes | yes | yes | yes | frozen | - |  |
 | Capitan Sevilla 2 (World) (Es) (Aftermarket) (Homebrew) | 1024 | 55 | yes | yes | yes | yes | advancing | - |  |
 | Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 775 | yes | yes | - | no | blank | - |  |
-| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 100 | yes | yes | yes | yes | advancing | - |  |
-| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 100 | yes | yes | yes | yes | advancing | - |  |
+| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 100 | yes | yes | yes | yes | frozen | - |  |
+| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 100 | yes | yes | yes | yes | frozen | - |  |
 | Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 522 | yes | yes | yes | yes | frozen | - |  |
 | Fishbone (World) (Demo 1) (Aftermarket) (Homebrew) | 2048 | 48 | yes | yes | yes | yes | advancing | - |  |
 | Fishbone (World) (Demo 2) (Aftermarket) (Homebrew) | 2048 | 111 | yes | yes | yes | yes | advancing | - |  |
@@ -112,7 +112,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Soviet Union 2011 (World) (v1.1) (Aftermarket) (Homebrew) | 2048 | 123 | yes | yes | yes | yes | advancing | - |  |
 | Soviet Union 2011 (World) (v1.2) (Aftermarket) (Homebrew) | 2048 | 131 | yes | yes | yes | yes | advancing | - |  |
 | SPONG (World) (En,Fr,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 585 | yes | yes | - | no | blank | - |  |
-| StarFox (World) (Demo) (Aftermarket) (Homebrew) | 128 | 224 | yes | yes | yes | yes | frozen | - |  |
+| StarFox (World) (Demo) (Aftermarket) (Homebrew) | 128 | 224 | yes | yes | yes | yes | advancing | - |  |
 | Tron VB (World) (Demo) (Aftermarket) (Homebrew) | 64 | 33 | yes | yes | yes | yes | frozen | - |  |
 | VUEngine Platformer (World) (En,Fr,De,Es-ES) (Demo) (Aftermarket) (Homebrew) | 2048 | 684 | yes | yes | - | no | blank | - |  |
 

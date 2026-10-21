@@ -32,3 +32,12 @@ entry 07F207C0
 entry 07F1F1A6
 entry 07F20728
 entry 07F1F1CE
+entry 07F1F12A
+entry 07F207C6
+entry 07F1F16A
+entry 07F2057C
+entry 07F1F190
+entry 07F1EE60
+entry 07F1EE88
+entry 07F1EB04
+entry 07F1F502

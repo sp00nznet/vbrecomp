@@ -24,3 +24,11 @@ entry 07FFAB80
 entry 07FFAB8C
 entry 07FF935E
 entry 07FE5206
+entry 07FF93C0
+entry 07FFAC2C
+entry 07FF936A
+entry 07FFABAC
+entry 07FF93CC
+entry 07FFAC50
+# entry 07FF939C: rejected by greedy discovery (score 10 < 12)
+# entry 07FFABD8: rejected by greedy discovery (score -10 < 12)

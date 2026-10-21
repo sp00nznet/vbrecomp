@@ -277,17 +277,26 @@ void vb_interrupt_check(void) {
                      fprintf(stderr, "IRQ NEST %d at level %d (PSW=%08X)\n",
                              nest, i, vb_cpu_get_psw());
                  }
+                 /* Frames below the current depth belong to the interrupted
+                  * code: nothing the handler does may unwind through them. */
+                 int floor_saved = vb_recomp_frame_floor;
+                 vb_recomp_frame_floor = vb_recomp_depth();
                  handlers[i]();
+                 /* A handler that ends in a jump parks its target; drain it
+                  * here, still above the floor, or the transfer fires later at
+                  * an unrelated call site. */
+                 vb_recomp_drain();
+                 vb_recomp_frame_floor = floor_saved;
                  nest--;
              }
-            /* A handler that ends in a jump parks its target; drain it here, or
-             * the transfer fires later at an unrelated call site. */
-            vb_recomp_drain();
             if (vb_cpu.r[3] != sp_before) {
                 static int leak_log[MAX_INT_LEVELS] = {0};
-                if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5)
+                if (getenv("VBRECOMP_HEARTBEAT") && leak_log[i]++ < 5) {
                     fprintf(stderr, "IRQ %d LEAKED SP: %08X -> %08X (delta %d)\n",
                             i, sp_before, vb_cpu.r[3], (int)(vb_cpu.r[3] - sp_before));
+                    /* The first leak names the functions the handler ran. */
+                    if (leak_log[i] == 1) vb_recomp_dump_trace();
+                }
                 if (getenv("VBRECOMP_COUNT_FUNC"))
                     fprintf(stderr, "    watched function entered %u times in this dispatch\n",
                             vb_recomp_func_hits);

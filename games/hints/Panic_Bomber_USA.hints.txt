@@ -1,0 +1,9 @@
+# Profile-guided entry points for Panic Bomber (USA).
+entry 07021D3C
+entry 07021FA6
+# entry 07F8172A: rejected by greedy discovery (score -20 < 1)
+entry 07F817CE
+entry 07F81EA8
+entry 07FA13EE
+entry 07F89070
+entry 07FA16F6
