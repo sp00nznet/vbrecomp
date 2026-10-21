@@ -40,6 +40,7 @@ $curated = @{
     "Virtual Pro Yakyuu '95 (Japan)"   = @{ boots="yes"; renders="yes"; playable="no";  note="Reaches pitcher select and batting order (2026-10-21)" }
     "Virtual Lab (Japan)"              = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): Level 01 with score and counters" }
     "Mario's Tennis (Japan, USA) (En)" = @{ boots="yes"; renders="yes"; playable="wip"; note="Plays a 1-set match, Mario vs Donkey Jr., score changing (2026-10-21); may be the attract demo" }
+    "Waterworld (USA)"                 = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): Round 1, the trimaran on the water with HUD; Start in the input cycle toggles PAUSED" }
     "Space Squash (Japan)"             = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only" }
     "Golf (USA)"                       = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): hole overview, then on the course taking shots" }
     "Red Alarm (USA)"                  = @{ boots="yes"; renders="wip"; playable="no";  note="Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate" }

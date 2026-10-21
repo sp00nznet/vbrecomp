@@ -26,3 +26,16 @@ entry 07FB6C2E
 entry 07FB975C
 entry 07FB90C2
 entry 07FB90BC
+entry 07FCDB1C
+entry 07FCF318
+entry 07FCDBB0
+entry 07FCF3EC
+entry 07FCDB28
+entry 07FCF35C
+entry 07FCDBBC
+entry 07FCF410
+entry 07FCDB5A
+entry 07FCF388
+entry 07FB9880
+entry 07FCDB66
+entry 07FCF394

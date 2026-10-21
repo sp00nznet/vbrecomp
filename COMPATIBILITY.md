@@ -56,7 +56,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Virtual League Baseball (USA) | 1024 | 1998 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
 | Virtual Pro Yakyuu '95 (Japan) | 1024 | 427 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
 | V-Tetris (Japan) | 512 | 372 | yes | yes | yes | yes | frozen | - |  |
-| Waterworld (USA) | 2048 | 138 | yes | yes | yes | yes | advancing | - |  |
+| Waterworld (USA) | 2048 | 138 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): Round 1, the trimaran on the water with HUD; Start in the input cycle toggles PAUSED |
 
 ## Proto / Demo (3)
 
