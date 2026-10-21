@@ -78,7 +78,6 @@ function Invoke-Timed([string]$Exe, [string[]]$ArgList, [int]$Timeout, [hashtabl
 }
 
 $results = @()
-$dllCopied = $false
 $i = 0
 foreach ($slug in $slugs) {
     $i++
@@ -105,7 +104,6 @@ foreach ($slug in $slugs) {
 
     # --- run headless + screenshot ---
     if ($rec.build -eq "ok") {
-        if (-not $dllCopied) { Copy-Item $SDL2Dll (Split-Path $exe) -Force; $dllCopied = $true }
         $romName = $meta[$slug]
         $rom = if ($romName) { Join-Path $RomDir "$romName.vb" } else { $null }
         if ($rom -and (Test-Path $rom)) {

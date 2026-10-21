@@ -29,7 +29,13 @@ static int frame_count;
 static int max_frames;          /* 0 = unlimited (VBRECOMP_HEADLESS_FRAMES) */
 static const char *shot_path;   /* VBRECOMP_SHOT_PATH: dump a PNG before exit */
 static int shot_every;          /* VBRECOMP_SHOT_EVERY: also dump every N frames */
-static uint16_t inject_btn;      /* VBRECOMP_PRESS: button mask to auto-press (testing) */
+/* VBRECOMP_PRESS: hex button masks to auto-press, comma-separated, one per
+ * burst in turn ("1000,0004" = Start, then A, then Start...). Press ONE button
+ * at a time: holding A|B|L|R|Start|Select together (the old 303C default) is a
+ * soft-reset combo, and 3-D Tetris and Teleroboxer restarted to their warning
+ * screen on every burst. */
+static uint16_t inject_btn[16];
+static int inject_n;
 
 extern int stbi_write_png(const char *, int, int, int, const void *, int);
 
@@ -100,7 +106,8 @@ static bool on_frame(void) {
         uint16_t btn = vb_platform_get_buttons();
         /* Test aid: auto-press a button in periodic bursts (press then release),
          * so a headless run can get past "press start"-style gates. */
-        if (inject_btn && frame_count > 60 && (frame_count % 120) < 40) btn |= inject_btn;
+        if (inject_n && frame_count > 60 && (frame_count % 120) < 40)
+            btn |= inject_btn[(frame_count / 120) % inject_n];
         vb_gamepad_set_buttons(btn);
     }
     vb_vip_render(framebuffer, 0);
@@ -172,7 +179,11 @@ int main(int argc, char **argv) {
     const char *se = getenv("VBRECOMP_SHOT_EVERY");
     shot_every = se ? atoi(se) : 0;
     const char *pb = getenv("VBRECOMP_PRESS");
-    inject_btn = pb ? (uint16_t)strtoul(pb, NULL, 16) : 0;
+    for (char *e = (char *)pb; pb && *e && inject_n < 16; ) {
+        uint16_t m = (uint16_t)strtoul(e, &e, 16);
+        if (m) inject_btn[inject_n++] = m;
+        if (*e == ',') e++; else break;
+    }
 
     vb_init(rom, rom_size);
     vb_cpu.sr[VB_SREG_PSW] = 0;

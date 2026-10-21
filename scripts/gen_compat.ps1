@@ -34,6 +34,8 @@ if (Test-Path $Survey) {
 # boots / renders / playable in {yes, wip, no, "-"(untested)}.
 $curated = @{
     "Mario's Tennis (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="wip"; note="Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering)" }
+    "Space Squash (Japan)"             = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only" }
+    "Golf (USA)"                       = @{ boots="yes"; renders="wip"; playable="no";  note="Past the warning and auto-pause screens to the Nintendo and T&E SOFT logos; later screens are striped garbage" }
     "Red Alarm (USA)"                  = @{ boots="yes"; renders="wip"; playable="no";  note="Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate" }
     "Galactic Pinball (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="no"; note="Renders since the inline-call-argument fix; world attributes now written, image still garbled" }
     "Mario Clash (Japan, USA) (En)"      = @{ boots="yes"; renders="wip"; playable="no"; note="Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames" }

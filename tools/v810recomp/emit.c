@@ -131,6 +131,31 @@ static struct { uint32_t addr; bool is_switch; } g_sp_loads[MAX_SP_LOADS];
 static int g_num_sp_loads;
 
 /* Was the most recent stack-pointer load before `addr` a context switch? */
+/* Is `jmp [rN]` at jmp_addr really an indirect CALL? It is when the two
+ * instructions before it load r31 with the address of the instruction right
+ * after it:
+ *     movhi  hi, r0, rX
+ *     movea  lo, rX, r31      ; r31 = jmp_addr + 2
+ *     jmp    [rN]
+ * The callee's `jmp [r31]` comes straight back. Emitted as a transfer, that
+ * return lands mid-function as a new entry and nests one C frame per pass:
+ * Golf's state dispatcher sub_07E0A2F0 overflowed the stack that way after
+ * 2,767 frames. */
+static bool jmp_is_indirect_call(v810_ctx_t *ctx, uint32_t jmp_addr) {
+    v810_insn_t mv, mh;
+    uint32_t off = jmp_addr - ctx->rom_base;
+    if (off < 8 || !v810_decode(ctx->rom, off - 4, ctx->rom_size, &mv)) return false;
+    if (mv.opcode != 0x28 || mv.reg2 != 31) return false;           /* movea ..., r31 */
+    uint32_t val = (uint32_t)(int32_t)(int16_t)mv.imm;
+    if (mv.reg1 != 0) {
+        if (!v810_decode(ctx->rom, off - 8, ctx->rom_size, &mh)) return false;
+        if (mh.opcode != 0x2F || mh.reg2 != mv.reg1 || mh.reg1 != 0) return false;
+        val += (uint32_t)((uint16_t)mh.imm) << 16;
+    }
+    return v810_normalize_rom_addr(ctx, val & 0x07FFFFFFu) ==
+           v810_normalize_rom_addr(ctx, jmp_addr + 2);
+}
+
 static bool after_stack_switch(uint32_t addr) {
     bool sw = false;
     uint32_t best = 0;
@@ -199,6 +224,9 @@ static void emit_insn(v810_ctx_t *ctx, FILE *out, const v810_insn_t *insn, label
             fprintf(out, "    VB_JUMP(vb_cpu.r[31] & ~1u);\n");
         } else if (insn->reg1 == 31 && !lookup_resolved_jump(ctx, insn->addr)) {
             fprintf(out, "    VB_RET(); /* jmp [r31] */\n");
+        } else if (insn->reg1 != 31 && jmp_is_indirect_call(ctx, insn->addr)) {
+            fprintf(out, "    VB_CALLI(%s & ~1u); /* jmp [r%d] with r31 = next insn: a call */\n",
+                    r1, insn->reg1);
         } else {
             /* Check for jump table first */
             int jt_idx = lookup_jump_table(ctx, insn->addr);
@@ -1077,6 +1105,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
     fprintf(out, "#define VB_CALL(f,a) do { vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain(); } while (0)\n");
+    fprintf(out, "#define VB_CALLI(a) do { uint32_t _c_ = (a); vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = _c_; if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep(_c_, vb_call_depth); vb_recomp_call_inner(_c_); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain(); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");

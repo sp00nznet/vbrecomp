@@ -5,7 +5,8 @@
 # returns is a score. Every control-flow attempt in this codebase has failed for
 # want of a check that says WHICH games moved, quickly enough to iterate. This
 # rebuilds a fixed panel of games whose behaviour is known, runs each headless,
-# and diffs the result against a committed baseline.
+# and diffs the result against a baseline saved in corpus/regress_baseline.json
+# (gitignored: it records results from your own ROMs).
 #
 #   ./scripts/regress.ps1              # check the panel against the baseline
 #   ./scripts/regress.ps1 -Save        # record current behaviour as the baseline
@@ -26,7 +27,7 @@ param(
     [int]$Frames      = 600,
     [int]$ShotEvery   = 200,
     [int]$TimeoutSec  = 45,
-    [string]$Press    = "303C",
+    [string]$Press    = "1000,0004",
     [string]$Panel    = "default",
     [switch]$Save,
     [string]$SDL2Dll  = "C:/vcpkg/installed/x64-windows/bin/SDL2.dll"
@@ -64,7 +65,6 @@ if ($Panel -eq "all") {
 }
 
 $rel = Join-Path $BuildDir "games\Release"
-Copy-Item $SDL2Dll $rel -Force
 $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 $env:VBRECOMP_HEADLESS = "1"; $env:VBRECOMP_HEADLESS_FRAMES = "$Frames"
 $env:VBRECOMP_SHOT_EVERY = "$ShotEvery"

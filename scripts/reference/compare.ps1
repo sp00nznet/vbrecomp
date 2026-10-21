@@ -16,7 +16,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Slug,
     [int]$RefFrame = 90,
     [int]$OurFrame = 450,
-    [string]$Press  = "303C",
+    [string]$Press  = "1000,0004",
     [int]$Pages     = 12,
     [int]$Words     = 10,
     [string]$Root   = "",

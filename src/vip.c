@@ -229,14 +229,14 @@ static uint16_t reg_read(vb_addr_t offset) {
     case VB_VIP_INTCLR:  return 0; /* Write-only */
     /* Display status. Like XPSTTS, the frame-phase bits must transition: games
      * detect frame boundaries by waiting on DPBSY0/1 (0x000C, which FB is being
-     * scanned out) and FCLK (0x0040, the frame clock). Forcing them constant
+     * scanned out) and FCLK (0x0080, the frame clock). Forcing them constant
      * (the old | 0x007E) deadlocks any "wait for the other phase" loop. Keep
      * DISP + scan-ready stable (0x0032), alternate the phase bits each read. */
     case VB_VIP_DPSTTS: {
         /* Cycle through each individual display phase rather than toggling two
          * lumped states. The DPBSY bits mark which framebuffer column-row pair
          * is being scanned out: L:FB0 (0x04), R:FB0 (0x08), L:FB1 (0x10),
-         * R:FB1 (0x20); FCLK (0x40) pulses at the frame boundary; plus an
+         * R:FB1 (0x20); FCLK (0x80) pulses at the frame boundary; plus an
          * all-clear "between phases" step. A 2-state toggle only ever showed
          * L0+R0+FCLK together, so a loop waiting for, say, DPBSY:R1 alone (or
          * for FCLK with the DPBSY bits clear) spun forever (Panic Bomber read
@@ -244,11 +244,16 @@ static uint16_t reg_read(vb_addr_t offset) {
          * single-phase wait terminate while still exposing all combinations.
          * DISP (0x02) stays on the whole time. */
         static const uint16_t dp_phases[] = {
-            0x0004u, 0x0008u, 0x0010u, 0x0020u, 0x0040u, 0x0000u
+            0x0004u, 0x0008u, 0x0010u, 0x0020u, 0x0080u, 0x0000u
         };
         static unsigned dp_poll;
         uint16_t phase = dp_phases[dp_poll++ % (sizeof dp_phases / sizeof dp_phases[0])];
-        return (reg_dpstts & ~0x007Cu) | 0x0002u | phase;
+        /* SCANRDY (0x40) is NOT a phase: it says the mirrors are up to speed,
+         * and once they are it stays set. FCLK is bit 7. Golf waits for 0x40
+         * to hold for 20,000 timer ticks and restarts the wait whenever it
+         * reads clear, so pulsing it (as this used to, calling it FCLK) kept
+         * Golf on its warning screen forever. */
+        return (reg_dpstts & ~0x00FCu) | 0x0042u | phase;
     }
     case VB_VIP_DPCTRL:  return reg_dpctrl;
     case VB_VIP_BRTA:    return reg_brta;

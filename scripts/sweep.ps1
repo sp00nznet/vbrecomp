@@ -9,7 +9,7 @@
 param(
     [string]$RomDir     = (Join-Path $PSScriptRoot "..\roms"),
     [string]$CorpusDir  = (Join-Path $PSScriptRoot "..\corpus"),
-    [string]$Tool       = (Join-Path $PSScriptRoot "..\build\Debug\v810recomp.exe"),
+    [string]$Tool       = (Join-Path $PSScriptRoot "..\build\Release\v810recomp.exe"),
     [string]$IncludeDir = (Join-Path $PSScriptRoot "..\include"),
     [int]$RecompTimeout = 60,
     [int]$CompileTimeout = 180,
@@ -96,7 +96,12 @@ foreach ($rom in $roms) {
     # output file and competing for CPU -- which makes the NEXT ROM look like it
     # hangs. Chasing that phantom cost this project a long time; clear it first.
     Get-Process -Name v810recomp -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
-    $r = Invoke-WithTimeout -Exe $Tool -ArgList @($rom.FullName, $outDir) -TimeoutSec $RecompTimeout
+    # The committed profile-guided entries (scripts/discover.ps1) are part of
+    # the game's recompile: without them every entry they found is dropped.
+    $toolArgs = @($rom.FullName, $outDir)
+    $hintFile = Join-Path $PSScriptRoot "..\games\hints\$slug.hints.txt"
+    if (Test-Path $hintFile) { $toolArgs += @("--hints", $hintFile) }
+    $r = Invoke-WithTimeout -Exe $Tool -ArgList $toolArgs -TimeoutSec $RecompTimeout
     if ($r.TimedOut) {
         $rec.recomp = "timeout"
     } elseif ($r.Code -ne 0) {

@@ -1853,3 +1853,130 @@ the game is now taking a different path.
   carry-out, the 64-bit multiply/divide register pair, every `setf` condition,
   load sign-extension, the float unit, the bit-string block copy, and
   branch/call/return shapes.
+
+## 2026-10-21: the harness was soft-resetting the games
+
+Commercial titles first, per the roadmap. Of the 31 retail and prototype ROMs,
+most "frozen" ones were on the same picture: **IMPORTANT: READ INSTRUCTION AND
+PRECAUTION BOOKLETS**. That turned out to be three separate problems stacked on
+each other.
+
+### 1. Holding every button is a reset combo
+
+The survey pressed `0x303C` -- A, B, L, R, Start and Select **at once** -- in
+bursts, and so did the BizHawk reference (`shot.lua`). With that mask 3-D Tetris
+tears its display down and rebuilds it 14 times in 1,800 frames, once per burst
+(14.5 bursts), and without input it never does: every burst restarted the game
+to its warning screen. Games test `pad & 0x303C` to mean *any* of those buttons,
+so one is enough.
+
+`VBRECOMP_PRESS` now takes a comma-separated list pressed one per burst in turn,
+and every script defaults to `1000,0004` (Start, then A). `shot.lua` cycles the
+same two. That also explains the old note below that BizHawk "never leaves the
+precaution screen" on Teleroboxer: it was being reset too.
+
+Measured on the 31 commercial titles at 3,600 frames, against the old mask:
+3-D Tetris now reaches its automatic-pause prompt and copyright screen;
+Teleroboxer its automatic-pause prompt; Vertical Force (USA), Virtual League
+Baseball and Virtual Pro Yakyuu '95 their title screens; Waterworld its
+"ROUND / PLAYER / LIVES" screen; Mario's Tennis its court demo.
+
+### 2. SCANRDY is a level, not a phase
+
+`DPSTTS` bit 6 is SCANRDY ("the mirrors are up to speed"); FCLK is bit 7. The
+runtime called bit 6 FCLK and pulsed it as one of six display phases. Golf's
+boot waits for bit 6 to stay set for 20,000 ticks of its timer-driven counter
+(`0x05000000`) and restarts the wait whenever it reads clear:
+
+```
+07E01474: ld.h  -2016[r1], r6   ; DPSTTS
+07E0147C: andi  0x0040, r6, r6
+07E01482: bz    07E01488        ; clear -> r8 = counter (restart the wait)
+07E01490: ld.w  0[r1], r6       ; counter
+07E01498: sub   r8, r6
+07E0149E: cmp   0x4E20, r6      ; 20,000
+07E014A0: bl    07E01474
+```
+
+SCANRDY now reads as set and FCLK pulses in its place. Golf and T&E Virtual
+Golf (same engine) went from the warning screen to the automatic-pause prompt;
+no other commercial title changed picture.
+
+### 3. `movea ..., r31; jmp [rN]` is a call when r31 is the next instruction
+
+With the first two fixed, every commercial title reaches code it never reached
+before, and almost all of them call targets that were never emitted
+(`unimplemented calls` in the heartbeat: Vertical Force 398 calls to
+`sub_07F43128`, Wario Land 1,782, Teleroboxer 2,167, ...). Discovery
+(`scripts/discover.ps1`) has to be rerun now that the games get further.
+
+Running it on Golf found 33 entries, took it past the prompt to the Nintendo and
+T&E SOFT logos -- and into `STATUS_STACK_OVERFLOW` after 2,767 frames. The cycle
+was Golf's state dispatcher:
+
+```
+07E0A306: movhi 0xFFE1, r0, r1
+07E0A30A: movea 0xA310, r1, r31   ; r31 = 0x07E0A310, the next instruction
+07E0A30E: jmp   [r10]             ; table of 42 state handlers
+07E0A310: ld.w  16[r3], r31       ; ...and the handler returns here
+```
+
+That is an indirect call. It was emitted as a table *transfer*, so the
+handler's `jmp [r31]` landed mid-function as a new entry and nested a C frame
+per state change. The emitter now recognises exactly this shape -- r31 loaded
+with the address right after the `jmp` -- and emits `VB_CALLI`, an
+address-dispatched twin of `VB_CALL`. Other table dispatches stay transfers
+(the Mario Clash note in `emit.c` still applies to them). Golf no longer
+overflows and draws a new picture at every sample to frame 3,600.
+
+### Also found on the way
+
+- `scripts/sweep.ps1` recompiled every ROM **without its committed hints**, so a
+  full sweep threw away everything `discover.ps1` had found. It passes
+  `--hints` now (and uses the Release recompiler, not Debug).
+- The pad's bit 1 (the controller's always-1 signature bit) reads 0 here. Setting
+  it moved none of six warning-screen titles, so it was left alone.
+- Golf's later screens are striped garbage, the same look as Vertical Force at
+  80,000 frame ticks and Red Alarm. Its only world is a BGMap world whose
+  attributes look overwritten by a fill (`GX=GY=208, MX=MY=209`). Open.
+
+### Results, and the first commercial title in game
+
+With all three fixes, a sweep that applies hints, and discovery rerun on Space
+Squash:
+
+| | before | after |
+|---|---|---|
+| Put something on screen | 64 / 76 | **66 / 76** |
+| Still reaching new state at frame 900 | 35 | **43** |
+| Blank | 12 | 10 |
+
+**Space Squash is in game**: automatic-pause prompt, GET READY, a scored rally,
+then the continue screen, with nothing but Start and A pressed. It got there in
+an instructive way. With `VB_CALLI` and the old entry points it went *black*:
+its script interpreter dispatches opcodes through
+`movea ..., r31; jmp [r11]`, and logging every dispatch showed only three
+before it died -- two to handlers that were never emitted (`07F802D0`,
+`07F807D0`) and one to `20204452`, by which point the script pointer was already
+wrong. As a transfer, the missing handler had silently skipped the
+interpreter's epilogue, which happened to leave a frozen logo on screen. As a
+call it exposed the missing code, and `discover.ps1` found 51 entries in six
+rounds (CHR writes 3,224 -> 351,691; unimplemented calls 0).
+
+Two regressions turned up on the way and are fixed:
+
+- **Elevated Speed** (both versions) went blank once the sweep applied its
+  hints. Trying each of its seven in-ROM entries alone, `07E01A30` (`07C01A30`
+  in the 4 MB version) blanks the game by itself; without hints it draws.
+  It is commented out in both hint files. Discovery can harvest a bad entry
+  (see the loop-label section above), and until now the sweep was hiding that
+  by ignoring the files.
+- **Space Squash**, above.
+
+Bound High (proto) now draws and advances; it has no `VB_CALLI` site, so that is
+its hints being applied.
+
+**Next:** every commercial title has unimplemented calls once it gets past its
+warning screen (see the stub list in the section above), so `discover.ps1` runs
+across the commercial set next, one title at a time with a survey after each so
+a poisoned entry is caught where it lands.
