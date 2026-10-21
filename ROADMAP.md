@@ -22,10 +22,6 @@ count toward the goal.
 
 ## Deferred
 
-- **History rewrite.** Recompiled ROM code was committed early on and is still in
-  git history (`b685aea`, `a92d465`, `6ed5935`). Removing it means
-  `git filter-repo` and a force-push to a public repo; it waits for an explicit
-  decision.
 - **Standalone emulator build** of `src/` (an interpreter in front of the same
   runtime). The runtime work counts toward it already.
 - A quieter default log: the generic driver prints VIP/interrupt diagnostics to
