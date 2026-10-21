@@ -25,3 +25,12 @@ entry 07FBF1AE
 entry 07FBF44E
 # entry 07FE40CE: rejected by greedy discovery (score 1 < 2)
 entry 07FE4D70
+entry 07F42DE0
+entry 07F42E10
+entry 07F42F5A
+entry 07F42F66
+entry 07F56C56
+entry 07F56C5C
+entry 07F42DDC
+entry 07F42FAE
+entry 07FE4E9E

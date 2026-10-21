@@ -1,0 +1,11 @@
+# Profile-guided entry points for Niko-chan Battle (Japan) (Proto).
+entry 07F02040
+entry 07F0214E
+entry 07F02386
+entry 07F020C2
+entry 07F024FC
+entry 07F021DA
+entry 07F02A30
+entry 07F026DC
+entry 07F02194
+entry 07F02950

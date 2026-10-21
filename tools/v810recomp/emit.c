@@ -1062,7 +1062,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "static int vb_unwinding;\n");
     fprintf(out, "static uint32_t vb_interior_owner(uint32_t a);\n");
     fprintf(out, "static int vb_frame_active(uint32_t f) {\n");
-    fprintf(out, "    for (int i = 0; i < vb_call_depth && i < 256; i++)\n");
+    fprintf(out, "    for (int i = vb_recomp_frame_floor; i < vb_call_depth && i < 256; i++)\n");
     fprintf(out, "        if (vb_frames[i] == f) return 1;\n");
     fprintf(out, "    return 0;\n");
     fprintf(out, "}\n");
@@ -1081,6 +1081,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
      * stub `jal` returns this way and lost 8 bytes of SP per interrupt until
      * SP left WRAM. */
     fprintf(out, "void vb_recomp_drain_to(uint32_t ra) {\n");
+    fprintf(out, "    if (vb_call_depth <= vb_recomp_frame_floor) vb_unwinding = 0;  /* an unwind stops at the floor */\n");
     fprintf(out, "    while (vb_recomp_tail_target) {\n");
     fprintf(out, "        if (ra && vb_recomp_tail_target == ra) { vb_recomp_tail_target = 0; return; }\n");
     fprintf(out, "        /* Too deep to keep going here: leave the target PARKED and\n");
@@ -1099,7 +1100,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "         * (StarFox boots six frames and stops). The loop is iterative,\n");
     fprintf(out, "         * so a flat depth costs no stack. */\n");
     fprintf(out, "        uint32_t _own = vb_interior_owner(t);\n");
-    fprintf(out, "        if (_own && vb_call_depth > 0 && vb_frame_active(_own)) {\n");
+    fprintf(out, "        if (_own && vb_call_depth > vb_recomp_frame_floor && vb_frame_active(_own)) {\n");
     fprintf(out, "            vb_unwinding = 1;   /* leave it parked and unwind first */\n");
     fprintf(out, "            return;\n");
     fprintf(out, "        }\n");
@@ -1113,8 +1114,8 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, " * and the instruction is a jump -- emitting a plain return there drops\n");
     fprintf(out, " * control, which is where StarFox's boot chain ends (sub_07FE0300).\n");
     fprintf(out, " * Only the run time knows which case applies, so count jal depth. */\n");
-    fprintf(out, "#define VB_CALL(f,a) do { uint32_t _ra_ = vb_cpu.r[31]; vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
-    fprintf(out, "#define VB_CALLI(a) do { uint32_t _ra_ = vb_cpu.r[31]; uint32_t _c_ = (a); vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = _c_; if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep(_c_, vb_call_depth); vb_recomp_call_inner(_c_); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > 0) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
+    fprintf(out, "#define VB_CALL(f,a) do { uint32_t _ra_ = vb_cpu.r[31]; vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = (a); if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep((a), vb_call_depth); (f)(); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > vb_recomp_frame_floor) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
+    fprintf(out, "#define VB_CALLI(a) do { uint32_t _ra_ = vb_cpu.r[31]; uint32_t _c_ = (a); vb_frames[vb_call_depth < 256 ? vb_call_depth : 255] = _c_; if (++vb_call_depth > 128 && vb_call_depth < 160) vb_recomp_deep(_c_, vb_call_depth); vb_recomp_call_inner(_c_); --vb_call_depth; if (vb_unwinding) { if (vb_call_depth > vb_recomp_frame_floor) return; vb_unwinding = 0; } vb_recomp_drain_to(_ra_); } while (0)\n");
     fprintf(out, "#define VB_RET()    do { if (vb_call_depth == 0) \\\n");
     fprintf(out, "                             vb_recomp_tail_target = vb_cpu.r[31] & ~1u; \\\n");
     fprintf(out, "                         return; } while (0)\n");
@@ -1341,6 +1342,7 @@ void v810_emit_c(v810_ctx_t *ctx, FILE *out) {
     fprintf(out, "    vb_recomp_call_inner(addr);\n");
     fprintf(out, "    --vb_call_depth;\n");
     fprintf(out, "}\n");
+    fprintf(out, "int vb_recomp_depth(void) { return vb_call_depth; }  /* for the interrupt frame floor */\n");
     fprintf(out, "static void vb_recomp_call_inner(uint32_t addr) {\n");
         fprintf(out, "    if (addr >= 0x08000000u) addr &= 0x07FFFFFFu;\n");
         if (ctx->rom_base > ROM_REGION_BASE) {

@@ -1,0 +1,8 @@
+# Profile-guided entry points for Teleroboxer (Japan, USA) (En).
+# entry 07F6AE58: rejected by greedy discovery (score -23 < -20)
+entry 07F6B824
+entry 07F6BA64
+entry 07F6BCA6
+entry 07F6AE7E
+entry 07F6BAA8
+# entry 07F6AE76: rejected by greedy discovery (score -23 < 1)

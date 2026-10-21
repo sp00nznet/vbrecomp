@@ -1,0 +1,2 @@
+# Profile-guided entry points for SD Gundam - Dimension War (Japan).
+entry 07F00CD2

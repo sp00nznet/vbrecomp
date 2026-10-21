@@ -13,3 +13,10 @@ entry 07F070F0
 entry 07F040E6
 entry 07F071E4
 entry 07F0414C
+entry 07F00BD2
+entry 07F07572
+entry 07F00C24
+entry 07F00C3A
+entry 07F00D9E
+entry 07F02304
+entry 07F07C38

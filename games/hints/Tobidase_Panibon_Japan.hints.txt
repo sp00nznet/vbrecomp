@@ -1,0 +1,9 @@
+# Profile-guided entry points for Tobidase! Panibon (Japan).
+entry 07021B58
+entry 07021DC2
+# entry 07F81726: rejected by greedy discovery (score -20 < 1)
+entry 07F817CA
+entry 07F81EA4
+entry 07FA120A
+entry 07F89070
+entry 07FA1512

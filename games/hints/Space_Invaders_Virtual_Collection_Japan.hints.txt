@@ -37,3 +37,6 @@ entry 07F80E62
 entry 07F8AC1A
 entry 07F8AC5A
 entry 07F8ABA0
+# entry 07F80C18: rejected by greedy discovery (score 5 < 8)
+# entry 07FF0000: rejected by greedy discovery (score -10 < 8)
+# entry 07FFF80C: rejected by greedy discovery (score -10 < 8)

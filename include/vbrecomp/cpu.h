@@ -117,6 +117,8 @@ extern uint32_t vb_recomp_entry;
 /* VBRECOMP_IRQ_ENTRY=1: also route interior transfers while PSW.EP is set.
  * Off by default because diverting a handler mid-flight can lose its RETI. */
 extern int vb_recomp_irq_entry;
+extern int vb_recomp_frame_floor;   /* see cpu.c */
+int vb_recomp_depth(void);          /* current call depth; defined in the generated code */
 void vb_recomp_trace(uint32_t addr);
 void vb_recomp_dump_trace(void);
 void vb_recomp_dump_stubs(void);

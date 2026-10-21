@@ -173,6 +173,13 @@ static uint32_t trace_pos;
 uint32_t vb_recomp_pc;
 uint32_t vb_recomp_entry;
 int vb_recomp_irq_entry;
+/* Lowest call depth an unwind may reach. The interrupt dispatcher raises it to
+ * the interrupted code's depth while a handler runs: the frames below belong
+ * to the code that was interrupted, and a transfer inside the handler must not
+ * unwind through them. Panic Bomber's timer handler did, never reached its
+ * RETI, and left the game running with EP set, waiting on a VIP interrupt that
+ * EP blocks. */
+int vb_recomp_frame_floor;
 
 /* VBRECOMP_COUNT_FUNC=<hex>: count entries to one function. The interrupt
  * dispatcher reports it per handler call, which is how you test a claim like

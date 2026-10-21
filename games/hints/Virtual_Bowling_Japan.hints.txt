@@ -11,3 +11,12 @@ entry 07F023B8
 entry 07F24EFE
 entry 07F02A58
 entry 07F02256
+entry 07F24F20
+entry 07F24FF2
+entry 07F250AA
+entry 07F0229C
+entry 07F022E2
+entry 07F02476
+entry 07FFFFFE
+entry 07F250EA
+entry 07F24F7E

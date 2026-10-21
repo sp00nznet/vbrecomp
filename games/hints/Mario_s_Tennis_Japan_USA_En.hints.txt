@@ -1,0 +1,5 @@
+# Profile-guided entry points for Mario's Tennis (Japan, USA) (En).
+entry 07F8DBD8
+entry 07F8DBFE
+entry 07F8DCBA
+# entry 07F8DD14: rejected by greedy discovery (score 10 < 11)
