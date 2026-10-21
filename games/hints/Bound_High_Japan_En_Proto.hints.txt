@@ -6,3 +6,16 @@ entry 07E00DE6
 entry 07E25176
 entry 07E08AF4
 entry 07E21EBC
+entry 07E0217E
+entry 07E2579A
+entry 07E220F6
+entry 07E220DE
+entry 07E220CA
+entry 07E21D94
+entry 07E229D6
+entry 07E088FC
+entry 07E021C8
+entry 07E038A6
+entry 07E189E6
+entry 07E0AA32
+entry 07E19948

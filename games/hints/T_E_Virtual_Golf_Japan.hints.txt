@@ -1,0 +1,21 @@
+# Profile-guided entry points for T&E Virtual Golf (Japan).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07E07AC4
+entry 07E19076
+entry 07E18FD0
+entry 07E1942A
+entry 07E190D2
+entry 07E18FB4
+entry 07E18E02
+entry 07E18F5A
+entry 07E000DA
+entry 07FFFF84
+entry 07E1900A
+entry 07E18FBC
+entry 07E09718
+entry 07E18FC6
+entry 07E093B6
+entry 07E1931A
+entry 07E191D0
+entry 07E0CF88

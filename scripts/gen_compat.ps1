@@ -34,6 +34,11 @@ if (Test-Path $Survey) {
 # boots / renders / playable in {yes, wip, no, "-"(untested)}.
 $curated = @{
     "Mario's Tennis (Japan, USA) (En)" = @{ boots="yes"; renders="wip"; playable="wip"; note="Demo mode runs; title/court/sprites render; gameplay upper-BG corruption (block rendering)" }
+    "Insmouth no Yakata (Japan)"       = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): first-person corridor with HUD, level timer counting down, Start/A input only" }
+    "T&E Virtual Golf (Japan)"         = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): on the course mid-hole, club select and swing meter, shots taken" }
+    "Bound High (Japan) (En) (Proto)"  = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): World 1 with score; still flips blank in some sessions" }
+    "Virtual League Baseball (USA)"    = @{ boots="yes"; renders="yes"; playable="no";  note="Reaches pitcher select and batting order (2026-10-21)" }
+    "Virtual Pro Yakyuu '95 (Japan)"   = @{ boots="yes"; renders="yes"; playable="no";  note="Reaches pitcher select and batting order (2026-10-21)" }
     "Space Squash (Japan)"             = @{ boots="yes"; renders="yes"; playable="wip"; note="In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only" }
     "Golf (USA)"                       = @{ boots="yes"; renders="wip"; playable="no";  note="Past the warning and auto-pause screens to the Nintendo and T&E SOFT logos; later screens are striped garbage" }
     "Red Alarm (USA)"                  = @{ boots="yes"; renders="wip"; playable="no";  note="Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate" }

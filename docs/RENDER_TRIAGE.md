@@ -1980,3 +1980,62 @@ its hints being applied.
 warning screen (see the stub list in the section above), so `discover.ps1` runs
 across the commercial set next, one title at a time with a survey after each so
 a poisoned entry is caught where it lands.
+
+### Discovery across the commercial set, and what it costs
+
+`discover.ps1` was run on every commercial title (3,600 frames, Start/A). It
+finds targets in almost all of them, and applying them is not uniformly good:
+
+- **Better:** Insmouth no Yakata reaches gameplay (first-person corridor, HUD,
+  the level timer running 0:59 -> 0:35). T&E Virtual Golf, Bound High, Virtual
+  Pro Yakyuu '95, Virtual League Baseball, Virtual Fishing and Golf all reach
+  screens they never drew before.
+- **Worse:** Mario Clash, Mario's Tennis (which had its court demo), Panic
+  Bomber, both Red Alarms and Tobidase Panibon went to solid black.
+  Galactic Pinball went black too, by re-harvesting `07F000AC`, the loop label
+  that was removed from its hints on purpose.
+
+All nine of Mario Clash's harvested targets lie *inside* functions the analyzer
+already had, one of them `07F000B2`, the counted loop the analyzer's own comment
+warns about. So the obvious idea was to stop making them separate functions.
+
+**Measured and reverted: hinted interior addresses as labels in their
+container.** Three versions were tried on the same hints:
+
+| rule for turning a hint into a container label | result |
+|---|---|
+| every interior hint not named by a JAL | Mario Clash back to its pre-discovery pictures; **StarFox, Formula V (HW), Space Invaders went blank** |
+| ... and only where the container's linear walk lands on it | Formula V and Space Invaders back (Space Invaders even advanced); StarFox still blank -- a *single* conversion, `07FE0012` two instructions into its reset code, does it |
+| ... and only inside a loop of the container | StarFox draws (less), Space Invaders frozen again; Mario's Tennis, Panic Bomber, Red Alarm, Panibon still black |
+
+None is a net win, so hints keep their original meaning (a function at the
+address) and the decision is made per title instead: a title keeps its new
+hints only if its pictures got better, and otherwise keeps its old file.
+What *was* kept from this: `discover.ps1` only harvests aligned cartridge
+addresses and remembers commented-out entries, and the emitter writes a stub
+for any declared function it could not emit (Waterworld's harvested
+`07FFFFFE`, the last halfword of ROM, failed to link).
+
+Why a harvested entry blanks a game is the open question this leaves, and it is
+probably the same question as Galactic Pinball's loop label.
+
+### Where the commercial set stands (end of 2026-10-21)
+
+Accepted hints only, full sweep + build + survey with the final recompiler:
+66/76 draw, 44 advancing (35 at the start of the day), 22 frozen, 10 blank;
+`regress.ps1` 0 worse. **In game: Space Squash, Insmouth no Yakata, T&E
+Virtual Golf (on the course, taking shots), Bound High (World 1).** Virtual
+League Baseball and Virtual Pro Yakyuu '95 reach pitcher select and batting
+order, so Start/A is driving their menus.
+
+Next, in rough order of reach:
+
+1. **Why a harvested entry blanks a game** (Mario Clash, Mario's Tennis, Panic
+   Bomber, Red Alarm, Panibon, Wario Land, Vertical Force). Each of those has
+   the targets it needs already listed; applying them is what fails.
+2. **Golf (USA)** shares T&E Virtual Golf's engine, and T&E gets onto the course;
+   Golf draws striped screens instead. Diffing the two is cheap.
+3. **3-D Tetris**: SP climbs past WRAM in its timer-interrupt path (the new
+   `SP LEFT WRAM` heartbeat line names the trail).
+4. **Menu navigation**: the baseball games and Waterworld need more than
+   Start/A (a direction, or a confirm that is not Start) to leave their menus.

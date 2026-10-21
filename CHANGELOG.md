@@ -8,6 +8,8 @@ history before this file was started (2026-10-21) is summarised, not itemised.
 ## [Unreleased]
 
 ### Added
+- Heartbeat diagnostic: the first time SP leaves WRAM, print it with the
+  recent function trail (3-D Tetris climbs past `0x05010000`).
 - `--headless`, `--record out.mp4` and `--frames N` on the generic driver, the
   house-style flags shared with snesrecomp. They set the existing
   `VBRECOMP_HEADLESS*` knobs; `--record` pipes frames to ffmpeg at 50.27 fps.
@@ -31,6 +33,13 @@ history before this file was started (2026-10-21) is summarised, not itemised.
   vcpkg's own deploy step needs PowerShell 7).
 
 ### Fixed
+- The emitter writes a stub for a declared function it declined to emit.
+  Waterworld's harvested `07FFFFFE` (the last halfword of ROM) was declared
+  and put in the function table but never defined, and the link failed.
+- `scripts/discover.ps1` only harvests halfword-aligned cartridge ROM
+  addresses (not WRAM, low memory or garbage), and treats a commented-out
+  `# entry X` as known so a deliberately removed entry is not harvested back
+  (it re-added Galactic Pinball's `07F000AC`).
 - `DPSTTS` bit 6 is SCANRDY and now stays set; FCLK (bit 7) pulses instead. Golf
   and T&E Virtual Golf waited for bit 6 to hold for 20,000 timer ticks and never
   left their warning screen.

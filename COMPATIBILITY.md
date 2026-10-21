@@ -12,8 +12,8 @@ Status values: `yes` | `wip` (partial) | `no` | `-` (untested).
 | Recompile to C | **76 / 76** |
 | That C compiles clean | **76 / 76** |
 | Put something on screen | **66 / 76** |
-| ... still reaching new state at frame 900 | **43** |
-| ... drew once and froze | **23** |
+| ... still reaching new state at frame 900 | **44** |
+| ... drew once and froze | **22** |
 | Blank | **10** (3 blank on real hardware too, so **7** are ours) |
 
 Three ROMs draw nothing on the reference emulator either -- verified on
@@ -32,7 +32,7 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | 3-D Tetris (USA) | 1024 | 895 | yes | yes | yes | yes | advancing | - |  |
 | Galactic Pinball (Japan, USA) (En) | 1024 | 109 | yes | yes | yes | wip | frozen | no | Renders since the inline-call-argument fix; world attributes now written, image still garbled |
 | Golf (USA) | 2048 | 505 | yes | yes | yes | wip | advancing | no | Past the warning and auto-pause screens to the Nintendo and T&E SOFT logos; later screens are striped garbage |
-| Insmouth no Yakata (Japan) | 1024 | 240 | yes | yes | yes | yes | frozen | - |  |
+| Insmouth no Yakata (Japan) | 1024 | 274 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): first-person corridor with HUD, level timer counting down, Start/A input only |
 | Jack Bros. (USA) | 1024 | 273 | yes | yes | - | no | blank | - |  |
 | Jack Bros. no Meiro de Hiihoo! (Japan) | 1024 | 262 | yes | yes | - | no | blank | - |  |
 | Mario Clash (Japan, USA) (En) | 1024 | 846 | yes | yes | yes | wip | advancing | no | Boots via the generic driver (no hand-written glue); programs VIP + world attributes, advancing frames |
@@ -43,8 +43,8 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Red Alarm (USA) | 1024 | 392 | yes | yes | yes | wip | advancing | no | Boots to title; wireframe framebuffer populated, pixel layout WIP; 3D scene does not animate |
 | SD Gundam - Dimension War (Japan) | 1024 | 335 | yes | yes | yes | yes | frozen | - |  |
 | Space Invaders - Virtual Collection (Japan) | 512 | 145 | yes | yes | yes | yes | frozen | - |  |
-| Space Squash (Japan) | 512 | 201 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only |
-| T&E Virtual Golf (Japan) | 2048 | 100 | yes | yes | yes | yes | advancing | - |  |
+| Space Squash (Japan) | 512 | 521 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): auto-pause prompt, GET READY, a scored rally, the continue screen, with Start/A input only |
+| T&E Virtual Golf (Japan) | 2048 | 495 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): on the course mid-hole, club select and swing meter, shots taken |
 | Teleroboxer (Japan, USA) (En) | 1024 | 757 | yes | yes | yes | yes | advancing | - |  |
 | Tobidase! Panibon (Japan) | 512 | 224 | yes | yes | yes | yes | frozen | - |  |
 | Vertical Force (Japan) | 1024 | 350 | yes | yes | yes | yes | advancing | - |  |
@@ -53,16 +53,16 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | Virtual Boy Wario Land (Japan, USA) (En) | 2048 | 3238 | yes | yes | yes | yes | frozen | - |  |
 | Virtual Fishing (Japan) | 1024 | 232 | yes | yes | yes | yes | frozen | - |  |
 | Virtual Lab (Japan) | 1024 | 327 | yes | yes | yes | yes | advancing | - |  |
-| Virtual League Baseball (USA) | 1024 | 1966 | yes | yes | yes | yes | advancing | - |  |
-| Virtual Pro Yakyuu '95 (Japan) | 1024 | 108 | yes | yes | yes | yes | advancing | - |  |
+| Virtual League Baseball (USA) | 1024 | 1998 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
+| Virtual Pro Yakyuu '95 (Japan) | 1024 | 421 | yes | yes | yes | yes | advancing | no | Reaches pitcher select and batting order (2026-10-21) |
 | V-Tetris (Japan) | 512 | 372 | yes | yes | yes | yes | frozen | - |  |
-| Waterworld (USA) | 2048 | 136 | yes | yes | yes | yes | advancing | - |  |
+| Waterworld (USA) | 2048 | 138 | yes | yes | yes | yes | advancing | - |  |
 
 ## Proto / Demo (3)
 
 | Game | KB | Funcs | Recompiles | Compiles | Boots | Renders | Motion | Playable | Notes |
 |------|----|-------|------------|----------|-------|---------|--------|----------|-------|
-| Bound High (Japan) (En) (Proto) | 2048 | 484 | yes | yes | yes | yes | advancing | - |  |
+| Bound High (Japan) (En) (Proto) | 2048 | 604 | yes | yes | yes | yes | advancing | wip | In game (2026-10-21): World 1 with score; still flips blank in some sessions |
 | Niko-chan Battle (Japan) (Proto) | 1024 | 407 | yes | yes | yes | yes | frozen | - |  |
 | Space Pinball (Japan) (En) (Proto) | 2048 | 103 | yes | yes | yes | yes | frozen | - |  |
 
@@ -81,8 +81,8 @@ See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) to reproduce it.
 | BLOX 2 (World) (En,Fr,De,Es,It,Sv,Fi,Cs,Sl) (Aftermarket) (Homebrew) | 2048 | 137 | yes | yes | yes | yes | frozen | - |  |
 | Capitan Sevilla 2 (World) (Es) (Aftermarket) (Homebrew) | 1024 | 55 | yes | yes | yes | yes | advancing | - |  |
 | Capitan Sevilla 3D (World) (En,De,Es) (Demo) (Aftermarket) (Homebrew) | 2048 | 775 | yes | yes | - | no | blank | - |  |
-| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 102 | yes | yes | yes | yes | advancing | - |  |
-| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 102 | yes | yes | yes | yes | advancing | - |  |
+| Elevated Speed (World) (High Resolution Version) (Aftermarket) (Homebrew) | 4096 | 100 | yes | yes | yes | yes | advancing | - |  |
+| Elevated Speed (World) (Low Resolution Version) (Aftermarket) (Homebrew) | 2048 | 100 | yes | yes | yes | yes | advancing | - |  |
 | Fishbone (World) (Aftermarket) (Homebrew) | 2048 | 522 | yes | yes | yes | yes | frozen | - |  |
 | Fishbone (World) (Demo 1) (Aftermarket) (Homebrew) | 2048 | 48 | yes | yes | yes | yes | advancing | - |  |
 | Fishbone (World) (Demo 2) (Aftermarket) (Homebrew) | 2048 | 111 | yes | yes | yes | yes | advancing | - |  |

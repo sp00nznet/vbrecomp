@@ -57,7 +57,10 @@ $env:PATH = (Split-Path $SDL2Dll) + ";" + $env:PATH
 
 $known = @{}
 foreach ($l in Get-Content $hints) {
-    if ($l -match '^\s*entry\s+([0-9A-Fa-f]{8})') { $known[$matches[1].ToUpper()] = $true }
+    # A commented-out entry ("# entry X: removed, ...") was dropped on purpose
+    # because it broke the game; counting it as known stops a later run from
+    # harvesting it straight back (Galactic Pinball's 07F000AC did exactly that).
+    if ($l -match '^\s*#?\s*entry\s+([0-9A-Fa-f]{8})') { $known[$matches[1].ToUpper()] = $true }
 }
 
 for ($round = 1; $round -le $Rounds; $round++) {
@@ -94,6 +97,11 @@ for ($round = 1; $round -le $Rounds; $round++) {
     foreach ($m in ($lines | Select-String "^\s+sub_([0-9A-F]{8}) x(\d+)")) {
         if ($m -match "sub_([0-9A-F]{8}) x(\d+)") {
             $a = $matches[1].ToUpper()
+            # Only cartridge ROM (0x07xxxxxx) at an instruction boundary can be
+            # recompiled. Targets in WRAM, low memory or odd addresses (Elevated
+            # Speed's 05001AB8, Space Squash's 20204452) are a symptom of a
+            # wrong jump somewhere else, and as entries they are only noise.
+            if ($a -notmatch '^07[0-9A-F]{5}[02468ACE]$') { continue }
             if (-not $known.ContainsKey($a)) { $known[$a] = $true; $new += $a }
         }
     }

@@ -1,0 +1,28 @@
+# Profile-guided entry points for Virtual League Baseball (USA).
+# Addresses the game jumps to at run time, harvested by scripts/discover.ps1
+# from the runtime's unimplemented-call counter. Regenerate with --hints.
+entry 07F0017A
+entry 07F01AFE
+entry 07F00D6E
+entry 07F00288
+entry 07FB6A04
+entry 07F002F8
+entry 07FB6A08
+entry 07FB5170
+entry 07F027AA
+entry 07F00C70
+entry 07FB6BE4
+entry 07FC798A
+entry 07FB8C36
+entry 07FB6C02
+entry 07FCF30E
+entry 07FCDB04
+entry 07F002D0
+entry 07FB8C7A
+entry 07FB8C80
+entry 07FB8CA2
+entry 07FB5174
+entry 07FB6C2E
+entry 07FB975C
+entry 07FB90C2
+entry 07FB90BC
